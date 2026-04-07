@@ -80,6 +80,7 @@ In plain English:
 If you are a coding agent or are onboarding quickly, start with:
 
 - [`AGENTS.md`](./AGENTS.md) — bootstrap guide for repo orientation, doc reading order, architecture hotspots, and working conventions
+- [`docs/DEVELOPMENT_CONSTRAINTS.md`](./docs/DEVELOPMENT_CONSTRAINTS.md) — pinned Node/npm versions, `npm ci`, required checks, and the concrete run/build expectations for local development
 
 ## Planning docs
 
