@@ -8,15 +8,17 @@ import { GatewayClient } from "./lib/gateway.ts";
 import { extractImages, extractText, isToolMessage } from "./lib/message-extract.ts";
 import {
   type AgentsListResult,
+  type Attachment,
   type ChatMessage,
   type ChatHistoryResult,
+  type ConnectionState,
+  type GatewayConfig,
   type GatewaySessionRow,
   type ModelsListResult,
   type SessionPreviewItem,
   type SessionsListResult,
   type SessionsPreviewResult,
   type ToolItem,
-  type Attachment,
 } from "./lib/types.ts";
 import { generateUUID } from "./lib/uuid.ts";
 import { formatBytes, formatCompactTokens, slugify } from "./lib/format.ts";
@@ -3441,15 +3443,27 @@ function toChatMessageSafe(raw: unknown, fallbackTimestamp?: number): ChatMessag
 }
 
 export default function App() {
-  const [gatewayUrl, setGatewayUrl] = useState(
-    loadStored(STORAGE_KEYS.gatewayUrl, DEFAULT_GATEWAY_URL),
-  );
-  const [token, setToken] = useState(loadStored(STORAGE_KEYS.token, ""));
-  const [password, setPassword] = useState("");
+  const [gatewayConfig, setGatewayConfig] = useState<GatewayConfig>({
+    gatewayUrl: loadStored(STORAGE_KEYS.gatewayUrl, DEFAULT_GATEWAY_URL),
+    token: loadStored(STORAGE_KEYS.token, ""),
+    password: "",
+  });
+  const { gatewayUrl, token, password } = gatewayConfig;
+  const setGatewayUrl = useCallback((value: string) => {
+    setGatewayConfig((prev) => ({ ...prev, gatewayUrl: value }));
+  }, []);
+  const setToken = useCallback((value: string) => {
+    setGatewayConfig((prev) => ({ ...prev, token: value }));
+  }, []);
+  const setPassword = useCallback((value: string) => {
+    setGatewayConfig((prev) => ({ ...prev, password: value }));
+  }, []);
   const [fsServerUrl, setFsServerUrl] = useState(loadStored(STORAGE_KEYS.fsServerUrl, ""));
-  const [connected, setConnected] = useState(false);
-  const [connectionNote, setConnectionNote] = useState<string | null>(null);
-  const [pairingRequired, setPairingRequired] = useState(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>({
+    status: "connecting",
+    reason: null,
+    note: null,
+  });
   const [sessions, setSessions] = useState<GatewaySessionRow[]>([]);
   const [sessionPreviews, setSessionPreviews] = useState<Record<string, SessionPreviewItem[]>>({});
   const [allSessionRows, setAllSessionRows] = useState<Record<string, GatewaySessionRow>>({});
@@ -4588,9 +4602,11 @@ export default function App() {
       clientName: "clawui",
       mode: "ui",
       onHello: (hello) => {
-        setConnected(true);
-        setConnectionNote(null);
-        setPairingRequired(false);
+        setConnectionState({
+          status: "connected",
+          reason: null,
+          note: null,
+        });
         gatewayMethodsRef.current = new Set(
           Array.isArray(hello.features?.methods)
             ? hello.features.methods.filter((item): item is string => typeof item === "string")
@@ -4610,22 +4626,26 @@ export default function App() {
         void refreshSessions(client);
       },
       onClose: (info) => {
-        setConnected(false);
         gatewayMethodsRef.current.clear();
         const reason = info.reason?.trim() ?? "";
         if (reason.toLowerCase().includes("pairing")) {
-          setPairingRequired(true);
-          setConnectionNote("Pairing required. Approve this device in the gateway.");
+          setConnectionState({
+            status: "pairing-required",
+            reason,
+            note: "Pairing required. Approve this device in the gateway.",
+          });
         } else {
           const hint =
             !reason && info.code === 1006
               ? "Handshake failed. Check Gateway URL/path or Origin allowlist."
               : "";
-          setConnectionNote(
-            reason
+          setConnectionState({
+            status: reason ? "error" : "disconnected",
+            reason: reason || null,
+            note: reason
               ? `Disconnected (${info.code}): ${reason}`
               : `Disconnected (${info.code}). ${hint}`.trim(),
-          );
+          });
         }
       },
       onEvent: (evt) => {
@@ -4979,7 +4999,10 @@ export default function App() {
       // Refresh once more so the pinned-main ordering uses the resolved default agent/main key.
       void refreshSessions(client);
     } catch (err) {
-      setConnectionNote(String(err));
+      setConnectionState((prev) => ({
+        ...prev,
+        note: String(err),
+      }));
     }
   }
 
@@ -5159,7 +5182,10 @@ export default function App() {
       );
     } catch (err) {
       loadingMoreSessionsRef.current = false;
-      setConnectionNote(String(err));
+      setConnectionState((prev) => ({
+        ...prev,
+        note: String(err),
+      }));
     }
   }
 
@@ -5264,7 +5290,10 @@ export default function App() {
       if (selectedSessionRef.current !== key) {
         return;
       }
-      setConnectionNote(String(err));
+      setConnectionState((prev) => ({
+        ...prev,
+        note: String(err),
+      }));
     } finally {
       historyLoadInFlightRef.current.delete(key);
       if (selectedSessionRef.current === key) {
@@ -6554,6 +6583,7 @@ export default function App() {
     }
   }
 
+  const connected = connectionState.status === "connected";
   const protocolWarning =
     typeof window !== "undefined" &&
       window.location.protocol === "https:" &&
@@ -6561,9 +6591,9 @@ export default function App() {
       ? "This page is HTTPS. Use wss:// for the Gateway WebSocket."
       : null;
 
-  const disabledReason = pairingRequired
+  const disabledReason = connectionState.status === "pairing-required"
     ? "Pairing required. Approve this device with openclaw devices approve."
-    : [protocolWarning, connectionNote].filter(Boolean).join(" ");
+    : [protocolWarning, connectionState.note].filter(Boolean).join(" ");
 
   return (
     <FileManagerProvider>
