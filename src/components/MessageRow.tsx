@@ -870,7 +870,7 @@ function handleMarkdownClick(e: React.MouseEvent<HTMLDivElement>) {
   }
 }
 
-function CopyButton({ text }: { text: string }) {
+export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<number | null>(null);
   useEffect(

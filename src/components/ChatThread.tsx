@@ -1,6 +1,6 @@
 import React from "react";
-import type { ChatMessage, ToolItem } from "../lib/types.ts";
-import { MessageRow } from "./MessageRow.tsx";
+import type { Attachment, ChatMessage, ToolItem } from "../lib/types.ts";
+import { CopyButton, MessageRow } from "./MessageRow.tsx";
 
 export type ChatThreadProps = {
   sessionKey: string | null;
@@ -16,7 +16,7 @@ export type ChatThreadProps = {
   timestampFontSize: number;
   toolBeforeFirst: ToolItem[];
   toolByMessageId: Map<string, ToolItem[]>;
-  streamText: string;
+  streamText: string | null;
   streamMarkdownHtml: string;
   thinking: boolean;
   streamPopActive: boolean;
@@ -24,8 +24,8 @@ export type ChatThreadProps = {
   streamMotionStyle?: React.CSSProperties;
   poppingMessageIdSet: Set<string>;
   sessionFlyInMessageIdSet: Set<string>;
-  onOpenImage: (payload: { src: string; alt?: string; localHint?: string | null }) => void;
-  onResolveRemoteImage?: ((src: string) => Promise<string | null>) | undefined;
+  onOpenImage: (attachment: Attachment) => void;
+  onResolveRemoteImage?: ((filePath: string) => Promise<string | null>) | undefined;
   onRenderToolPanel: (items: ToolItem[], keyPrefix: string, opts?: { snapshot?: boolean }) => React.ReactNode;
   onHandleMarkdownClick: React.MouseEventHandler<HTMLElement>;
 };
@@ -98,6 +98,7 @@ export function ChatThread(props: ChatThreadProps) {
           style={props.streamMotionStyle}
         >
           <article className="message-bubble assistant stream-bubble">
+            <CopyButton text={props.streamText || ""} />
             <div className="message-role">Assistant</div>
             <div
               className="markdown"
