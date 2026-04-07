@@ -22,7 +22,6 @@ It captures:
 - `docs/PHASE-1-TICKETS.md` implementation findings for:
   - Ticket `1.1.1` — connection-state ownership audit
   - Ticket `1.1.2` — first explicit connection-state boundary
-- `AGENTS.md` in the repo root for future agent bootstrap/orientation
 
 ### Changed
 - Updated `README.md` to point to `AGENTS.md`
