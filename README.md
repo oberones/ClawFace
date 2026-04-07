@@ -84,10 +84,10 @@ If you are a coding agent or are onboarding quickly, start with:
 
 The repo now includes project-planning docs to guide the modernization effort:
 
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — architecture inventory and refactor plan
-- [`PRODUCT-BRIEF.md`](./PRODUCT-BRIEF.md) — product vision, principles, and differentiators
-- [`MILESTONE-1.md`](./MILESTONE-1.md) — first serious milestone definition
-- [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) — phased roadmap with vertical slices
+- [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — architecture inventory and refactor plan
+- [`PRODUCT-BRIEF.md`](./docs/PRODUCT-BRIEF.md) — product vision, principles, and differentiators
+- [`MILESTONE-1.md`](./docs/MILESTONE-1.md) — first serious milestone definition
+- [`IMPLEMENTATION-ROADMAP.md`](./docs/IMPLEMENTATION-ROADMAP.md) — phased roadmap with vertical slices
 
 If you are working on the app, start with those docs before making major architectural changes.
 
