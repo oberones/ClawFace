@@ -589,6 +589,90 @@ A cleaner session-state boundary.
 - session switching logic is less implicit
 - selected session is not being re-derived in multiple fragile ways
 
+### Implementation notes (2026-04-07)
+
+This ticket has now been completed as a first-pass session-domain boundary introduction in `src/app.tsx` and `src/lib/types.ts`.
+
+#### Added types
+In `src/lib/types.ts`:
+- `SessionTransitionState`
+- `SessionState`
+
+Current first-pass session model:
+- `selectedSessionKey`
+- `sessions`
+- `isCurrentSessionLoading`
+- `transitionState`
+
+#### Structural change made
+Previous top-level ownership was spread across independent state values such as:
+- `sessions`
+- `selectedSessionKey`
+- assorted logic using `selectedSessionRef`
+- implicit loading/transition behavior
+
+A first explicit boundary now exists via:
+- `sessionState`
+
+with scoped update helpers for:
+- `setSessions(...)`
+- `setSelectedSessionKey(...)`
+- `setIsCurrentSessionLoading(...)`
+- `setSessionTransitionState(...)`
+
+#### What this boundary now owns explicitly
+The new `sessionState` object owns:
+- selected session key
+- session list data
+- current-session loading state
+- coarse transition state (`idle` / `switching`)
+
+This is not yet a separate external store module, but it is a real ownership improvement over the previous loose arrangement.
+
+#### Additional behavior improvements landed as part of the ticket
+
+##### 1. History loading now updates `isCurrentSessionLoading`
+When `loadHistory(...)` is invoked for the currently selected session, the app now:
+- sets `isCurrentSessionLoading = true` before work starts
+- sets `isCurrentSessionLoading = false` in the matching completion path
+
+This gives the session boundary a real loading signal instead of leaving session-loading state entirely implicit.
+
+##### 2. Session switch intent now updates `transitionState`
+`handleSelectSession(...)` now sets:
+- `transitionState = "switching"` when moving from one session to another
+- `transitionState = "idle"` when no real switch occurred
+
+And successful active-session history application resets:
+- `transitionState = "idle"`
+
+This is intentionally coarse, but it makes session switching more explicit than before.
+
+#### What this ticket accomplished
+- introduced a first explicit session-domain object
+- made selected-session/session-list ownership less scattered
+- gave the shell explicit current-session loading state
+- gave the shell an explicit coarse transition-state model
+- created a better base for the next ticket (`1.1.6`) without forcing a full state-management rewrite
+
+#### What this ticket does *not* solve yet
+
+##### 1. `selectedSessionRef` still exists and is still important
+This is expected for now.
+Async/event-driven code still depends on imperative current-session access.
+The point of this ticket was not to remove every ref immediately, but to reduce loose ownership.
+
+##### 2. `currentSession` is still derived in `app.tsx`
+The ticket did not yet extract a dedicated selector/store module.
+That can come later if the session domain grows further.
+
+##### 3. `ChatView` still owns its own session-transition internals
+This ticket only introduced a coarse shell-level transition signal.
+A deeper cleanup still belongs to later thread/session work.
+
+#### Recommended next step
+Ticket `1.1.6` should now use the new `isCurrentSessionLoading` and `transitionState` signals to make session-switch behavior in the shell and thread feel more intentional and less fragile.
+
 ---
 
 ## Ticket 1.1.6 — Improve session-switch consistency in the UI shell
