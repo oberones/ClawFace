@@ -4639,12 +4639,16 @@ export default function App() {
             !reason && info.code === 1006
               ? "Handshake failed. Check Gateway URL/path or Origin allowlist."
               : "";
-          setConnectionState({
-            status: reason ? "error" : "disconnected",
-            reason: reason || null,
-            note: reason
+          const nextStatus = !client.isClosed && info.code !== 1000 ? "connecting" : reason ? "error" : "disconnected";
+          const note = nextStatus === "connecting"
+            ? "Connection lost. Reconnecting…"
+            : reason
               ? `Disconnected (${info.code}): ${reason}`
-              : `Disconnected (${info.code}). ${hint}`.trim(),
+              : `Disconnected (${info.code}). ${hint}`.trim();
+          setConnectionState({
+            status: nextStatus,
+            reason: reason || null,
+            note,
           });
         }
       },
@@ -6658,6 +6662,7 @@ export default function App() {
             onAbort={() => void handleSlashCommand("/abort")}
             canAbort={Boolean(chatRunId)}
             connected={connected}
+            connectionStatus={connectionState.status}
             disabledReason={disabledReason}
             sessionInfo={sessionInfo}
             models={models}

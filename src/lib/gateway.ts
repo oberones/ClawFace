@@ -130,6 +130,10 @@ export class GatewayClient {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
+  get isClosed() {
+    return this.closed;
+  }
+
   updateAuth(params: { token?: string; password?: string }) {
     this.opts.token = params.token;
     this.opts.password = params.password;

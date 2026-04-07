@@ -8,6 +8,38 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## [0.0.3] - 2026-04-07
+
+### Summary
+This release records the next Phase 1 shell-stabilization increment after the initial connection-state boundary work.
+
+It captures:
+- completion of Ticket `1.1.3`
+- richer user-facing connection lifecycle UX
+- improved signaling for reconnecting, pairing-required, error, and disconnected states
+
+### Added
+- `docs/PHASE-1-TICKETS.md` implementation notes for Ticket `1.1.3` — reconnect and disconnected-state UX stabilization
+
+### Changed
+- Updated `src/components/ChatView.tsx` so the chat shell can render a richer connection lifecycle via `connectionStatus`
+- Improved topbar connection messaging to distinguish:
+  - connected
+  - connecting
+  - pairing-required
+  - connection error
+  - disconnected
+- Improved composer warning messaging so non-happy-path connection states are more legible and less generic
+- Updated `src/app.tsx` so reconnect-oriented close cases can surface an explicit `connecting` state instead of collapsing immediately into a generic disconnected state
+- Continued the Phase 1 move away from a binary connection UX toward a lifecycle-aware shell state
+
+### Notes
+- This is still a pre-release modernization phase, not a product milestone release
+- Reconnect state is still inferred at the app/UI boundary and not yet modeled in a dedicated store module
+- `connected` is still passed alongside `connectionStatus` during the transition to richer shell state handling
+
+---
+
 ## [0.0.2] - 2026-04-07
 
 ### Summary
