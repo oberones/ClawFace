@@ -117,6 +117,23 @@ Current stack includes:
 
 This remains a reasonable baseline for the product.
 
+## Common development commands
+
+A `Makefile` is available for common local tasks.
+
+Examples:
+
+```bash
+make help
+make install
+make dev
+make build
+make typecheck
+make verify
+```
+
+The Makefile wraps the commands that are actually present in the repo today, plus a small number of sensible extras like `typecheck` and `clean`.
+
 ## Development status and expectations
 
 This repo is under active repositioning and architectural cleanup.
