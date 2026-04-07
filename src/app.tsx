@@ -6697,6 +6697,8 @@ export default function App() {
             uiSettings={uiSettings}
             canLoadOlder={canLoadMoreHistory}
             loadingOlder={loadingOlderHistory}
+            isCurrentSessionLoading={isCurrentSessionLoading}
+            sessionTransitionState={transitionState}
             onLoadOlder={() => void handleLoadOlderHistory()}
             onModelSelect={(model) => void handleSelectModel(model)}
             onThinkingSelect={(level) => void handleSelectThinking(level)}
