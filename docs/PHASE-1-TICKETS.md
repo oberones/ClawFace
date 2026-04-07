@@ -1189,6 +1189,63 @@ A clearer per-message rendering layer.
 ### Done when
 - message rendering logic is no longer mostly embedded in one giant parent
 
+### Implementation notes (2026-04-07)
+
+This ticket has now been completed as a dedicated message-rendering extraction.
+
+#### New module added
+- `src/components/MessageRow.tsx`
+
+#### What moved into `MessageRow.tsx`
+The extracted module now owns:
+- `MessageRow`
+- `MessageRowProps`
+- `CopyButton`
+- message timestamp formatting helpers used by the row
+- render-time attachment helpers
+- `MessageImageAttachment`
+- markdown click/copy behavior used by message content
+- local/desktop image resolution helper cluster needed by image attachments
+
+This means the message-level rendering system is no longer primarily embedded in `ChatView.tsx`.
+
+#### What changed structurally
+Before this ticket:
+- `ChatThread.tsx` had to import `MessageRow` back from `ChatView.tsx`
+- `ChatView.tsx` still owned both thread-level and message-level rendering logic
+
+After this ticket:
+- `ChatThread.tsx` imports `MessageRow` from `./MessageRow.tsx`
+- `ChatView.tsx` imports `MessageRow` from the same dedicated module when needed
+- the thread layer and message row layer now have a cleaner separation
+
+#### Why the extraction included more than just `MessageRow`
+A shallow move would not have been honest or clean because `MessageRow` depended on a meaningful cluster of rendering helpers and subcomponents already embedded in `ChatView.tsx`.
+
+Instead of pretending this was a tiny extraction, the ticket moved the render-time dependency cluster that actually belonged with the row-level rendering system.
+
+That was the right move because it:
+- avoids a fake extraction with back-references to `ChatView.tsx`
+- creates a real render-layer seam
+- makes subsequent thread/component cleanup easier
+
+#### What this ticket accomplished
+- established a dedicated message-rendering module
+- removed the `ChatThread -> ChatView` dependency introduced during the previous ticket
+- reduced `ChatView.tsx` responsibility density further
+- clarified the boundary between:
+  - thread orchestration/rendering
+  - per-message rendering
+
+#### Remaining caveat
+The extracted message-rendering module still includes a substantial amount of media/local-image handling logic.
+That is acceptable for now because this ticket’s purpose was to separate message-level rendering from the giant parent component.
+
+A later platform/media extraction should further improve that boundary.
+
+#### Recommended next step
+Proceed to `1.2.4` (`useAutoScroll`) or begin the composer-focused cleanup in `1.3.1`, depending on whether the next priority is further thread simplification or input-surface cleanup.
+
 ---
 
 ## Ticket 1.2.4 — Extract and stabilize `useAutoScroll`

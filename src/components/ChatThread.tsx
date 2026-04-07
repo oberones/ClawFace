@@ -1,6 +1,6 @@
 import React from "react";
 import type { ChatMessage, ToolItem } from "../lib/types.ts";
-import { MessageRow } from "./ChatView.tsx";
+import { MessageRow } from "./MessageRow.tsx";
 
 export type ChatThreadProps = {
   sessionKey: string | null;
