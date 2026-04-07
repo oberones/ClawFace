@@ -56,10 +56,13 @@ A short map of current connection-state ownership and pain points.
 
 ### Audit findings (2026-04-07)
 
-#### Primary ownership today
-Connection state is currently owned at the top of `src/app.tsx`.
+#### Primary ownership before 1.1.2 (pre-implementation baseline)
+Connection state was owned at the top of `src/app.tsx` using a loose set of individual state variables.
 
-Observed primary state:
+> **Note:** The following reflects the state of the codebase *before* ticket 1.1.2 was implemented.
+> See the 1.1.2 implementation notes below for the model that replaced this.
+
+Observed primary state at audit time:
 - `gatewayUrl` — `useState(...)` in `src/app.tsx`
 - `token` — `useState(...)` in `src/app.tsx`
 - `password` — `useState(...)` in `src/app.tsx`
@@ -67,21 +70,21 @@ Observed primary state:
 - `connectionNote` — `useState<string | null>(null)` in `src/app.tsx`
 - `clientRef` — `useRef<GatewayClient | null>(null)` in `src/app.tsx`
 
-This makes `app.tsx` the current connection-state source of truth, but only in a coarse and fairly UI-coupled way.
+This made `app.tsx` the connection-state source of truth, but only in a coarse and fairly UI-coupled way.
 
-#### Gateway lifecycle touchpoints
-The main gateway lifecycle is created in `src/app.tsx` via:
+#### Gateway lifecycle touchpoints (pre-1.1.2 baseline)
+The main gateway lifecycle was created in `src/app.tsx` via:
 - `new GatewayClient({ url: gatewayUrl, token, password, ... })`
 
 Within that lifecycle:
-- successful connect path sets `connected = true`
-- disconnect/error path sets `connected = false`
-- disconnect/error path also sets `connectionNote`
-- special pairing-required handling also sets `connectionNote`
+- successful connect path set `connected = true`
+- disconnect/error path set `connected = false`
+- disconnect/error path also set `connectionNote`
+- special pairing-required handling also set `connectionNote`
 
-The actual transport behavior lives in `src/lib/gateway.ts`, but the app-level interpretation of connection state currently lives in `app.tsx`.
+The actual transport behavior lives in `src/lib/gateway.ts`, but the app-level interpretation of connection state lived in `app.tsx`.
 
-#### Transport/domain boundary today
+#### Transport/domain boundary (pre-1.1.2 baseline)
 `src/lib/gateway.ts` exposes:
 - `GatewayClient`
 - internal websocket lifecycle
@@ -89,13 +92,13 @@ The actual transport behavior lives in `src/lib/gateway.ts`, but the app-level i
 - auth mutation/update behavior
 - request/event transport behavior
 
-But the renderer does **not** appear to consume a normalized connection domain model.
-Instead, `app.tsx` translates transport events directly into a small UI-facing state pair:
+But the renderer did **not** consume a normalized connection domain model.
+Instead, `app.tsx` translated transport events directly into a small UI-facing state pair:
 - `connected`
 - `connectionNote`
 
-This is usable, but thin.
-It does not yet model richer app-level connection states such as:
+This was usable, but thin.
+It did not model richer app-level connection states such as:
 - connecting
 - reconnecting
 - disconnected
