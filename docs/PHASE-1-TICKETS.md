@@ -795,6 +795,296 @@ A decomposition plan for `ChatView.tsx`.
 ### Done when
 - the first extraction targets are explicit and ordered
 
+### Responsibility map (2026-04-07)
+
+`src/components/ChatView.tsx` is currently acting as a large multi-system surface rather than a narrowly scoped view component.
+
+The file contains at least the following major responsibility clusters.
+
+#### 1. Thread/message rendering system
+Responsibilities include:
+- rendering the main thread
+- rendering snapshot/outgoing thread overlays during session transitions
+- rendering message rows and markdown content
+- rendering history hints / empty states / thinking state / stream state
+- rendering tool panels before/after messages
+
+Key signals of this cluster:
+- `displayedMessages`
+- `toolTimeline`
+- `MessageRow`
+- main-thread and outgoing-thread JSX blocks
+
+#### 2. Attachment/media rendering and local-image resolution
+Responsibilities include:
+- path normalization helpers
+- data URL normalization
+- image-source candidate extraction
+- desktop-local image URL mapping
+- remote/local image fallback logic
+- attachment opening behavior
+- lightbox image failure recovery
+
+Key signals of this cluster:
+- `MessageImageAttachment`
+- many file/url/path helper functions near the top of the file
+- `onResolveRemoteImage`
+- desktop runtime checks and local-image scheme handling
+
+This is a major smell because it mixes platform/media concerns directly into the chat surface.
+
+#### 3. Composer/input interaction system
+Responsibilities include:
+- draft editing
+- command suggestion state
+- active command selection
+- send behavior
+- auto-resize behavior
+- compose-state refs
+- disabled/warning messaging
+- model/thinking menus colocated with composition
+
+Key signals:
+- `activeCommand`
+- `composerTextareaRef`
+- `autoResizeComposer`
+- `sendWithPhysics`
+- command suggestion memo/state
+
+This is one of the clearest extraction candidates.
+
+#### 4. Streaming and tool-activity presentation
+Responsibilities include:
+- stream markdown rendering
+- stream bubble animation state
+- tool activity panel rendering
+- tool expand/collapse state
+- tool panel fly-in/popping behavior
+
+Key signals:
+- `streamMarkdownHtml`
+- `streamPopActive`
+- `toolExpanded`
+- `renderToolPanel(...)`
+- `poppingToolIds`
+- `sessionFlyInToolIds`
+
+This is product-critical because OpenClaw-native UX depends on tool visibility, but it should not remain fused to the entire chat shell.
+
+#### 5. Session-switch choreography / animation system
+Responsibilities include:
+- session transition phases (`idle`, `out`, `preparing`, `in`)
+- outgoing thread snapshots
+- session switch timers/refs
+- session fly-in marks for messages/tools/stream
+- layout timing and pre-paint transition handling
+
+Key signals:
+- `sessionTransitionPhase`
+- `outgoingThreadSnapshot`
+- `prevSessionKeyRef`
+- `prevSessionKeyForLayoutRef`
+- `snapshotSessionKeyRef`
+- `useLayoutEffect(...)` for session switch prep
+- multiple timer refs and RAF refs
+
+This is one of the riskiest clusters in the file. It is too intertwined to extract first without care.
+
+#### 6. Scroll and viewport behavior
+Responsibilities include:
+- auto-scroll enable/disable
+- scroll restoration while loading history
+- older-history loading trigger behavior
+- message jump behavior
+
+Key signals:
+- `autoScrollEnabled`
+- `scrollRef`
+- `restoreScrollRef`
+- `olderLoadRequestedRef`
+- `scrollToMessage(...)`
+
+This is a good candidate for dedicated hook extraction after thread boundaries are clarified.
+
+#### 7. Overlay / lightbox / portal behavior
+Responsibilities include:
+- image lightbox state
+- portal rendering
+- local image retry/failure handling in overlay
+- click-close and interaction management
+
+Key signals:
+- `imageLightbox`
+- `createPortal`
+- `onLightboxImageError`
+
+This can likely become a separable component once media logic is better isolated.
+
+#### 8. Shell/status/control presentation
+Responsibilities include:
+- topbar connection status
+- session info strip
+- model menu / thinking menu
+- shell controls like settings/files/new-session/compact
+- composer warning banners
+
+This is currently mixed into the same giant rendering surface instead of being clearly separated as shell/header controls.
+
+---
+
+### Low-risk extraction targets
+These are the best first candidates because they provide meaningful cleanup without forcing a redesign of the hardest transition logic immediately.
+
+#### A. `Composer`
+Why low risk:
+- already conceptually separate
+- strong user-facing value
+- large amount of isolated input/command/menu logic lives here
+
+Suggested extraction scope:
+- textarea/input surface
+- send button / abort button
+- slash-command suggestion UI
+- model/thinking controls adjacent to composer if desired for now
+- attachment staging area if tightly coupled
+
+#### B. `ChatThread` / `MessageList`
+Why low risk:
+- the file already has a clear thread-rendering block
+- this would shrink `ChatView` substantially
+
+Suggested extraction scope:
+- history hint
+- empty state
+- message list iteration
+- stream/thinking placeholders
+- tool panels around messages
+
+#### C. `AttachmentTray` / attachment staging UI
+Why low risk:
+- a conceptually distinct sub-surface
+- likely can be isolated from the main shell with limited disruption
+
+#### D. `useAutoScroll` / scroll-state hook
+Why medium-low risk:
+- behavior is important, but it is already one coherent concern
+- extracting it behind a hook would simplify the main component substantially
+
+---
+
+### Medium-risk extraction targets
+These are good follow-ups after the low-risk extractions establish better boundaries.
+
+#### A. `ToolTimeline` / `ToolActivityPanel`
+Why medium risk:
+- important product differentiator
+- coupled to message/thread rendering and animations
+- should be split, but carefully
+
+#### B. `SessionHeader` / shell controls block
+Why medium risk:
+- not conceptually hard
+- but currently mixed with runtime controls and topbar state
+
+#### C. `ImageLightbox`
+Why medium risk:
+- conceptually self-contained
+- but current local-image fallback behavior may keep it tied to media-resolution logic until that is cleaned up
+
+---
+
+### High-risk / defer-for-now clusters
+These should probably not be the first extractions.
+
+#### A. Session-transition choreography
+This includes:
+- outgoing snapshots
+- transition phases
+- session fly-in logic
+- timer/RAF coordination
+- pre-paint layout work
+
+Why high risk:
+- lots of hidden coupling
+- likely to regress UX if extracted blindly
+
+Recommended approach:
+- isolate responsibilities conceptually first
+- extract easier adjacent pieces before attempting deeper session-transition surgery
+
+#### B. Desktop media resolution inside `MessageImageAttachment`
+Why high risk:
+- tied to local files, custom schemes, desktop bridge behavior, and remote fallback behavior
+- worth extracting to a platform/media layer, but not casually
+
+Recommended approach:
+- first define a renderer-side `platform/images` abstraction
+- then move the logic behind that boundary
+
+---
+
+### Dependency map between clusters
+
+#### Thread rendering depends on:
+- tool activity rendering
+- stream state
+- scroll behavior
+- session-transition state
+
+#### Composer depends on:
+- connection status / disabled reason
+- attachment staging state
+- slash-command logic
+- model/thinking selection hooks
+
+#### Media rendering depends on:
+- runtime/platform detection
+- local/remote image resolution
+- attachment model shape
+- lightbox behavior
+
+#### Session-transition choreography depends on:
+- thread snapshots
+- message/tool lists
+- animation timing
+- selected session changes from the shell
+
+This is why `ChatView` is difficult to refactor all at once: its concerns are not only numerous, they are interdependent.
+
+---
+
+### Recommended extraction order
+
+#### First wave
+1. `Composer`
+2. `ChatThread` / `MessageList`
+3. `useAutoScroll`
+
+#### Second wave
+4. `AttachmentTray`
+5. `ToolTimeline` / `ToolActivityPanel`
+6. `SessionHeader` / topbar shell controls
+
+#### Later wave
+7. `ImageLightbox`
+8. media/platform abstraction for local image handling
+9. session-transition choreography cleanup
+
+---
+
+### Conclusion
+The main lesson from this ticket is:
+
+> `ChatView.tsx` is not one component with a few helper concerns — it is the current convergence point for multiple subsystems.
+
+That means the next refactors should prioritize:
+- low-risk extractions with clear conceptual boundaries
+- reducing cross-concern density
+- avoiding a first move that tries to untangle the hardest animation/transition logic immediately
+
+### Recommended next step
+Ticket `1.2.2` should start with the low-risk thread rendering extraction (`ChatThread` / `MessageList`) or `1.3.1` can begin with composer extraction if we want a more interaction-centric first split.
+
 ---
 
 ## Ticket 1.2.2 — Extract `ChatThread` / `MessageList` rendering surface
