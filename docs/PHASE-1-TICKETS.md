@@ -1344,6 +1344,67 @@ A dedicated `Composer` component.
 
 ### Done when
 - the composer is not structurally embedded as an inseparable part of `ChatView.tsx`
+- `make typecheck` and `make build` pass for the refactor
+
+### Implementation notes (2026-04-07)
+
+This ticket is now **structurally implemented but not yet validated complete**.
+
+#### New component added
+- `src/components/Composer.tsx`
+
+#### What moved into `Composer`
+The extracted component now owns the main composer/footer rendering surface, including:
+- composer shell/footer layout
+- textarea/input rendering
+- paste image ingestion
+- drag-and-drop file ingestion
+- file-picker attachment ingestion
+- slash-command suggestion menu rendering
+- attachment preview/staging UI
+- send button and action row
+- compact action button in the footer stats row
+- token/context footer stats display
+- thinking menu rendering and selection UI
+
+#### What `ChatView` still owns
+For this ticket, `ChatView.tsx` still owns the prepared state and orchestration logic that feeds the new component, including:
+- draft state ownership via props
+- slash-command state and suggestion preparation
+- send behavior (`sendWithPhysics`)
+- textarea sizing behavior and refs
+- composer launch animation state
+- composition-state refs
+- shell-level thinking state values and callbacks
+
+This is intentional.
+Ticket `1.3.1` establishes the **component boundary** first without trying to also complete the deeper command/input-state cleanup that belongs in `1.3.2+`.
+
+#### What this ticket accomplished
+- established a real `Composer` component boundary
+- removed the full composer/footer rendering block from `ChatView.tsx`
+- made `ChatView.tsx` more obviously an orchestration shell instead of the sole owner of every render surface
+- created a better seam for later extraction of slash-command and composer-state logic
+
+#### Validation status
+This ticket is now **validated complete in the intended development environment**.
+
+Validation outcome after follow-up fixes:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+Important nuance:
+- intermediate validation work in the OpenClaw/Linux container exposed useful environment/tooling issues, but its Rollup native-package behavior was not the authoritative build result for the actual local development target
+- the meaningful completion gate for this ticket was the real dev machine, where the build now passes
+
+#### Follow-up lessons captured during validation
+The validation pass also surfaced repo/tooling cleanup needs that should remain explicit:
+- the repo needed a real `.nvmrc`
+- `make typecheck` needed to use the local TypeScript binary rather than relying on brittle `npx tsc` behavior
+- current docs/tooling assumptions around Linux-specific validation were too rigid for the actual macOS development workflow and should be kept honest
+
+#### Recommended next step
+Proceed to `1.3.2` (`useSlashCommands`) now that the composer boundary has been extracted and validated.
 
 ---
 

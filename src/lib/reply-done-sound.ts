@@ -637,8 +637,9 @@ export function createReplyDoneSoundPlayer(): ReplyDoneSoundPlayer {
       audio.onerror = cleanup;
       if (typeof maxPlayMs === "number" && maxPlayMs > 0) {
         timeoutId = window.setTimeout(() => {
+          const currentAudio = audio;
           try {
-            audio.pause();
+            currentAudio?.pause();
           } catch {
             // ignore
           }
@@ -648,9 +649,10 @@ export function createReplyDoneSoundPlayer(): ReplyDoneSoundPlayer {
       await audio.play();
       return true;
     } catch {
-      if (audio) {
+      const currentAudio = audio;
+      if (currentAudio) {
         try {
-          audio.pause();
+          currentAudio.pause();
         } catch {
           // ignore
         }

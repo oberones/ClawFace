@@ -185,8 +185,8 @@ markdownParser.use({
           type: "mathFence",
         };
       },
-      renderer(token: MathToken) {
-        return `${renderMath(token.text, true)}\n`;
+      renderer(token) {
+        return `${renderMath((token as unknown as MathToken).text, true)}\n`;
       },
     },
     {
@@ -208,8 +208,8 @@ markdownParser.use({
           type: "mathBracketBlock",
         };
       },
-      renderer(token: MathToken) {
-        return `${renderMath(token.text, true)}\n`;
+      renderer(token) {
+        return `${renderMath((token as unknown as MathToken).text, true)}\n`;
       },
     },
     {
@@ -234,8 +234,8 @@ markdownParser.use({
           type: "mathEnvironmentBlock",
         };
       },
-      renderer(token: MathToken) {
-        return `${renderMath(token.text, true)}\n`;
+      renderer(token) {
+        return `${renderMath((token as unknown as MathToken).text, true)}\n`;
       },
     },
     {
@@ -257,8 +257,8 @@ markdownParser.use({
           type: "mathTagBlock",
         };
       },
-      renderer(token: MathToken) {
-        return `${renderMath(token.text, true)}\n`;
+      renderer(token) {
+        return `${renderMath((token as unknown as MathToken).text, true)}\n`;
       },
     },
     {
@@ -280,8 +280,8 @@ markdownParser.use({
           type: "mathParenInline",
         };
       },
-      renderer(token: MathToken) {
-        return renderMath(token.text, false);
+      renderer(token) {
+        return renderMath((token as unknown as MathToken).text, false);
       },
     },
     {
@@ -303,8 +303,8 @@ markdownParser.use({
           type: "mathTagInline",
         };
       },
-      renderer(token: MathToken) {
-        return renderMath(token.text, false);
+      renderer(token) {
+        return renderMath((token as unknown as MathToken).text, false);
       },
     },
   ],

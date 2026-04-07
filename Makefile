@@ -1,7 +1,7 @@
 SHELL := /bin/sh
 
 NPM := npm
-TSCP := npx tsc --noEmit
+TSCP := ./node_modules/.bin/tsc --noEmit
 
 .PHONY: help install dev build preview typecheck check-runtime check-rollup-linux check-env verify desktop-build-web desktop-pack desktop-dist-mac hooks-install clean
 
@@ -23,7 +23,7 @@ help:
 	@echo "  make clean              Remove generated build output"
 
 install:
-	$(NPM) install
+	ELECTRON_CACHE=$(CURDIR)/.cache/electron $(NPM) install --include=dev
 
 dev:
 	$(NPM) run dev
@@ -47,7 +47,7 @@ check-env:
 	$(NPM) run check:env
 
 verify:
-	$(NPM) run verify:ci
+	ELECTRON_CACHE=$(CURDIR)/.cache/electron $(NPM) run verify:ci
 
 desktop-build-web:
 	$(NPM) run desktop:build:web

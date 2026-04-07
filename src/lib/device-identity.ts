@@ -58,11 +58,7 @@ async function generateIdentity(): Promise<DeviceIdentity> {
   const privateKey =
     typeof utils.randomPrivateKey === "function"
       ? utils.randomPrivateKey()
-      : typeof (utils as { randomSecretKey?: () => Uint8Array }).randomSecretKey === "function"
-        ? (utils as { randomSecretKey: () => Uint8Array }).randomSecretKey()
-        : typeof utils.randomBytes === "function"
-          ? utils.randomBytes(32)
-          : fallbackKey();
+      : fallbackKey();
   const publicKey = await getPublicKeyAsync(privateKey);
   const deviceId = await fingerprintPublicKey(publicKey);
   return {

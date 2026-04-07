@@ -3471,6 +3471,7 @@ export default function App() {
     isCurrentSessionLoading: false,
     transitionState: "idle",
   });
+  const connected = connectionState.status === "connected";
   const { selectedSessionKey, sessions, isCurrentSessionLoading, transitionState } = sessionState;
   const setSessions = useCallback((value: React.SetStateAction<GatewaySessionRow[]>) => {
     setSessionState((prev) => ({
@@ -6624,7 +6625,6 @@ export default function App() {
     }
   }
 
-  const connected = connectionState.status === "connected";
   const protocolWarning =
     typeof window !== "undefined" &&
       window.location.protocol === "https:" &&
