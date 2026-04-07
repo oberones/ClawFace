@@ -699,6 +699,79 @@ A more consistent session-switching experience.
 ### Done when
 - switching sessions no longer produces confusing or obviously fragile UI behavior
 
+### Implementation notes (2026-04-07)
+
+This ticket has now been completed as a first-pass shell/session-switch UX improvement on top of the `SessionState` boundary introduced in 1.1.5.
+
+#### Desired behavior clarified
+For the current phase, the desired shell behavior is:
+
+##### Switching to another session
+- shell should explicitly enter a switching state
+- thread should not pretend the user is simply in a blank new conversation while the new session is being restored
+
+##### Loading the current selected session
+- shell should expose a loading state while history/thread context is being fetched
+
+##### Returning to idle
+- once the active session history has been applied, the shell should return to an idle transition state
+
+This is intentionally simple, but much clearer than silently reusing whatever thread state happened to be visible.
+
+#### Key implementation changes
+
+##### 1. `ChatView` now accepts session loading/transition props
+New props added:
+- `isCurrentSessionLoading?: boolean`
+- `sessionTransitionState?: SessionTransitionState`
+
+This allows the shell/view boundary to communicate session-switch state directly instead of relying only on message presence.
+
+##### 2. `app.tsx` now passes shell-level session signals into `ChatView`
+`ChatView` now receives:
+- `isCurrentSessionLoading={isCurrentSessionLoading}`
+- `sessionTransitionState={transitionState}`
+
+That means session-switch UX can now be driven by explicit shell state rather than hidden assumptions.
+
+##### 3. `ChatView` now distinguishes loading/switching empty states from a true new conversation
+Previously, when there were no visible messages, the thread primarily fell back to the generic:
+- `New Conversation`
+
+That made session switches or active-session loads feel more ambiguous than they should.
+
+Now, when:
+- `sessionTransitionState === "switching"`
+- or `isCurrentSessionLoading === true`
+
+and there are no visible messages yet, `ChatView` renders a more intentional state:
+- `Switching Sessions`
+- or `Loading Session`
+
+with explanatory copy instead of the generic new-conversation prompt.
+
+#### What this ticket improved for the user
+- switching sessions is less likely to look like an accidental empty thread
+- current-session loading is more legible
+- the shell is more honest about what state it is in during session changes
+- there is now a clearer distinction between:
+  - a genuinely new/empty conversation
+  - a session currently being loaded/restored
+
+#### What this ticket does *not* solve yet
+
+##### 1. `ChatView` still owns deeper transition/snapshot behavior
+This ticket did not remove the internal session-transition machinery in `ChatView`. It only gave the shell a clearer top-level state model to communicate with it.
+
+##### 2. Switching while streaming still needs deeper handling later
+This ticket improves the visible state model, but does not yet fully redesign how all in-flight stream/UI transition edge cases should behave.
+
+##### 3. Scroll/input preservation rules remain only partially explicit
+The shell is more coherent now, but future tickets around thread and composer cleanup should make those behaviors even more intentional.
+
+#### Recommended next step
+With Slice 1.1 now materially advanced, the best next move is likely `1.2.1` — the `ChatView.tsx` responsibility map — because the remaining fragility is now increasingly concentrated in the overloaded chat surface itself.
+
 ---
 
 # Slice 1.2 — Thread rendering and streaming cleanup
