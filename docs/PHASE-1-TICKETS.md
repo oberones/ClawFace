@@ -438,6 +438,132 @@ A short map of selected-session flow and problem points.
 ### Done when
 - we understand the state flow from sidebar selection to thread view update
 
+### Audit findings (2026-04-07)
+
+#### Primary ownership today
+Selected-session ownership currently lives in `src/app.tsx`.
+
+Observed primary state:
+- `selectedSessionKey` — `useState<string | null>(...)`
+- `selectedSessionRef` — `useRef<string | null>(selectedSessionKey)`
+
+The state and ref are kept in sync with an effect:
+- `selectedSessionRef.current = selectedSessionKey`
+
+This means the current app uses both:
+- React state for rendering and effects
+- an imperative ref for async/event-driven code paths
+
+That pattern is understandable, but it is also one of the main sources of complexity.
+
+#### Where session selection is consumed
+The selected session affects many surfaces in `app.tsx`, including:
+- history loading
+- current session lookup via `useMemo`
+- usage/token stats loading
+- verbose tool-event loading
+- model/thinking overrides
+- message send and run operations
+- session deletion fallback behavior
+- newly created/resolved session selection behavior
+- routing of tool/message/task-style event updates back into the active thread
+
+This means selected-session state is doing a lot more than simply picking which sidebar row is highlighted.
+
+#### Sidebar → shell → thread flow
+The basic interaction flow is:
+1. `SessionSidebar` receives:
+   - `selectedKey={selectedSessionKey}`
+   - `onSelect={handleSelectSession}`
+2. user clicks a session card in `SessionSidebar`
+3. `handleSelectSession` in `app.tsx` updates:
+   - `selectedSessionRef.current`
+   - `setSelectedSessionKey(...)`
+4. `selectedSessionKey` then propagates to:
+   - session-derived memos
+   - history-loading effect(s)
+   - `ChatView` via `sessionKey={selectedSessionKey}`
+
+So the sidebar itself is thin. The complexity is concentrated in `app.tsx` and then amplified by `ChatView`’s session-transition behavior.
+
+#### `ChatView` also owns session-transition behavior
+`ChatView.tsx` receives `props.sessionKey`, but it does not merely render the currently selected thread.
+It also appears to maintain its own transition/snapshot logic around session changes, including refs such as:
+- `prevSessionKeyRef`
+- `prevSessionKeyForLayoutRef`
+- `snapshotSessionKeyRef`
+
+This suggests the app currently has **two layers** of session-switch logic:
+- app-level selected-session ownership in `app.tsx`
+- view-level session transition/snapshot behavior in `ChatView.tsx`
+
+That is not necessarily wrong, but it means session switching is split across layers and will remain fragile until those boundaries are clarified.
+
+#### Imperative ref usage is central to async correctness
+`selectedSessionRef.current` is used widely in async/event-driven code paths, especially where closures would otherwise capture stale selected-session state.
+
+Examples include logic around:
+- patching/merging session updates
+- filtering inbound events to active vs non-active sessions
+- determining whether to mark another session as unread
+- history loading guards
+- new-session creation/resolution flows
+- session delete fallback behavior
+
+This means the ref is currently acting as a practical workaround for closure staleness across a large number of flows.
+
+#### Current flow is resilient but highly coupled
+The good news:
+- there is a consistent notion of a selected session
+- the app does make serious attempts to avoid stale-closure bugs
+- active-vs-background session behavior is already modeled in several places
+
+The bad news:
+- session ownership is spread across state, ref, effects, callbacks, and view transitions
+- many behaviors assume direct access to the current selected key
+- `app.tsx` has become the orchestration center for too many session-coupled concerns
+
+#### Fragility points / smells
+
+##### 1. Dual ownership pattern (`selectedSessionKey` + `selectedSessionRef`)
+This is useful, but it is still a smell because it means the app needs both a declarative and imperative selected-session model just to stay coherent.
+
+##### 2. Session selection is entangled with many unrelated behaviors
+Selection currently drives:
+- history loading
+- usage stats
+- verbose tool events
+- send path behavior
+- session resolution after create/send
+- delete fallback behavior
+- override state lookup
+
+This makes it harder to reason about what should happen on session switch.
+
+##### 3. `ChatView` adds a second layer of session switching complexity
+The view is not just a pure consumer of the selected session; it has its own transition model. That makes the app more likely to accumulate hidden coupling between shell logic and UI transition logic.
+
+##### 4. There are several fallback/repair paths that can change selection indirectly
+Examples include:
+- resolving newly created session keys
+- deletion choosing a next selected key
+- startup fallback choosing a session when none is selected
+
+These are all valid behaviors, but they make selection flow more branchy and less explicit.
+
+##### 5. Active-session determination is repeatedly re-derived in async handlers
+Many code paths compute "is this for the currently selected session?" using `selectedSessionRef.current`. This works, but suggests the need for a clearer session-domain boundary.
+
+#### Recommended next step from this audit
+Ticket `1.1.5` should introduce a clearer selected-session/session-domain boundary that explicitly owns at least:
+- selected session key
+- session list
+- current-session lookup
+- current-session loading state
+- session switch intent/transition state (at least coarse-grained)
+
+It should not try to solve every session-related concern at once, but it should reduce the need for `app.tsx` to be the only place where session meaning exists.
+
 ---
 
 ## Ticket 1.1.5 — Introduce explicit `sessionStore` or equivalent selected-session boundary
