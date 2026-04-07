@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState, ToolItem } from "../lib/types.ts";
+import { ChatThread } from "./ChatThread.tsx";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { formatBytes, formatCompactTokens, truncate } from "../lib/format.ts";
 import { BASE_COMMANDS, type SlashCommand } from "../lib/slash-commands.ts";
@@ -2357,96 +2358,33 @@ export default function ChatView(props: ChatViewProps) {
           </div>
         )}
 
-        <div
-          key={`main-${props.sessionKey ?? "none"}`}
-          className={`chat-thread chat-thread-main ${chatImpulseActive ? "is-impulsing" : ""} ${(sessionTransitionPhase === "out" || sessionTransitionPhase === "preparing") ? "is-hidden-for-switch-out" : ""}`}
-          style={{ maxWidth: "var(--claw-content-width)", gap: "var(--claw-message-gap)" }}
-        >
-          {(hiddenMessageCount > 0 || props.loadingOlder) && (
-            <div className="history-hint">
-              {props.loadingOlder
-                ? "Loading older messages..."
-                : `${hiddenMessageCount} older messages available. Scroll up to load.`}
-            </div>
-          )}
-
-          {props.messages.length === 0 && isThreadBusy && (
-            <article className="empty-state">
-              <div className="empty-state-greeting" aria-hidden="true">🦞</div>
-              <div className="empty-state-title">{isSessionSwitching ? "Switching Sessions" : "Loading Session"}</div>
-              <div className="empty-state-copy">
-                {isSessionSwitching
-                  ? "Preparing the selected session and restoring its thread context."
-                  : "Loading the current session history and thread state."}
-              </div>
-            </article>
-          )}
-
-          {props.messages.length === 0 && !isThreadBusy && (
-            <article className="empty-state">
-              <div className="empty-state-greeting" aria-hidden="true">🦞</div>
-              <div className="empty-state-title">New Conversation</div>
-              <div className="empty-state-copy">
-                Type a message to get started, or use a <code>/command</code>.
-              </div>
-              <div className="empty-state-hints">
-                <span className="empty-state-hint">/model</span>
-                <span className="empty-state-hint">/status</span>
-                <span className="empty-state-hint">/usage</span>
-                <span className="empty-state-hint">/compact</span>
-              </div>
-            </article>
-          )}
-
-          {props.uiSettings.showToolActivity && renderToolPanel(toolTimeline.beforeFirst, "tool-before-first")}
-
-          {displayedMessages.map((msg) => (
-            <React.Fragment key={msg.id}>
-              <MessageRow
-                message={msg}
-                showTimestamp={props.uiSettings.showMessageTimestamp}
-                timestampFontSize={props.uiSettings.messageTimestampFontSize}
-                drawerPop={poppingMessageIdSet.has(msg.id)}
-                sessionFlyIn={sessionFlyInMessageIdSet.has(msg.id)}
-                onOpenImage={setImageLightbox}
-                onResolveRemoteImage={props.onResolveRemoteImage}
-              />
-              {props.uiSettings.showToolActivity &&
-                renderToolPanel(toolTimeline.byMessageId.get(msg.id) ?? [], `tool-after-${msg.id}`)}
-            </React.Fragment>
-          ))}
-
-          {props.streamText && (
-            <div
-              className={`message-row assistant ${streamPopActive ? "drawer-pop" : ""} ${sessionFlyInStream ? "session-fly-in" : ""}`}
-              data-stream-row="1"
-              style={streamMotionStyle}
-            >
-              <article className="message-bubble assistant stream-bubble">
-                <CopyButton text={props.streamText || ""} />
-                <div className="message-role">Assistant</div>
-                <div
-                  className="markdown"
-                  dangerouslySetInnerHTML={{ __html: streamMarkdownHtml }}
-                  onClick={handleMarkdownClick}
-                />
-              </article>
-            </div>
-          )}
-
-          {!props.streamText && props.thinking && (
-            <div className="message-row assistant">
-              <article className="message-bubble assistant thinking-indicator">
-                <span className="thinking-label">Thinking</span>
-                <span className="thinking-dots" aria-hidden="true">
-                  <span className="dot" />
-                  <span className="dot" />
-                  <span className="dot" />
-                </span>
-              </article>
-            </div>
-          )}
-        </div>
+        <ChatThread
+          sessionKey={props.sessionKey}
+          chatImpulseActive={chatImpulseActive}
+          sessionTransitionPhase={sessionTransitionPhase}
+          hiddenMessageCount={hiddenMessageCount}
+          loadingOlder={props.loadingOlder}
+          messages={displayedMessages}
+          isThreadBusy={isThreadBusy}
+          isSessionSwitching={isSessionSwitching}
+          showToolActivity={props.uiSettings.showToolActivity}
+          showMessageTimestamp={props.uiSettings.showMessageTimestamp}
+          timestampFontSize={props.uiSettings.messageTimestampFontSize}
+          toolBeforeFirst={toolTimeline.beforeFirst}
+          toolByMessageId={toolTimeline.byMessageId}
+          streamText={props.streamText}
+          streamMarkdownHtml={streamMarkdownHtml}
+          thinking={props.thinking}
+          streamPopActive={streamPopActive}
+          sessionFlyInStream={sessionFlyInStream}
+          streamMotionStyle={streamMotionStyle}
+          poppingMessageIdSet={poppingMessageIdSet}
+          sessionFlyInMessageIdSet={sessionFlyInMessageIdSet}
+          onOpenImage={setImageLightbox}
+          onResolveRemoteImage={props.onResolveRemoteImage}
+          onRenderToolPanel={renderToolPanel}
+          onHandleMarkdownClick={handleMarkdownClick}
+        />
       </div>
 
       <div className="msg-nav-buttons">
