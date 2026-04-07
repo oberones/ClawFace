@@ -1110,6 +1110,63 @@ A dedicated thread-rendering component or set of components.
 - `ChatView.tsx` no longer directly owns all thread rendering logic
 - thread rendering is easier to reason about in isolation
 
+### Implementation notes (2026-04-07)
+
+This ticket has now been completed as a **first-pass presentational extraction**.
+
+#### New component added
+- `src/components/ChatThread.tsx`
+
+#### What moved into `ChatThread`
+The extracted component now owns the main thread rendering block for the active session, including:
+- history hint rendering
+- loading/switching empty state
+- generic new-conversation empty state
+- message iteration for displayed messages
+- tool-panel placement before first message and after messages
+- stream bubble rendering
+- thinking placeholder rendering
+- top-level thread container structure and thread-level CSS classes
+
+#### What `ChatView` still owns
+`ChatView.tsx` still owns the preparation and orchestration of thread inputs, including:
+- computing `displayedMessages`
+- computing `toolTimeline`
+- stream markdown preparation
+- session-transition state
+- media/lightbox state
+- render callbacks such as `renderToolPanel(...)`
+- message row implementation details via `MessageRow`
+
+That means this ticket reduced the main render density without trying to uproot all the intelligence at once.
+
+#### Why this extraction is intentionally conservative
+The goal of 1.2.2 was to create a real thread-rendering boundary without detonating the highest-risk systems in the file.
+
+So the extracted `ChatThread` currently works as a **presentational boundary fed by prepared props and callbacks**.
+This is the right first move because it:
+- shrinks `ChatView.tsx`
+- clarifies the thread-rendering seam
+- gives future refactors a more stable place to start
+
+#### Important caveat
+`ChatThread.tsx` currently imports `MessageRow` from `ChatView.tsx`.
+
+This is a transitional compromise, not the final design.
+It means the extraction is real but not yet fully clean.
+
+##### Implication
+The next ticket (`1.2.3`) should split `MessageRow` and message-type rendering out so the new thread component no longer depends back on `ChatView.tsx`.
+
+#### What this ticket accomplished
+- established a real `ChatThread` component boundary
+- removed a large thread-rendering block from the center of `ChatView.tsx`
+- made the remaining `ChatView` responsibilities easier to see
+- set up the next extraction step more cleanly
+
+#### Recommended next step
+Proceed to `1.2.3` — extract `MessageRow` and message-type rendering boundaries — so the new thread component can stop depending on internals from `ChatView.tsx`.
+
 ---
 
 ## Ticket 1.2.3 — Extract `MessageRow` and message-type rendering boundaries
