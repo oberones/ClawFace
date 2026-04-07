@@ -5,6 +5,7 @@
   </p>
 </p>
 
+> **Note:** The project has been rebranded in the docs as **ClawFace**, but some existing package/build/release metadata may still use the legacy **ClawUI** name until the rename is completed across the codebase.
 ClawFace is a fork-forward continuation of an abandoned OpenClaw desktop/web client experiment.
 It is now being repositioned as a **desktop-first frontend product for OpenClaw**, not a generic chatbot shell and not a replacement for OpenClaw’s backend management/configuration surfaces.
 
