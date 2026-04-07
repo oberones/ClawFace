@@ -3460,7 +3460,7 @@ export default function App() {
   }, []);
   const [fsServerUrl, setFsServerUrl] = useState(loadStored(STORAGE_KEYS.fsServerUrl, ""));
   const [connectionState, setConnectionState] = useState<ConnectionState>({
-    status: "connecting",
+    status: "disconnected",
     reason: null,
     note: null,
   });
