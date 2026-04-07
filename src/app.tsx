@@ -3471,7 +3471,7 @@ export default function App() {
     isCurrentSessionLoading: false,
     transitionState: "idle",
   });
-  const { selectedSessionKey, sessions } = sessionState;
+  const { selectedSessionKey, sessions, isCurrentSessionLoading, transitionState } = sessionState;
   const setSessions = useCallback((value: React.SetStateAction<GatewaySessionRow[]>) => {
     setSessionState((prev) => ({
       ...prev,
