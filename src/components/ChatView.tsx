@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState, ToolItem } from "../lib/types.ts";
+import type { Attachment, ChatMessage, ConnectionStatus, ToolItem } from "../lib/types.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { formatBytes, formatCompactTokens, truncate } from "../lib/format.ts";
 import { BASE_COMMANDS, type SlashCommand } from "../lib/slash-commands.ts";
@@ -41,8 +41,6 @@ type ChatViewProps = {
   uiSettings: UiSettings;
   canLoadOlder: boolean;
   loadingOlder: boolean;
-  isCurrentSessionLoading?: boolean;
-  sessionTransitionState?: SessionTransitionState;
   onLoadOlder: () => void;
   onModelSelect: (model: string) => void;
   onThinkingSelect: (level: string) => void;
@@ -2184,8 +2182,6 @@ export default function ChatView(props: ChatViewProps) {
   );
 
   const connectionStatus = props.connectionStatus ?? (props.connected ? "connected" : "disconnected");
-  const isSessionSwitching = props.sessionTransitionState === "switching";
-  const isThreadBusy = Boolean(props.isCurrentSessionLoading || isSessionSwitching);
   const statusLabel =
     connectionStatus === "connected"
       ? "Gateway connected"
@@ -2370,19 +2366,7 @@ export default function ChatView(props: ChatViewProps) {
             </div>
           )}
 
-          {props.messages.length === 0 && isThreadBusy && (
-            <article className="empty-state">
-              <div className="empty-state-greeting" aria-hidden="true">🦞</div>
-              <div className="empty-state-title">{isSessionSwitching ? "Switching Sessions" : "Loading Session"}</div>
-              <div className="empty-state-copy">
-                {isSessionSwitching
-                  ? "Preparing the selected session and restoring its thread context."
-                  : "Loading the current session history and thread state."}
-              </div>
-            </article>
-          )}
-
-          {props.messages.length === 0 && !isThreadBusy && (
+          {props.messages.length === 0 && (
             <article className="empty-state">
               <div className="empty-state-greeting" aria-hidden="true">🦞</div>
               <div className="empty-state-title">New Conversation</div>
