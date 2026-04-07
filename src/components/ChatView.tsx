@@ -1473,7 +1473,29 @@ export default function ChatView(props: ChatViewProps) {
           onOpenImage={setImageLightbox}
           onResolveRemoteImage={props.onResolveRemoteImage}
           onRenderToolPanel={renderToolPanel}
-          onHandleMarkdownClick={handleMarkdownClick}
+          onHandleMarkdownClick={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (!target) return;
+
+            const copyTrigger = target.closest(
+              '[data-copy-code], [data-code-copy], .md-code-copy, .code-copy-button, button[aria-label="Copy code"]',
+            ) as HTMLElement | null;
+
+            if (!copyTrigger) return;
+
+            const codeContainer =
+              copyTrigger.closest("pre") ??
+              copyTrigger.parentElement?.querySelector("pre") ??
+              copyTrigger.closest("[data-code-block], .markdown-code-block, .code-block");
+
+            const codeElement = codeContainer?.querySelector("code");
+            const codeText = codeElement?.textContent;
+
+            if (!codeText) return;
+
+            event.preventDefault();
+            void navigator.clipboard?.writeText(codeText);
+          }}
         />
       </div>
 
