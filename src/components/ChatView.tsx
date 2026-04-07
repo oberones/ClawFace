@@ -3,7 +3,6 @@ import { createPortal, flushSync } from "react-dom";
 import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState, ToolItem } from "../lib/types.ts";
 import { ChatThread } from "./ChatThread.tsx";
 import { MessageRow } from "./MessageRow.tsx";
-import { renderMarkdown } from "../lib/markdown.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { BASE_COMMANDS, type SlashCommand } from "../lib/slash-commands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
