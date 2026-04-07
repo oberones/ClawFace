@@ -54,6 +54,133 @@ A short map of current connection-state ownership and pain points.
 - we know which UI surfaces depend on it
 - we know where reconnect/error logic is currently split
 
+### Audit findings (2026-04-07)
+
+#### Primary ownership today
+Connection state is currently owned at the top of `src/app.tsx`.
+
+Observed primary state:
+- `gatewayUrl` — `useState(...)` in `src/app.tsx`
+- `token` — `useState(...)` in `src/app.tsx`
+- `password` — `useState(...)` in `src/app.tsx`
+- `connected` — `useState(false)` in `src/app.tsx`
+- `connectionNote` — `useState<string | null>(null)` in `src/app.tsx`
+- `clientRef` — `useRef<GatewayClient | null>(null)` in `src/app.tsx`
+
+This makes `app.tsx` the current connection-state source of truth, but only in a coarse and fairly UI-coupled way.
+
+#### Gateway lifecycle touchpoints
+The main gateway lifecycle is created in `src/app.tsx` via:
+- `new GatewayClient({ url: gatewayUrl, token, password, ... })`
+
+Within that lifecycle:
+- successful connect path sets `connected = true`
+- disconnect/error path sets `connected = false`
+- disconnect/error path also sets `connectionNote`
+- special pairing-required handling also sets `connectionNote`
+
+The actual transport behavior lives in `src/lib/gateway.ts`, but the app-level interpretation of connection state currently lives in `app.tsx`.
+
+#### Transport/domain boundary today
+`src/lib/gateway.ts` exposes:
+- `GatewayClient`
+- internal websocket lifecycle
+- `connected` getter
+- auth mutation/update behavior
+- request/event transport behavior
+
+But the renderer does **not** appear to consume a normalized connection domain model.
+Instead, `app.tsx` translates transport events directly into a small UI-facing state pair:
+- `connected`
+- `connectionNote`
+
+This is usable, but thin.
+It does not yet model richer app-level connection states such as:
+- connecting
+- reconnecting
+- disconnected
+- auth/pairing required
+- failed configuration
+
+#### Renderer/UI consumers of connection state
+Observed consumers include:
+
+##### `src/components/ChatView.tsx`
+Consumes `connected` via props and uses it for:
+- topbar status indicator (`Gateway connected` / `Gateway disconnected`)
+- disabled-state messaging in the composer area
+- send behavior gating
+- some interaction gating around message sending
+
+This means the main chat surface is directly coupled to the coarse boolean connection model.
+
+##### `src/components/SettingsModal.tsx`
+Does not appear to consume `connected` directly, but owns/edit-controls for:
+- `gatewayUrl`
+- `token`
+- `password`
+- `fsServerUrl`
+
+So settings mutate the underlying connection inputs, while `app.tsx` interprets their runtime effect.
+
+##### `src/app.tsx` internal async flows
+Many async operations are guarded by `if (!connected) return` or equivalent patterns, including logic around:
+- history loading
+- usage loading
+- verbose tool-event loading
+- image/http proxy fallback behavior
+- status-like commands and model/agent loading paths
+
+This indicates that `connected` is acting as a broad gate across many unrelated app behaviors.
+
+#### Derived/presentational connection state
+There is also additional presentational logic in `app.tsx` combining:
+- protocol warnings (for `ws://` vs expected secure use)
+- `connectionNote`
+
+into a user-facing disabled/status message.
+
+That means user-visible connection state is currently composed from multiple concepts:
+- raw connectivity boolean
+- disconnect/pairing note
+- protocol warning
+
+These concepts are related, but not the same thing. Right now they are only loosely modeled.
+
+#### Current pain points / smells
+
+##### 1. Connection state is too coarse
+The main app-level model is basically:
+- `connected: boolean`
+- `connectionNote: string | null`
+
+That is not enough to cleanly represent the actual lifecycle.
+
+##### 2. Connection state is UI-coupled in `app.tsx`
+Transport events are translated directly into UI-facing state in the top-level renderer component, rather than through a dedicated app/domain boundary.
+
+##### 3. Many unrelated features gate on the same boolean
+A single `connected` boolean is used to short-circuit multiple flows, which increases the chance of hidden coupling and awkward partial-failure behavior.
+
+##### 4. Credentials/config and runtime status are adjacent but not well separated
+`gatewayUrl`, `token`, and `password` are configuration inputs, while `connected` / `connectionNote` are runtime state, but today they all live together in the same top-level surface without a more explicit boundary.
+
+##### 5. Pairing/auth-required is modeled as a note, not a state
+Special cases like pairing-required currently collapse into `connectionNote` text instead of a structured connection state.
+
+#### Recommended next step from this audit
+Ticket `1.1.2` should introduce an explicit connection-state boundary that at minimum distinguishes:
+- config/input state
+- connection lifecycle state
+- human-readable status/reason
+
+A likely first-pass model would separate:
+- `gatewayConfig`
+- `connectionStatus`
+- `connectionReason` / `connectionHint`
+
+rather than continuing to overload a simple boolean plus note string.
+
 ---
 
 ## Ticket 1.1.2 — Introduce explicit `connectionStore` or equivalent state boundary
@@ -78,6 +205,98 @@ A single clear source of truth for connection state.
 ### Done when
 - connection state is not duplicated across major surfaces unnecessarily
 - top-level UI can render connection status without fragile prop chains
+
+### Implementation notes (2026-04-07)
+
+A first-pass explicit connection boundary has now been introduced in `src/app.tsx` and `src/lib/types.ts`.
+
+#### Added types
+In `src/lib/types.ts`:
+- `GatewayConfig`
+- `ConnectionStatus`
+- `ConnectionState`
+
+Current first-pass model:
+- `GatewayConfig`
+  - `gatewayUrl`
+  - `token`
+  - `password`
+- `ConnectionState`
+  - `status`
+  - `reason`
+  - `note`
+
+#### Structural change made
+Previous top-level state:
+- `gatewayUrl`
+- `token`
+- `password`
+- `connected`
+- `connectionNote`
+- `pairingRequired`
+
+New top-level boundary:
+- `gatewayConfig`
+- `connectionState`
+
+With derived values:
+- `gatewayUrl`, `token`, `password` destructured from `gatewayConfig`
+- `connected` derived from `connectionState.status === "connected"`
+
+#### Current `ConnectionStatus` values
+- `connecting`
+- `connected`
+- `disconnected`
+- `pairing-required`
+- `error`
+
+#### Current behavior after this ticket
+- successful gateway hello sets:
+  - `status: "connected"`
+  - `reason: null`
+  - `note: null`
+- pairing-related close sets:
+  - `status: "pairing-required"`
+  - `reason` from close payload
+  - pairing note text
+- non-pairing close sets either:
+  - `status: "error"` when a reason string exists
+  - `status: "disconnected"` when there is no explicit reason
+- several previous `setConnectionNote(...)` error paths now update `connectionState.note`
+
+#### What this ticket accomplished
+- separated gateway config inputs from runtime connection lifecycle state
+- removed the old `pairingRequired` boolean
+- removed the old standalone `connectionNote` state
+- removed the old standalone `connected` state as primary ownership
+- established a first explicit app-level connection model without introducing a full store yet
+
+#### Why this is intentionally a first pass
+This ticket does **not** yet create a dedicated external store module.
+Instead, it introduces a cleaner boundary in-place so the app can evolve without a huge state-management rewrite all at once.
+
+That is acceptable for this phase because the goal was to stop treating connection state as only:
+- boolean + note string
+
+and instead begin modeling lifecycle state explicitly.
+
+#### Remaining gaps / follow-up opportunities
+This first pass still leaves room for later improvement:
+
+##### 1. `connecting` is currently defined but not fully surfaced
+The type now supports it, but the renderer lifecycle does not yet model all transitions explicitly.
+
+##### 2. `connectionState` still lives in `app.tsx`
+The boundary is cleaner, but it is not yet extracted into a dedicated store module.
+
+##### 3. Some non-transport request failures still write into `connectionState.note`
+This is better than the old loose note state, but later work should decide which errors are:
+- true connection-state issues
+- thread/session-level operation errors
+- generic operation failures
+
+#### Recommended next step
+Ticket `1.1.3` should now build on this by improving reconnect/disconnected UX using the new `connectionState` model.
 
 ---
 
