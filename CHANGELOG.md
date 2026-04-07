@@ -2,9 +2,47 @@
 
 All notable changes to this project should be documented in this file.
 
-This project is currently in an early repositioning and architectural-reset phase, so the changelog starts by declaring the current pre-write baseline as the first explicit version.
+This project is currently in an early repositioning and architectural-reset phase, so the changelog starts by declaring the planning baseline and then tracking incremental pre-release implementation work.
 
 The format is loosely based on Keep a Changelog.
+
+---
+
+## [0.0.2] - 2026-04-07
+
+### Summary
+This release records the first concrete implementation work after the planning baseline.
+
+It captures:
+- documentation/layout cleanup around the new `docs/` structure
+- repo bootstrap guidance for future agents
+- the first completed Phase 1 architecture ticket work around connection-state ownership
+
+### Added
+- `docs/PHASE-1-TICKETS.md` implementation findings for:
+  - Ticket `1.1.1` — connection-state ownership audit
+  - Ticket `1.1.2` — first explicit connection-state boundary
+
+### Changed
+- Updated `README.md` to point to `AGENTS.md`
+- Updated `README.md` to better reflect the current project framing and doc layout
+- Established a first explicit connection-state model in the renderer via:
+  - `GatewayConfig`
+  - `ConnectionStatus`
+  - `ConnectionState`
+- Replaced the previous top-level loose connection model built around:
+  - `connected`
+  - `connectionNote`
+  - `pairingRequired`
+  with a cleaner first-pass boundary using:
+  - `gatewayConfig`
+  - `connectionState`
+- Updated `src/app.tsx` so successful hello, pairing-required close, disconnect, and several note/error flows now resolve through the new connection-state boundary
+
+### Notes
+- This is still a pre-release modernization phase, not a product milestone release
+- The connection-state work is intentionally a first pass and does not yet extract a dedicated external store module
+- Follow-up work should build on this with reconnect/disconnected-state UX improvements and further state-boundary cleanup
 
 ---
 

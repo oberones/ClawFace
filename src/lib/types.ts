@@ -143,3 +143,22 @@ export type ChatMessage = {
   attachments?: Attachment[];
   raw?: unknown;
 };
+
+export type GatewayConfig = {
+  gatewayUrl: string;
+  token: string;
+  password: string;
+};
+
+export type ConnectionStatus =
+  | "connecting"
+  | "connected"
+  | "disconnected"
+  | "pairing-required"
+  | "error";
+
+export type ConnectionState = {
+  status: ConnectionStatus;
+  reason: string | null;
+  note: string | null;
+};
