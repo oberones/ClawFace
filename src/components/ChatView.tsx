@@ -2,8 +2,17 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal, flushSync } from "react-dom";
 import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState, ToolItem } from "../lib/types.ts";
 import { ChatThread } from "./ChatThread.tsx";
-import { MessageRow } from "./MessageRow.tsx";
+import { Composer } from "./Composer.tsx";
+import {
+  buildDesktopLocalImageUrl,
+  buildMotionVars,
+  filePathFromImageSource,
+  isDesktopRuntime,
+  isLikelyLocalFileSource,
+  MessageRow,
+} from "./MessageRow.tsx";
 import { formatCompactTokens } from "../lib/format.ts";
+import { renderMarkdown } from "../lib/markdown.ts";
 import { BASE_COMMANDS, type SlashCommand } from "../lib/slash-commands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
 
@@ -76,133 +85,6 @@ type ThreadSnapshot = {
   thinking: boolean;
 };
 
-type MotionVarsStyle = React.CSSProperties & Record<`--${string}`, string>;
-
-function hashString(value: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
-
-function buildMotionVars(id: string): MotionVarsStyle {
-  const hash = hashString(id);
-  const byte = (shift: number) => ((hash >>> shift) & 0xff) / 255;
-  // Horizontal jitter — slight random drift left/right (GPU translate, no blur)
-  const dx = (byte(0) - 0.5) * 6;
-  // Time scale — each card animates at a slightly different speed
-  const timeScale = 0.9 + byte(24) * 0.2;
-  // Emerge Y — how far below the card starts (drawer depth)
-  const emergeY = 42 + byte(4) * 30;
-  return {
-    "--pop-dx": `${dx.toFixed(1)}px`,
-    "--pop-time-scale": `${timeScale.toFixed(3)}`,
-    "--pop-emerge-y": `${Math.round(emergeY)}px`,
-  };
-}
-
-const MessageRow = React.memo(
-  function MessageRow(props: MessageRowProps) {
-    const { message } = props;
-    const isUser = message.role === "user";
-    const isSystem = message.role === "system";
-    const roleLabel = isSystem ? "System" : isUser ? "You" : "Assistant";
-    const rowMotionClass = `${props.drawerPop ? "drawer-pop" : ""} ${props.sessionFlyIn ? "session-fly-in" : ""}`.trim();
-    const motionStyle = useMemo(() => buildMotionVars(message.id), [message.id]);
-    const markdownHtml = useMemo(
-      () => (message.text ? renderMarkdown(message.text) : ""),
-      [message.text],
-    );
-
-    if (isSystem) {
-      return (
-        <div className={`message-row system ${rowMotionClass}`} data-message-id={message.id} style={motionStyle}>
-          <article
-            className="message-bubble system"
-            style={{
-              fontSize: "var(--claw-font-size)",
-              lineHeight: "var(--claw-line-height)",
-            }}
-          >
-            <div className="message-role">{roleLabel}</div>
-            <div className="message-body plain-text">{message.text}</div>
-            {props.showTimestamp && (
-              <div className="message-meta">
-                <time
-                  className="message-time"
-                  dateTime={formatMessageDateTime(message.timestamp)}
-                  title={formatLocalDateTime(message.timestamp)}
-                  style={{ fontSize: `${props.timestampFontSize}px` }}
-                >
-                  {formatLocalDateTime(message.timestamp)}
-                </time>
-              </div>
-            )}
-          </article>
-        </div>
-      );
-    }
-
-    return (
-      <div
-        className={`message-row ${isUser ? "user" : "assistant"} ${rowMotionClass}`}
-        data-message-id={message.id}
-        style={motionStyle}
-      >
-        <article className={`message-bubble ${isUser ? "user" : "assistant"}`}>
-          <CopyButton text={message.text} />
-          <div className="message-role">{roleLabel}</div>
-          {markdownHtml && (
-            <div
-              className="markdown"
-              dangerouslySetInnerHTML={{ __html: markdownHtml }}
-              onClick={handleMarkdownClick}
-            />
-          )}
-          {message.attachments && message.attachments.length > 0 && (
-            <div className="attachments-wrap">
-              {message.attachments.map((att) => {
-                if (att.isImage) {
-                  return (
-                    <MessageImageAttachment
-                      key={att.id}
-                      attachment={att}
-                      onOpen={props.onOpenImage}
-                      resolveRemoteImage={props.onResolveRemoteImage}
-                    />
-                  );
-                }
-                return renderAttachment(att);
-              })}
-            </div>
-          )}
-          {props.showTimestamp && (
-            <div className="message-meta">
-              <time
-                className="message-time"
-                dateTime={formatMessageDateTime(message.timestamp)}
-                title={formatLocalDateTime(message.timestamp)}
-                style={{ fontSize: `${props.timestampFontSize}px` }}
-              >
-                {formatLocalDateTime(message.timestamp)}
-              </time>
-            </div>
-          )}
-        </article>
-      </div>
-    );
-  },
-  (prev, next) =>
-    prev.message === next.message &&
-    prev.showTimestamp === next.showTimestamp &&
-    prev.timestampFontSize === next.timestampFontSize &&
-    prev.drawerPop === next.drawerPop &&
-    prev.sessionFlyIn === next.sessionFlyIn &&
-    prev.onOpenImage === next.onOpenImage &&
-    prev.onResolveRemoteImage === next.onResolveRemoteImage,
-);
 
 export default function ChatView(props: ChatViewProps) {
   const [activeCommand, setActiveCommand] = useState(0);
@@ -1525,317 +1407,46 @@ export default function ChatView(props: ChatViewProps) {
       </div>
       </div>
 
-      <footer className="composer-shell">
-        <div
-          className={`composer-inner ${composerLaunchActive ? "is-launching" : ""}`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const files = Array.from(e.dataTransfer?.files ?? []);
-            if (files.length === 0) {
-              return;
-            }
-            const reads: Promise<Attachment>[] = files.map((file) => {
-              return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  const dataUrl = typeof reader.result === "string" ? reader.result : "";
-                  resolve({
-                    id: `drop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name}`,
-                    name: file.name,
-                    size: file.size,
-                    type: file.type || "application/octet-stream",
-                    dataUrl,
-                    isImage: file.type.startsWith("image/"),
-                  });
-                };
-                reader.onerror = () => reject(reader.error);
-                reader.readAsDataURL(file);
-              });
-            });
-            Promise.all(reads)
-              .then((next) => {
-                props.onAttachmentsChange([...props.attachments, ...next]);
-              })
-              .catch(() => {
-                // ignore
-              });
-          }}
-        >
-          {composerWarning && (
-            <div className="composer-warning">
-              {composerWarning}
-            </div>
-          )}
-
-          <div className="composer-input-wrap">
-            <textarea
-              ref={composerTextareaRef}
-              value={props.draft}
-              onChange={(e) => props.onDraftChange(e.target.value)}
-              onCompositionStart={() => {
-                isComposingRef.current = true;
-              }}
-              onCompositionEnd={() => {
-                isComposingRef.current = false;
-              }}
-              onKeyDown={onKeyDown}
-              onPaste={(e) => {
-                const items = e.clipboardData?.items;
-                if (!items) {
-                  return;
-                }
-                const imageFiles: File[] = [];
-                for (let i = 0; i < items.length; i += 1) {
-                  const item = items[i];
-                  if (item && item.kind === "file" && item.type.startsWith("image/")) {
-                    const file = item.getAsFile();
-                    if (file) {
-                      imageFiles.push(file);
-                    }
-                  }
-                }
-                if (imageFiles.length === 0) {
-                  return;
-                }
-                e.preventDefault();
-                const reads: Promise<Attachment>[] = imageFiles.map((file) => {
-                  return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      const dataUrl = typeof reader.result === "string" ? reader.result : "";
-                      resolve({
-                        id: `paste-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name}`,
-                        name: file.name || `pasted-image.${file.type.split("/")[1] || "png"}`,
-                        size: file.size,
-                        type: file.type || "image/png",
-                        dataUrl,
-                        isImage: true,
-                      });
-                    };
-                    reader.onerror = () => reject(reader.error);
-                    reader.readAsDataURL(file);
-                  });
-                });
-                Promise.all(reads)
-                  .then((next) => {
-                    props.onAttachmentsChange([...props.attachments, ...next]);
-                  })
-                  .catch(() => {
-                    // ignore
-                  });
-              }}
-              placeholder="Type a message or /command"
-              className="composer-textarea"
-              style={{
-                fontFamily: "var(--claw-font)",
-                fontSize: "var(--claw-font-size)",
-                lineHeight: "var(--claw-line-height)",
-              }}
-            />
-
-            {showSlashMenu && commandSuggestions.length > 0 && (
-              <div className="slash-menu" style={{ fontSize: typographyFontSize }}>
-                {commandSuggestions.map((cmd, idx) => (
-                  <button
-                    key={`${cmd.name}-${cmd.value ?? cmd.description}`}
-                    type="button"
-                    onClick={() => applySuggestion(cmd)}
-                    className={`slash-item ${idx === activeCommand ? "active" : ""}`}
-                  >
-                    <span className="slash-name">/{cmd.name}</span>
-                    <span className="slash-detail">{cmd.value ?? cmd.description}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {props.attachments.length > 0 && (
-            <div className="attachment-preview-list">
-              {props.attachments.map((att) => (
-                <div key={att.id} className={`attachment-preview-item ${att.isImage ? "is-image" : "is-file"}`}>
-                  {att.isImage ? (
-                    <div className="attachment-preview-thumb">
-                      <img src={att.dataUrl} alt={att.name} className="attachment-preview-img" />
-                    </div>
-                  ) : (
-                    <div className="attachment-preview-file-icon">
-                      <span className="attachment-preview-file-ext">
-                        {att.name.split(".").pop()?.toUpperCase().slice(0, 4) || "FILE"}
-                      </span>
-                    </div>
-                  )}
-                  <div className="attachment-preview-info">
-                    <span className="attachment-preview-name" title={att.name}>{truncate(att.name, 20)}</span>
-                    <span className="attachment-preview-size">{formatBytes(att.size)}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      props.onAttachmentsChange(props.attachments.filter((item) => item.id !== att.id))
-                    }
-                    className="attachment-preview-remove"
-                    aria-label={`Remove ${att.name}`}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="composer-actions-row">
-            <div className="composer-actions">
-              <label
-                className="attachment-trigger"
-                style={{
-                  fontSize: actionFontSize,
-                  padding: `${Math.round(5 * actionScale)}px ${Math.round(10 * actionScale)}px`,
-                  minHeight: "auto",
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
-                Attach
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files ?? []);
-                    const events: Promise<Attachment>[] = files.map((file) => {
-                      return new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const dataUrl = typeof reader.result === "string" ? reader.result : "";
-                          resolve({
-                            id: `${file.name}-${file.size}-${file.lastModified}`,
-                            name: file.name,
-                            size: file.size,
-                            type: file.type || "application/octet-stream",
-                            dataUrl,
-                            isImage: file.type.startsWith("image/"),
-                          });
-                        };
-                        reader.onerror = () => reject(reader.error);
-                        reader.readAsDataURL(file);
-                      });
-                    });
-                    Promise.all(events)
-                      .then((next) => {
-                        props.onAttachmentsChange([...props.attachments, ...next]);
-                      })
-                      .catch(() => {
-                        // ignore
-                      });
-                  }}
-                />
-              </label>
-
-              <button
-                type="button"
-                onClick={sendWithPhysics}
-                disabled={!props.connected}
-                className="ui-btn ui-btn-primary"
-                style={{
-                  fontSize: sendFontSize,
-                  padding: `${Math.round(6 * actionScale)}px ${Math.round(16 * actionScale)}px`,
-                  minHeight: "auto",
-                }}
-              >
-                Send
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "-2px" }}><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-              </button>
-            </div>
-
-            <div className="footer-stats" style={{ fontSize: `${props.uiSettings.footerStatsFontSize}px` }}>
-              {props.onCompact && (
-                <button
-                  type="button"
-                  onClick={props.onCompact}
-                  className="ui-btn ui-btn-light compact-btn"
-                  title="Compact session context"
-                  style={{
-                    fontSize: `${props.uiSettings.footerStatsFontSize}px`,
-                    padding: `${Math.round(props.uiSettings.footerStatsFontSize * 0.45)}px ${Math.round(props.uiSettings.footerStatsFontSize * 0.8)}px`,
-                    minHeight: "auto",
-                  }}
-                >
-                  🧹 Compact
-                </button>
-              )}
-              <span>
-                Context:{" "}
-                {(() => {
-                  const total =
-                    props.sessionInfo.totalTokens ??
-                    (Number.isFinite(props.sessionInfo.inputTokens) || Number.isFinite(props.sessionInfo.outputTokens)
-                      ? (props.sessionInfo.inputTokens ?? 0) + (props.sessionInfo.outputTokens ?? 0)
-                      : null);
-                  const used = Number.isFinite(total) ? total : null;
-                  const modelId = props.sessionInfo.modelId || props.sessionInfo.modelLabel;
-                  const model =
-                    props.models.find((item) => item.id === modelId) ??
-                    props.models.find((item) => `${item.provider}/${item.id}` === modelId) ??
-                    props.models.find((item) => `${item.provider}/${item.name}` === modelId) ??
-                    null;
-                  const limit = model?.contextWindow ?? props.sessionInfo.contextLimit ?? null;
-                  if (!Number.isFinite(used)) {
-                    return "-";
-                  }
-                  if (Number.isFinite(limit)) {
-                    const percent = Math.max(0, Math.min(100, ((used as number) / (limit as number)) * 100));
-                    return `${formatCompactTokens(used)} / ${formatCompactTokens(limit)} (${percent.toFixed(0)}%)`;
-                  }
-                  return formatCompactTokens(used);
-                })()}
-              </span>
-              <span>In: {formatCompactTokens(props.sessionInfo.inputTokens)}</span>
-              <span>Out: {formatCompactTokens(props.sessionInfo.outputTokens)}</span>
-              <span>Total: {formatCompactTokens(props.sessionInfo.totalTokens)}</span>
-
-              <div className={`relative ${thinkingMenuOpen ? "menu-open-ctx" : ""}`} ref={thinkingMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setThinkingMenuOpen((prev) => !prev)}
-                  className="ui-btn ui-btn-light"
-                  style={{
-                    fontSize: `${props.uiSettings.footerStatsFontSize}px`,
-                    padding: `${Math.round(props.uiSettings.footerStatsFontSize * 0.45)}px ${Math.round(props.uiSettings.footerStatsFontSize * 0.8)}px`,
-                    minHeight: "auto",
-                  }}
-                >
-                  Thinking: {activeThinking}
-                </button>
-                {thinkingMenuOpen && (
-                  <div className="thinking-menu">
-                    {thinkChoices.map((level) => {
-                      const isActive = level === activeThinking;
-                      return (
-                        <button
-                          key={level}
-                          type="button"
-                          onClick={() => {
-                            setThinkingMenuOpen(false);
-                            props.onThinkingSelect(level);
-                          }}
-                          className={`thinking-item ${isActive ? "active" : ""}`}
-                        >
-                          {level}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Composer
+        composerLaunchActive={composerLaunchActive}
+        composerWarning={composerWarning}
+        draft={props.draft}
+        attachments={props.attachments}
+        connected={props.connected}
+        uiSettings={{
+          composerActionScale: actionScale,
+          footerStatsFontSize: props.uiSettings.footerStatsFontSize,
+          composeActionsFontSize: Math.round(12 * actionScale),
+          composeSendFontSize: Math.round(14 * actionScale),
+        }}
+        commandSuggestions={commandSuggestions}
+        showSlashMenu={showSlashMenu}
+        activeCommand={activeCommand}
+        thinkingMenuOpen={thinkingMenuOpen}
+        thinkingMenuRef={thinkingMenuRef}
+        activeThinking={activeThinking}
+        thinkChoices={thinkChoices}
+        sessionInfo={props.sessionInfo}
+        models={props.models}
+        onDraftChange={props.onDraftChange}
+        onAttachmentsChange={props.onAttachmentsChange}
+        onKeyDown={onKeyDown}
+        onCompositionStart={() => {
+          isComposingRef.current = true;
+        }}
+        onCompositionEnd={() => {
+          isComposingRef.current = false;
+        }}
+        onApplySuggestion={applySuggestion}
+        onSend={sendWithPhysics}
+        onCompact={props.onCompact}
+        onThinkingMenuToggle={() => setThinkingMenuOpen((prev) => !prev)}
+        onThinkingSelect={(level) => {
+          setThinkingMenuOpen(false);
+          props.onThinkingSelect(level);
+        }}
+        textareaRef={composerTextareaRef}
+      />
 
       {imageLightbox && (
         <div
