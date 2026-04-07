@@ -330,6 +330,93 @@ A clearer connection-state UX flow.
 - the user can tell what the app is doing during backend interruptions
 - reconnects do not feel like silent breakage
 
+### Implementation notes (2026-04-07)
+
+This ticket has now been completed as a first-pass UX improvement on top of the `connectionState` model introduced in 1.1.2.
+
+#### Desired user-facing states defined
+For the current shell, the useful first-pass states are:
+- `connected`
+- `connecting`
+- `pairing-required`
+- `error`
+- `disconnected`
+
+These now map more clearly to user-facing shell status than the previous binary connected/disconnected treatment.
+
+#### Key implementation changes
+
+##### 1. `ChatView` now accepts `connectionStatus`
+A new prop was added to `ChatView`:
+- `connectionStatus?: ConnectionStatus`
+
+This allows the chat shell to render richer connection UX than just `connected: boolean`.
+
+##### 2. Topbar status is now lifecycle-aware
+Previously the topbar only showed:
+- `Gateway connected`
+- `Gateway disconnected`
+
+It now renders more specific states:
+- `Gateway connected`
+- `Connecting to gateway…`
+- `Gateway pairing required`
+- `Gateway connection error`
+- `Gateway disconnected`
+
+##### 3. Composer warning messaging is now lifecycle-aware
+Previously the composer warning only appeared when not connected and mostly rendered a generic disconnected message.
+
+It now renders different warning text based on `connectionStatus`:
+- connecting → `Connecting to the gateway…`
+- pairing-required → pairing guidance
+- error → explicit connection error guidance
+- disconnected → disconnected guidance
+
+##### 4. Reconnect state is now surfaced during retry behavior
+`GatewayClient` already had automatic reconnect behavior internally.
+What was missing was a user-facing reconnect state.
+
+The app now sets `connectionState.status = "connecting"` in reconnect-oriented close cases instead of collapsing immediately to a generic disconnected state.
+
+Current first-pass rule:
+- if the client is not intentionally closed and the close is not a normal 1000 close, the app surfaces `connecting`
+- pairing-required still becomes `pairing-required`
+- explicit reason-bearing failures can still surface as `error`
+- normal/no-retry-style cases can still surface as `disconnected`
+
+##### 5. `app.tsx` passes the new lifecycle state into `ChatView`
+`ChatView` now receives:
+- `connected`
+- `connectionStatus`
+- `disabledReason`
+
+This is an incremental improvement that keeps compatibility while making the UX less coarse.
+
+#### What this ticket improved for the user
+- backend interruptions are less likely to feel like silent breakage
+- reconnecting now looks like an active state rather than a dead one
+- pairing-required is more clearly distinguished from generic failure
+- the shell now communicates more of the connection lifecycle honestly
+
+#### Remaining limitations
+
+##### 1. Reconnect state is still inferred at the app/UI boundary
+This is good enough for now, but a future store/domain layer could make reconnect intent more explicit.
+
+##### 2. `connected` is still passed alongside `connectionStatus`
+This is acceptable for the transition, but eventually the UI could rely more directly on the richer state model.
+
+##### 3. There is still room for a more visible shell-level reconnect banner or status surface
+For now the improvement lives mainly in:
+- topbar status
+- composer warning text
+
+That is a good first pass, not the final word.
+
+#### Recommended next step
+Move on to ticket `1.1.4` or `1.2.1` depending on whether the next priority is session-state mapping or ChatView decomposition.
+
 ---
 
 ## Ticket 1.1.4 — Audit current session-selection ownership and flow
