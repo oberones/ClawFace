@@ -829,13 +829,6 @@ function MessageImageAttachment(props: {
 }
 
 function renderAttachment(att: Attachment) {
-  if (att.isImage) {
-    return (
-      <div key={att.id} className="attachment-image">
-        <img src={att.dataUrl} alt={att.name} className="attachment-image-preview" />
-      </div>
-    );
-  }
   return (
     <div key={att.id} className="attachment-file">
       <div>
