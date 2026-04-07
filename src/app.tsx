@@ -4627,10 +4627,6 @@ export default function App() {
       },
       onClose: (info) => {
         gatewayMethodsRef.current.clear();
-        setConnectionState((prev) => ({
-          ...prev,
-          status: "connecting",
-        }));
         const reason = info.reason?.trim() ?? "";
         if (reason.toLowerCase().includes("pairing")) {
           setConnectionState({
@@ -4643,7 +4639,7 @@ export default function App() {
             !reason && info.code === 1006
               ? "Handshake failed. Check Gateway URL/path or Origin allowlist."
               : "";
-          const nextStatus = !client.closed && info.code !== 1000 ? "connecting" : reason ? "error" : "disconnected";
+          const nextStatus = !client.isClosed && info.code !== 1000 ? "connecting" : reason ? "error" : "disconnected";
           const note = nextStatus === "connecting"
             ? "Connection lost. Reconnecting…"
             : reason
