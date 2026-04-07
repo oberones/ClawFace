@@ -3561,6 +3561,7 @@ export default function App() {
   const historyLimitBySessionRef = useRef<Record<string, number>>({});
   const historyCanLoadMoreBySessionRef = useRef<Record<string, boolean>>({});
   const historyLoadInFlightRef = useRef(new Set<string>());
+  const loadingSessionKeyRef = useRef<string | null>(null);
   const replyDoneSoundRef = useRef<ReturnType<typeof createReplyDoneSoundPlayer> | null>(null);
   const agentFinalizeTimerByRunRef = useRef<Record<string, number>>({});
   const finalizedAssistantByRunRef = useRef<Map<string, string>>(new Map());
@@ -3579,6 +3580,10 @@ export default function App() {
   const sessionPreviewKeysSignatureRef = useRef("");
 
   useEffect(() => {
+    if (loadingSessionKeyRef.current !== null && loadingSessionKeyRef.current !== selectedSessionKey) {
+      loadingSessionKeyRef.current = null;
+      setIsCurrentSessionLoading(false);
+    }
     selectedSessionRef.current = selectedSessionKey;
   }, [selectedSessionKey]);
 
@@ -5230,6 +5235,7 @@ export default function App() {
 
   async function loadHistory(client: GatewayClient, key: string, requestedLimit?: number) {
     if (selectedSessionRef.current === key) {
+      loadingSessionKeyRef.current = key;
       setIsCurrentSessionLoading(true);
     }
     try {
@@ -5328,6 +5334,9 @@ export default function App() {
       historyLoadInFlightRef.current.delete(key);
       if (selectedSessionRef.current === key) {
         setLoadingOlderHistory(false);
+      }
+      if (loadingSessionKeyRef.current === key) {
+        loadingSessionKeyRef.current = null;
         setIsCurrentSessionLoading(false);
       }
     }
