@@ -16,6 +16,7 @@ import {
   type GatewaySessionRow,
   type ModelsListResult,
   type SessionPreviewItem,
+  type SessionState,
   type SessionsListResult,
   type SessionsPreviewResult,
   type ToolItem,
@@ -3464,14 +3465,35 @@ export default function App() {
     reason: null,
     note: null,
   });
-  const [sessions, setSessions] = useState<GatewaySessionRow[]>([]);
+  const [sessionState, setSessionState] = useState<SessionState>({
+    selectedSessionKey: loadStored(STORAGE_KEYS.lastSession, ""),
+    sessions: [],
+    isCurrentSessionLoading: false,
+    transitionState: "idle",
+  });
+  const { selectedSessionKey, sessions } = sessionState;
+  const setSessions = useCallback((value: React.SetStateAction<GatewaySessionRow[]>) => {
+    setSessionState((prev) => ({
+      ...prev,
+      sessions: typeof value === "function" ? (value as (prev: GatewaySessionRow[]) => GatewaySessionRow[])(prev.sessions) : value,
+    }));
+  }, []);
+  const setSelectedSessionKey = useCallback((value: React.SetStateAction<string | null>) => {
+    setSessionState((prev) => ({
+      ...prev,
+      selectedSessionKey: typeof value === "function" ? (value as (prev: string | null) => string | null)(prev.selectedSessionKey) : value,
+    }));
+  }, []);
+  const setIsCurrentSessionLoading = useCallback((value: boolean) => {
+    setSessionState((prev) => ({ ...prev, isCurrentSessionLoading: value }));
+  }, []);
+  const setSessionTransitionState = useCallback((value: SessionState["transitionState"]) => {
+    setSessionState((prev) => ({ ...prev, transitionState: value }));
+  }, []);
   const [sessionPreviews, setSessionPreviews] = useState<Record<string, SessionPreviewItem[]>>({});
   const [allSessionRows, setAllSessionRows] = useState<Record<string, GatewaySessionRow>>({});
   const [sessionDefaults, setSessionDefaults] = useState<SessionsListResult["defaults"] | null>(
     null,
-  );
-  const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(
-    loadStored(STORAGE_KEYS.lastSession, ""),
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -3539,6 +3561,7 @@ export default function App() {
   const historyLimitBySessionRef = useRef<Record<string, number>>({});
   const historyCanLoadMoreBySessionRef = useRef<Record<string, boolean>>({});
   const historyLoadInFlightRef = useRef(new Set<string>());
+  const loadingSessionKeyRef = useRef<string | null>(null);
   const replyDoneSoundRef = useRef<ReturnType<typeof createReplyDoneSoundPlayer> | null>(null);
   const agentFinalizeTimerByRunRef = useRef<Record<string, number>>({});
   const finalizedAssistantByRunRef = useRef<Map<string, string>>(new Map());
@@ -3557,6 +3580,10 @@ export default function App() {
   const sessionPreviewKeysSignatureRef = useRef("");
 
   useEffect(() => {
+    if (loadingSessionKeyRef.current !== null && loadingSessionKeyRef.current !== selectedSessionKey) {
+      loadingSessionKeyRef.current = null;
+      setIsCurrentSessionLoading(false);
+    }
     selectedSessionRef.current = selectedSessionKey;
   }, [selectedSessionKey]);
 
@@ -5207,6 +5234,10 @@ export default function App() {
   }
 
   async function loadHistory(client: GatewayClient, key: string, requestedLimit?: number) {
+    if (selectedSessionRef.current === key) {
+      loadingSessionKeyRef.current = key;
+      setIsCurrentSessionLoading(true);
+    }
     try {
       const limit = Math.min(
         CHAT_HISTORY_MAX_LIMIT,
@@ -5275,6 +5306,7 @@ export default function App() {
       if (!isActiveSession) {
         return;
       }
+      setSessionTransitionState("idle");
       thinkingLevelRef.current = resolvedThinkingLevel;
       setThinkingLevel(resolvedThinkingLevel);
       messagesRef.current = historyMessages;
@@ -5302,6 +5334,10 @@ export default function App() {
       historyLoadInFlightRef.current.delete(key);
       if (selectedSessionRef.current === key) {
         setLoadingOlderHistory(false);
+      }
+      if (loadingSessionKeyRef.current === key) {
+        loadingSessionKeyRef.current = null;
+        setIsCurrentSessionLoading(false);
       }
     }
   }
@@ -5712,6 +5748,7 @@ export default function App() {
     restoreFromCache(key);
     selectedSessionRef.current = key;
     setCanLoadMoreHistory(historyCanLoadMoreBySessionRef.current[key] ?? false);
+    setSessionTransitionState(previousKey && previousKey !== key ? "switching" : "idle");
     setSelectedSessionKey(key);
   }
 
