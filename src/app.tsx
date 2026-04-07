@@ -3471,7 +3471,7 @@ export default function App() {
     isCurrentSessionLoading: false,
     transitionState: "idle",
   });
-  const { selectedSessionKey, sessions } = sessionState;
+  const { selectedSessionKey, sessions, isCurrentSessionLoading, transitionState } = sessionState;
   const setSessions = useCallback((value: React.SetStateAction<GatewaySessionRow[]>) => {
     setSessionState((prev) => ({
       ...prev,
@@ -6706,6 +6706,8 @@ export default function App() {
             uiSettings={uiSettings}
             canLoadOlder={canLoadMoreHistory}
             loadingOlder={loadingOlderHistory}
+            isCurrentSessionLoading={isCurrentSessionLoading}
+            sessionTransitionState={transitionState}
             onLoadOlder={() => void handleLoadOlderHistory()}
             onModelSelect={(model) => void handleSelectModel(model)}
             onThinkingSelect={(level) => void handleSelectThinking(level)}
