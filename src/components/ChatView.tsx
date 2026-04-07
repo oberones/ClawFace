@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import type { Attachment, ChatMessage, ToolItem } from "../lib/types.ts";
+import type { Attachment, ChatMessage, ConnectionStatus, ToolItem } from "../lib/types.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { formatBytes, formatCompactTokens, truncate } from "../lib/format.ts";
 import { BASE_COMMANDS, type SlashCommand } from "../lib/slash-commands.ts";
@@ -34,6 +34,7 @@ type ChatViewProps = {
   onAbort: () => void;
   canAbort: boolean;
   connected: boolean;
+  connectionStatus?: ConnectionStatus;
   disabledReason?: string | null;
   sessionInfo: SessionInfo;
   models: Array<{ id: string; name: string; provider: string; contextWindow?: number }>;
@@ -2180,14 +2181,46 @@ export default function ChatView(props: ChatViewProps) {
     [outgoingThreadSnapshot],
   );
 
+  const connectionStatus = props.connectionStatus ?? (props.connected ? "connected" : "disconnected");
+  const statusLabel =
+    connectionStatus === "connected"
+      ? "Gateway connected"
+      : connectionStatus === "connecting"
+        ? "Connecting to gateway…"
+        : connectionStatus === "pairing-required"
+          ? "Gateway pairing required"
+          : connectionStatus === "error"
+            ? "Gateway connection error"
+            : "Gateway disconnected";
+  const statusDotClass =
+    connectionStatus === "connected"
+      ? "connected"
+      : connectionStatus === "connecting"
+        ? "connecting"
+        : connectionStatus === "pairing-required"
+          ? "warning"
+          : connectionStatus === "error"
+            ? "warning"
+            : "disconnected";
+  const composerWarning =
+    connectionStatus === "connecting"
+      ? props.disabledReason || "Connecting to the gateway…"
+      : connectionStatus === "pairing-required"
+        ? props.disabledReason || "Pairing required before sending messages."
+        : connectionStatus === "error"
+          ? props.disabledReason || "Gateway connection error. Check settings and retry."
+          : !props.connected
+            ? props.disabledReason || "Gateway disconnected. Update settings to reconnect."
+            : null;
+
   return (
     <section className="claw-chat-area chat-shell">
       <header className={`chat-header ${modelMenuOpen || thinkingMenuOpen ? "menu-layer-active" : ""}`}>
         <div className="chat-header-main">
           <div className="chat-brand-title">ClawUI</div>
           <div className="topbar-status">
-            <span className={`status-dot ${props.connected ? "connected" : "disconnected"}`} />
-            <span>{props.connected ? "Gateway connected" : "Gateway disconnected"}</span>
+            <span className={`status-dot ${statusDotClass}`} />
+            <span>{statusLabel}</span>
           </div>
         </div>
 
@@ -2467,9 +2500,9 @@ export default function ChatView(props: ChatViewProps) {
               });
           }}
         >
-          {!props.connected && (
+          {composerWarning && (
             <div className="composer-warning">
-              {props.disabledReason || "Gateway disconnected. Update settings to reconnect."}
+              {composerWarning}
             </div>
           )}
 
