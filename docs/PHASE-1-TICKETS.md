@@ -1500,6 +1500,76 @@ A clearer composer behavior model.
 
 ### Done when
 - composer behavior feels predictable in the most common edge conditions
+- `make typecheck` and `make build` pass for the behavior changes
+
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as a first-pass explicit composer behavior model cleanup.
+
+#### Key behavior changes landed
+
+##### 1. Composer state is now session-scoped
+The existing per-session `SessionViewState` cache in `src/app.tsx` now explicitly includes:
+- `draft`
+- `attachments`
+
+This means composer state is no longer treated as an accidental global surface while the rest of the thread/runtime state is session-specific.
+
+##### 2. Session switching now preserves composer work intentionally
+When switching sessions:
+- the current session's draft and staged attachments are saved into the session view cache
+- the target session's cached draft and attachments are restored
+
+This makes session switching much less destructive and much more predictable for in-progress work.
+
+##### 3. New sessions explicitly clear composer state
+When creating a new session, the app now intentionally initializes a fresh composer state:
+- empty draft
+- no staged attachments
+
+That is clearer than inheriting whatever happened to be on screen previously.
+
+##### 4. History reloads preserve composer state
+When session history is reloaded/refreshed, the per-session draft and attachment state is preserved instead of being implicitly blown away by a cache rewrite.
+
+##### 5. Busy vs offline vs ready composer runtime state is now explicit
+`ChatView.tsx` now computes a first-pass composer runtime model:
+- `ready`
+- `busy`
+- `offline`
+
+Current first-pass rules:
+- `ready` → connected and no active run; send enabled
+- `busy` → active run/thinking state present; typing still allowed, but a second send is disabled
+- `offline` → disconnected/error-style state; send disabled
+
+##### 6. Busy-state send behavior is clearer
+When a run is already in progress:
+- the user can continue editing the draft
+- the user cannot send again until the run completes or is stopped
+- the composer warning explains that a run is already active
+
+This is a more explicit and less accidental behavior model than simply relying on a mix of `connected`, `thinking`, and `canAbort` state in different places.
+
+#### What this ticket intentionally does *not* solve yet
+- It does not introduce per-session draft persistence to disk; this is session-runtime state only
+- It does not redesign all slash-command execution semantics
+- It does not yet fully model every edge case around reconnecting mid-stream across all backend event paths
+
+That is acceptable for this phase because the ticket goal was to make the composer behavior **predictable in the common cases**, not to complete the entire future composer architecture in one pass.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `1.3.4` — reduce prop and state sprawl between shell and composer — now that:
+- the composer component boundary exists
+- slash-command behavior has been extracted
+- first-pass composer runtime behavior rules have been made explicit
 
 ---
 
