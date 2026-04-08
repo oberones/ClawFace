@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Attachment } from "../lib/types.ts";
 
 async function fileToAttachment(file: File, idPrefix: string): Promise<Attachment> {
@@ -15,29 +15,52 @@ async function fileToAttachment(file: File, idPrefix: string): Promise<Attachmen
         isImage: file.type.startsWith("image/"),
       });
     };
-    reader.onerror = () => reject(reader.error);
+    reader.onerror = () => reject(reader.error ?? new Error(`Failed to read ${file.name}`));
     reader.readAsDataURL(file);
   });
+}
+
+function isFileDrag(event: React.DragEvent<HTMLElement>): boolean {
+  const types = Array.from(event.dataTransfer?.types ?? []);
+  if (types.includes("Files")) {
+    return true;
+  }
+  const items = Array.from(event.dataTransfer?.items ?? []);
+  return items.some((item) => item.kind === "file");
 }
 
 export type UseAttachmentIngestionOptions = {
   attachments: Attachment[];
   onAttachmentsChange: (next: Attachment[]) => void;
+  onError?: (message: string) => void;
 };
 
 export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   const [isDragActive, setIsDragActive] = useState(false);
   const dragDepthRef = useRef(0);
+  const attachmentsRef = useRef(options.attachments);
+
+  useEffect(() => {
+    attachmentsRef.current = options.attachments;
+  }, [options.attachments]);
 
   const appendFiles = useCallback(async (files: File[], idPrefix: string) => {
     if (files.length === 0) {
       return;
     }
-    const next = await Promise.all(files.map((file) => fileToAttachment(file, idPrefix)));
-    options.onAttachmentsChange([...options.attachments, ...next]);
-  }, [options.attachments, options.onAttachmentsChange]);
+    try {
+      const next = await Promise.all(files.map((file) => fileToAttachment(file, idPrefix)));
+      options.onAttachmentsChange([...attachmentsRef.current, ...next]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to ingest attachments.";
+      options.onError?.(message);
+    }
+  }, [options.onAttachmentsChange, options.onError]);
 
   const handleDragEnter = useCallback((event: React.DragEvent<HTMLElement>) => {
+    if (!isFileDrag(event)) {
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     dragDepthRef.current += 1;
@@ -45,6 +68,9 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   }, []);
 
   const handleDragOver = useCallback((event: React.DragEvent<HTMLElement>) => {
+    if (!isFileDrag(event)) {
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     if (!isDragActive) {
@@ -53,6 +79,9 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   }, [isDragActive]);
 
   const handleDragLeave = useCallback((event: React.DragEvent<HTMLElement>) => {
+    if (!isFileDrag(event)) {
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
@@ -62,6 +91,9 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   }, []);
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLElement>) => {
+    if (!isFileDrag(event)) {
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     dragDepthRef.current = 0;
@@ -93,13 +125,14 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   }, [appendFiles]);
 
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []);
+    const files = Array.from(event.currentTarget.files ?? []);
+    event.currentTarget.value = "";
     void appendFiles(files, "upload");
   }, [appendFiles]);
 
   const removeAttachment = useCallback((attachmentId: string) => {
-    options.onAttachmentsChange(options.attachments.filter((item) => item.id !== attachmentId));
-  }, [options.attachments, options.onAttachmentsChange]);
+    options.onAttachmentsChange(attachmentsRef.current.filter((item) => item.id !== attachmentId));
+  }, [options.onAttachmentsChange]);
 
   const dragBindings = useMemo(() => ({
     onDragEnter: handleDragEnter,
