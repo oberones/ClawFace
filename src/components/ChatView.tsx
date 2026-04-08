@@ -13,6 +13,7 @@ import {
 } from "./MessageRow.tsx";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
+import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
 
@@ -64,7 +65,6 @@ type ChatViewProps = {
 };
 
 const MESSAGE_RENDER_STEP = 60;
-const AUTO_SCROLL_BOTTOM_THRESHOLD = 10;
 const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 const SESSION_SWITCH_OUT_MS = 260;
 const SESSION_SWITCH_IN_MS = 800;
@@ -88,11 +88,9 @@ type ThreadSnapshot = {
 
 export default function ChatView(props: ChatViewProps) {
   const [activeCommand, setActiveCommand] = useState(0);
-  const [toolExpanded, setToolExpanded] = useState<Record<string, boolean>>({});
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [thinkingMenuOpen, setThinkingMenuOpen] = useState(false);
-  const [visibleMessageCount, setVisibleMessageCount] = useState(MESSAGE_RENDER_STEP);
-  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const [toolExpanded, setToolExpanded] = useState<Record<string, boolean>>({});
   const [imageLightbox, setImageLightbox] = useState<Attachment | null>(null);
   const [chatImpulseActive, setChatImpulseActive] = useState(false);
   const [composerLaunchActive, setComposerLaunchActive] = useState(false);
@@ -109,10 +107,7 @@ export default function ChatView(props: ChatViewProps) {
   const isComposingRef = useRef(false);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const thinkingMenuRef = useRef<HTMLDivElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const restoreScrollRef = useRef<{ height: number; top: number } | null>(null);
-  const olderLoadRequestedRef = useRef(false);
   const prevSessionKeyRef = useRef<string | null>(props.sessionKey);
   const prevSessionKeyForLayoutRef = useRef<string | null>(props.sessionKey);
 
@@ -162,6 +157,30 @@ export default function ChatView(props: ChatViewProps) {
   const latestThreadSnapshotRef = useRef<ThreadSnapshot | null>(null);
   const snapshotSessionKeyRef = useRef<string | null>(props.sessionKey);
 
+  const orderedTools = useMemo(
+    () => [...props.toolItems].sort((a, b) => a.startedAt - b.startedAt),
+    [props.toolItems],
+  );
+  const {
+    scrollRef,
+    visibleMessageCount,
+    autoScrollEnabled,
+    onScroll,
+    resetAutoScrollState,
+  } = useAutoScroll({
+    messageCount: props.messages.length,
+    lastMessageRole: props.messages[Math.max(0, props.messages.length - 1)]?.role ?? null,
+    orderedTools,
+    streamText: props.streamText,
+    thinking: props.thinking,
+    canLoadOlder: props.canLoadOlder,
+    loadingOlder: props.loadingOlder,
+    showToolActivity: props.uiSettings.showToolActivity,
+    autoScrollAssistantResponses: props.uiSettings.autoScrollAssistantResponses,
+    messageRenderStep: MESSAGE_RENDER_STEP,
+    onLoadOlder: props.onLoadOlder,
+  });
+
   const displayedMessages = useMemo(() => {
     const total = props.messages.length;
     const count = Math.max(0, Math.min(total, visibleMessageCount));
@@ -170,10 +189,6 @@ export default function ChatView(props: ChatViewProps) {
 
   const hiddenMessageCount = Math.max(0, props.messages.length - displayedMessages.length);
 
-  const orderedTools = useMemo(
-    () => [...props.toolItems].sort((a, b) => a.startedAt - b.startedAt),
-    [props.toolItems],
-  );
   const toolTimeline = useMemo(() => {
     const beforeFirst: ToolItem[] = [];
     const byMessageId = new Map<string, ToolItem[]>();
@@ -568,8 +583,7 @@ export default function ChatView(props: ChatViewProps) {
 
     prevSessionKeyRef.current = props.sessionKey;
     setToolExpanded({});
-    setVisibleMessageCount(MESSAGE_RENDER_STEP);
-    setAutoScrollEnabled(true);
+    resetAutoScrollState();
     setImageLightbox(null);
     setModelMenuOpen(false);
     setThinkingMenuOpen(false);
@@ -598,23 +612,6 @@ export default function ChatView(props: ChatViewProps) {
     triggerVisibleSessionFlyIn,
   ]);
 
-  useEffect(() => {
-    const pending = restoreScrollRef.current;
-    const container = scrollRef.current;
-    if (!pending || !container) {
-      return;
-    }
-    const delta = container.scrollHeight - pending.height;
-    container.scrollTop = pending.top + delta;
-    restoreScrollRef.current = null;
-  }, [displayedMessages.length]);
-
-  useEffect(() => {
-    if (props.loadingOlder) {
-      return;
-    }
-    olderLoadRequestedRef.current = false;
-  }, [props.loadingOlder]);
 
   useEffect(() => {
     if (sessionTransitionPhase !== "idle") {
@@ -828,58 +825,6 @@ export default function ChatView(props: ChatViewProps) {
     return !isDesktopRuntime() && isLikelyLocalFileSource(imageLightbox.dataUrl);
   }, [imageLightbox]);
 
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container || !autoScrollEnabled || !props.uiSettings.showToolActivity) {
-      return;
-    }
-    container.scrollTop = container.scrollHeight;
-  }, [orderedTools, autoScrollEnabled, props.uiSettings.showToolActivity]);
-
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container || !autoScrollEnabled) {
-      return;
-    }
-    const lastMessage = displayedMessages[displayedMessages.length - 1];
-    if (lastMessage?.role === "assistant" && !props.uiSettings.autoScrollAssistantResponses) {
-      return;
-    }
-    if (props.streamText && !props.uiSettings.autoScrollAssistantResponses) {
-      return;
-    }
-    container.scrollTop = container.scrollHeight;
-  }, [
-    displayedMessages,
-    props.streamText,
-    props.thinking,
-    autoScrollEnabled,
-    props.uiSettings.autoScrollAssistantResponses,
-  ]);
-
-  const onScroll: React.UIEventHandler<HTMLDivElement> = (event) => {
-    const container = event.currentTarget;
-    const distanceToBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
-    const nearBottom = distanceToBottom <= AUTO_SCROLL_BOTTOM_THRESHOLD;
-    if (nearBottom !== autoScrollEnabled) {
-      setAutoScrollEnabled(nearBottom);
-    }
-    if (container.scrollTop > 80) {
-      return;
-    }
-    if (visibleMessageCount < props.messages.length) {
-      restoreScrollRef.current = {
-        height: container.scrollHeight,
-        top: container.scrollTop,
-      };
-      setVisibleMessageCount((prev) => Math.min(props.messages.length, prev + MESSAGE_RENDER_STEP));
-      return;
-    }
-    if (props.canLoadOlder && !props.loadingOlder && !olderLoadRequestedRef.current) {
-      olderLoadRequestedRef.current = true;
-      props.onLoadOlder();
-    }
-  };
 
   const actionScale = props.uiSettings.composerActionScale;
   const actionFontSize = `${Math.round(12 * actionScale)}px`;
@@ -896,11 +841,6 @@ export default function ChatView(props: ChatViewProps) {
   const toolMinorFontSize = `${Math.max(10, props.uiSettings.toolCallFontSize - 2)}px`;
   const typographyFontSize = `${props.uiSettings.fontSize}px`;
 
-  useEffect(() => {
-    if (props.messages.length < visibleMessageCount) {
-      setVisibleMessageCount(Math.max(MESSAGE_RENDER_STEP, props.messages.length));
-    }
-  }, [props.messages.length, visibleMessageCount]);
 
   useLayoutEffect(() => {
     autoResizeComposer();

@@ -1592,6 +1592,56 @@ A cleaner shell/composer boundary.
 
 ### Done when
 - the composer interface is easier to understand than a bag of unrelated values and callbacks
+- `make typecheck` and `make build` pass for the refactor
+
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as a shell/composer interface cleanup pass.
+
+#### What changed
+`src/components/Composer.tsx` no longer accepts one large flat prop bag mixing unrelated responsibilities.
+
+Instead, the component now accepts a smaller set of coherent prop groups:
+- `uiSettings`
+- `input`
+- `slash`
+- `runtime`
+- `footer`
+
+#### Why this is better
+Before this ticket, the `Composer` boundary existed, but the interface still leaked too many unrelated concerns in one undifferentiated prop list.
+That made the extraction structurally real but still harder to reason about than it should have been.
+
+After this ticket:
+- input-state concerns are grouped together
+- slash-command concerns are grouped together
+- runtime/send-state concerns are grouped together
+- footer/thinking/session-stats concerns are grouped together
+
+That makes the shell/composer seam more legible without pushing orchestration logic back into `ChatView.tsx`.
+
+#### What this ticket accomplished
+- reduced prop-surface sprawl between `ChatView` and `Composer`
+- made the `Composer` interface easier to understand and evolve
+- clarified which concerns belong to which part of the composer surface
+- created a better base for any future composer-internal subcomponents or hooks
+
+#### What this ticket intentionally does *not* solve yet
+- it does not extract all remaining composer orchestration out of `ChatView`
+- it does not introduce a dedicated composer store/domain module
+- it does not yet split the footer or attachment staging into further subcomponents
+
+That is fine for this phase. The goal here was to make the boundary less messy, not to fully complete the eventual composer architecture in one more ticket.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `1.2.4` — extract and stabilize `useAutoScroll` — now that the Phase 1 composer slice has been materially cleaned up.
 
 ---
 
