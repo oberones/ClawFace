@@ -134,6 +134,15 @@ make verify
 
 The Makefile wraps the commands that are actually present in the repo today, plus a small number of sensible extras like `typecheck` and `clean`.
 
+## Runtime expectations
+
+ClawFace is currently pinned to a **Node 22** development/runtime target.
+
+If you see `EBADENGINE` warnings on Node 20, that is expected with the current repo constraints rather than a sign that the repo is intended to support both lines equally.
+Some parts of the current Electron/tooling dependency chain now also require Node 22+.
+
+Use the pinned runtime described in [`docs/DEVELOPMENT_CONSTRAINTS.md`](./docs/DEVELOPMENT_CONSTRAINTS.md) before treating install or validation failures as application-code regressions.
+
 ## Development status and expectations
 
 This repo is under active repositioning and architectural cleanup.

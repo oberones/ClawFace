@@ -1344,6 +1344,67 @@ A dedicated `Composer` component.
 
 ### Done when
 - the composer is not structurally embedded as an inseparable part of `ChatView.tsx`
+- `make typecheck` and `make build` pass for the refactor
+
+### Implementation notes (2026-04-07)
+
+This ticket is now **structurally implemented but not yet validated complete**.
+
+#### New component added
+- `src/components/Composer.tsx`
+
+#### What moved into `Composer`
+The extracted component now owns the main composer/footer rendering surface, including:
+- composer shell/footer layout
+- textarea/input rendering
+- paste image ingestion
+- drag-and-drop file ingestion
+- file-picker attachment ingestion
+- slash-command suggestion menu rendering
+- attachment preview/staging UI
+- send button and action row
+- compact action button in the footer stats row
+- token/context footer stats display
+- thinking menu rendering and selection UI
+
+#### What `ChatView` still owns
+For this ticket, `ChatView.tsx` still owns the prepared state and orchestration logic that feeds the new component, including:
+- draft state ownership via props
+- slash-command state and suggestion preparation
+- send behavior (`sendWithPhysics`)
+- textarea sizing behavior and refs
+- composer launch animation state
+- composition-state refs
+- shell-level thinking state values and callbacks
+
+This is intentional.
+Ticket `1.3.1` establishes the **component boundary** first without trying to also complete the deeper command/input-state cleanup that belongs in `1.3.2+`.
+
+#### What this ticket accomplished
+- established a real `Composer` component boundary
+- removed the full composer/footer rendering block from `ChatView.tsx`
+- made `ChatView.tsx` more obviously an orchestration shell instead of the sole owner of every render surface
+- created a better seam for later extraction of slash-command and composer-state logic
+
+#### Validation status
+This ticket is now **validated complete in the intended development environment**.
+
+Validation outcome after follow-up fixes:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+Important nuance:
+- intermediate validation work in the OpenClaw/Linux container exposed useful environment/tooling issues, but its Rollup native-package behavior was not the authoritative build result for the actual local development target
+- the meaningful completion gate for this ticket was the real dev machine, where the build now passes
+
+#### Follow-up lessons captured during validation
+The validation pass also surfaced repo/tooling cleanup needs that should remain explicit:
+- the repo needed a real `.nvmrc`
+- `make typecheck` needed to use the local TypeScript binary rather than relying on brittle `npx tsc` behavior
+- current docs/tooling assumptions around Linux-specific validation were too rigid for the actual macOS development workflow and should be kept honest
+
+#### Recommended next step
+Proceed to `1.3.2` (`useSlashCommands`) now that the composer boundary has been extracted and validated.
 
 ---
 
@@ -1367,6 +1428,54 @@ A dedicated slash-command hook/module.
 
 ### Done when
 - slash-command behavior is no longer smeared through generic composer logic
+- `make typecheck` and `make build` pass for the extraction
+
+### Implementation notes (2026-04-07)
+
+This ticket has now been completed as a dedicated slash-command behavior extraction.
+
+#### New module added
+- `src/hooks/useSlashCommands.ts`
+
+#### What moved into `useSlashCommands`
+The new hook now owns the slash-command interpretation layer, including:
+- slash-menu visibility detection from the draft
+- command tokenization/parsing
+- `commandName` / `commandArgs` derivation
+- suggestion generation for base commands
+- suggestion generation for model-specific completions
+- suggestion generation for thinking-level completions
+- required-args detection
+- exact-command lookup
+- active suggestion state helpers
+- suggestion application back into the draft
+
+#### What `ChatView` still owns
+`ChatView.tsx` still owns the outer keyboard event handler and the final send decision points, including:
+- deciding when Enter should send vs apply a suggestion
+- calling `sendWithPhysics`
+- composition-state handling tied to the textarea/input event lifecycle
+
+That is intentional for this ticket.
+The goal of `1.3.2` was to extract slash-command behavior into a dedicated hook boundary, not to redesign all composer send semantics at the same time.
+
+#### What this ticket accomplished
+- established a real `useSlashCommands` hook boundary
+- removed inline slash-command parsing and suggestion derivation from `ChatView.tsx`
+- clarified the boundary between:
+  - generic composer/input event handling
+  - slash-command interpretation/state
+- created a cleaner seam for later composer behavior cleanup in `1.3.3`
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `1.3.3` — clarify composer behavior during send/stream/switch/reconnect — now that both the component boundary and slash-command hook boundary are in place.
 
 ---
 
@@ -1391,6 +1500,76 @@ A clearer composer behavior model.
 
 ### Done when
 - composer behavior feels predictable in the most common edge conditions
+- `make typecheck` and `make build` pass for the behavior changes
+
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as a first-pass explicit composer behavior model cleanup.
+
+#### Key behavior changes landed
+
+##### 1. Composer state is now session-scoped
+The existing per-session `SessionViewState` cache in `src/app.tsx` now explicitly includes:
+- `draft`
+- `attachments`
+
+This means composer state is no longer treated as an accidental global surface while the rest of the thread/runtime state is session-specific.
+
+##### 2. Session switching now preserves composer work intentionally
+When switching sessions:
+- the current session's draft and staged attachments are saved into the session view cache
+- the target session's cached draft and attachments are restored
+
+This makes session switching much less destructive and much more predictable for in-progress work.
+
+##### 3. New sessions explicitly clear composer state
+When creating a new session, the app now intentionally initializes a fresh composer state:
+- empty draft
+- no staged attachments
+
+That is clearer than inheriting whatever happened to be on screen previously.
+
+##### 4. History reloads preserve composer state
+When session history is reloaded/refreshed, the per-session draft and attachment state is preserved instead of being implicitly blown away by a cache rewrite.
+
+##### 5. Busy vs offline vs ready composer runtime state is now explicit
+`ChatView.tsx` now computes a first-pass composer runtime model:
+- `ready`
+- `busy`
+- `offline`
+
+Current first-pass rules:
+- `ready` → connected and no active run; send enabled
+- `busy` → active run/thinking state present; typing still allowed, but a second send is disabled
+- `offline` → disconnected/error-style state; send disabled
+
+##### 6. Busy-state send behavior is clearer
+When a run is already in progress:
+- the user can continue editing the draft
+- the user cannot send again until the run completes or is stopped
+- the composer warning explains that a run is already active
+
+This is a more explicit and less accidental behavior model than simply relying on a mix of `connected`, `thinking`, and `canAbort` state in different places.
+
+#### What this ticket intentionally does *not* solve yet
+- It does not introduce per-session draft persistence to disk; this is session-runtime state only
+- It does not redesign all slash-command execution semantics
+- It does not yet fully model every edge case around reconnecting mid-stream across all backend event paths
+
+That is acceptable for this phase because the ticket goal was to make the composer behavior **predictable in the common cases**, not to complete the entire future composer architecture in one pass.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `1.3.4` — reduce prop and state sprawl between shell and composer — now that:
+- the composer component boundary exists
+- slash-command behavior has been extracted
+- first-pass composer runtime behavior rules have been made explicit
 
 ---
 
@@ -1413,6 +1592,56 @@ A cleaner shell/composer boundary.
 
 ### Done when
 - the composer interface is easier to understand than a bag of unrelated values and callbacks
+- `make typecheck` and `make build` pass for the refactor
+
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as a shell/composer interface cleanup pass.
+
+#### What changed
+`src/components/Composer.tsx` no longer accepts one large flat prop bag mixing unrelated responsibilities.
+
+Instead, the component now accepts a smaller set of coherent prop groups:
+- `uiSettings`
+- `input`
+- `slash`
+- `runtime`
+- `footer`
+
+#### Why this is better
+Before this ticket, the `Composer` boundary existed, but the interface still leaked too many unrelated concerns in one undifferentiated prop list.
+That made the extraction structurally real but still harder to reason about than it should have been.
+
+After this ticket:
+- input-state concerns are grouped together
+- slash-command concerns are grouped together
+- runtime/send-state concerns are grouped together
+- footer/thinking/session-stats concerns are grouped together
+
+That makes the shell/composer seam more legible without pushing orchestration logic back into `ChatView.tsx`.
+
+#### What this ticket accomplished
+- reduced prop-surface sprawl between `ChatView` and `Composer`
+- made the `Composer` interface easier to understand and evolve
+- clarified which concerns belong to which part of the composer surface
+- created a better base for any future composer-internal subcomponents or hooks
+
+#### What this ticket intentionally does *not* solve yet
+- it does not extract all remaining composer orchestration out of `ChatView`
+- it does not introduce a dedicated composer store/domain module
+- it does not yet split the footer or attachment staging into further subcomponents
+
+That is fine for this phase. The goal here was to make the boundary less messy, not to fully complete the eventual composer architecture in one more ticket.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `1.2.4` — extract and stabilize `useAutoScroll` — now that the Phase 1 composer slice has been materially cleaned up.
 
 ---
 

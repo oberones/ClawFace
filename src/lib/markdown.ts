@@ -17,6 +17,13 @@ type MathToken = {
   displayMode?: boolean;
 };
 
+function readMathTokenText(token: unknown): string {
+  if (token && typeof token === "object" && "text" in token && typeof (token as { text?: unknown }).text === "string") {
+    return (token as { text: string }).text;
+  }
+  return "";
+}
+
 const SUPPORTED_MATH_ENVIRONMENTS = new Set<string>([
   "array",
   "aligned",
@@ -185,8 +192,8 @@ markdownParser.use({
           type: "mathFence",
         };
       },
-      renderer(token: MathToken) {
-        return `${renderMath(token.text, true)}\n`;
+      renderer(token) {
+        return `${renderMath(readMathTokenText(token), true)}\n`;
       },
     },
     {
@@ -208,8 +215,8 @@ markdownParser.use({
           type: "mathBracketBlock",
         };
       },
-      renderer(token: MathToken) {
-        return `${renderMath(token.text, true)}\n`;
+      renderer(token) {
+        return `${renderMath(readMathTokenText(token), true)}\n`;
       },
     },
     {
@@ -234,8 +241,8 @@ markdownParser.use({
           type: "mathEnvironmentBlock",
         };
       },
-      renderer(token: MathToken) {
-        return `${renderMath(token.text, true)}\n`;
+      renderer(token) {
+        return `${renderMath(readMathTokenText(token), true)}\n`;
       },
     },
     {
@@ -257,8 +264,8 @@ markdownParser.use({
           type: "mathTagBlock",
         };
       },
-      renderer(token: MathToken) {
-        return `${renderMath(token.text, true)}\n`;
+      renderer(token) {
+        return `${renderMath(readMathTokenText(token), true)}\n`;
       },
     },
     {
@@ -280,8 +287,8 @@ markdownParser.use({
           type: "mathParenInline",
         };
       },
-      renderer(token: MathToken) {
-        return renderMath(token.text, false);
+      renderer(token) {
+        return renderMath(readMathTokenText(token), false);
       },
     },
     {
@@ -303,8 +310,8 @@ markdownParser.use({
           type: "mathTagInline",
         };
       },
-      renderer(token: MathToken) {
-        return renderMath(token.text, false);
+      renderer(token) {
+        return renderMath(readMathTokenText(token), false);
       },
     },
   ],

@@ -40,7 +40,7 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
-function buildMotionVars(id: string): MotionVarsStyle {
+export function buildMotionVars(id: string): MotionVarsStyle {
   const hash = hashString(id);
   const byte = (shift: number) => ((hash >>> shift) & 0xff) / 255;
   const dx = (byte(0) - 0.5) * 6;
@@ -384,7 +384,7 @@ function extractImageSourceCandidates(value: string): string[] {
   return candidates;
 }
 
-function buildDesktopLocalImageUrl(filePath: string): string {
+export function buildDesktopLocalImageUrl(filePath: string): string {
   return `${DESKTOP_LOCAL_IMAGE_SCHEME}://open?path=${encodeURIComponent(filePath)}`;
 }
 
@@ -412,7 +412,7 @@ function localPathFromDesktopLocalImageUrl(value: string): string | null {
   }
 }
 
-function filePathFromImageSource(value: string): string | null {
+export function filePathFromImageSource(value: string): string | null {
   const trimmed = stripPathDecorators(value);
   if (!trimmed) {
     return null;
@@ -526,7 +526,7 @@ function normalizeHttpImageUrl(value: string): string | null {
   return null;
 }
 
-function isDesktopRuntime(): boolean {
+export function isDesktopRuntime(): boolean {
   if (window.desktopInfo?.isDesktop) {
     return true;
   }
@@ -544,7 +544,7 @@ function toDesktopRenderableSrc(value: string): string {
   return buildDesktopLocalImageUrl(path);
 }
 
-function isLikelyLocalFileSource(value: string): boolean {
+export function isLikelyLocalFileSource(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) {
     return false;
