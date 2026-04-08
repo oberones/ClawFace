@@ -3945,6 +3945,69 @@ export default function App() {
     agentFinalizeTimerByRunRef.current = next;
   };
 
+  const buildFinalAssistantMessage = (rawMessage: unknown, streamedText: string): ChatMessage | null => {
+    let msg = toChatMessageSafe(rawMessage);
+    if (msg && msg.role !== "user" && !msg.text.trim() && streamedText) {
+      msg = { ...msg, text: streamedText };
+    }
+    if ((!msg || !msg.text.trim()) && streamedText) {
+      msg = {
+        id: generateUUID(),
+        role: "assistant",
+        text: streamedText,
+        timestamp: Date.now(),
+        raw: rawMessage,
+      };
+    }
+    const hasRenderableAttachment = Boolean(msg?.attachments && msg.attachments.length > 0);
+    const hasRenderableText = Boolean(msg?.text.trim());
+    return msg && (hasRenderableText || hasRenderableAttachment) ? msg : null;
+  };
+
+  const buildStreamCommittedAssistantMessage = (streamedText: string): ChatMessage | null => {
+    const normalized = streamedText.trim();
+    if (!normalized) {
+      return null;
+    }
+    return {
+      id: generateUUID(),
+      role: "assistant",
+      text: normalized,
+      timestamp: Date.now(),
+    };
+  };
+
+  const clearActiveStreamingState = () => {
+    setStreamTextSynced(null);
+    setChatRunId(null);
+    setThinking(false);
+  };
+
+  const clearCachedStreamingState = (key: string) => {
+    updateCacheField(key, (cached) => ({
+      ...cached,
+      streamText: null,
+      chatRunId: null,
+      thinking: false,
+    }));
+  };
+
+  const refreshSessionListsSoon = () => {
+    const client = clientRef.current;
+    if (client) {
+      refreshSessionsWithFollowUp(client);
+    }
+  };
+
+  const reloadActiveSessionHistory = () => {
+    const client = clientRef.current;
+    const activeSessionKey = selectedSessionRef.current;
+    if (client && activeSessionKey) {
+      void loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
+      refreshSessionsWithFollowUp(client);
+    }
+  };
+
   const scheduleAgentFinalizeFallback = (params: {
     runId: string | null | undefined;
     phase: "end" | "error";
@@ -3966,15 +4029,9 @@ export default function App() {
       const streamedText = (streamTextRef.current ?? "").trim();
       if (params.phase === "end") {
         if (!streamedText) {
-          setStreamTextSynced(null);
-          setChatRunId(null);
-          setThinking(false);
-          const client = clientRef.current;
+          clearActiveStreamingState();
+          reloadActiveSessionHistory();
           const activeSessionKey = selectedSessionRef.current;
-          if (client && activeSessionKey) {
-            void loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
-            refreshSessionsWithFollowUp(client);
-          }
           if (activeSessionKey) {
             updateSessionActivity(activeSessionKey, { working: false, unread: false });
           }
@@ -3992,22 +4049,15 @@ export default function App() {
           ]);
           notifyReplyCompleted();
         }
-        setStreamTextSynced(null);
-        setChatRunId(null);
-        setThinking(false);
-        const client = clientRef.current;
+        clearActiveStreamingState();
+        refreshSessionListsSoon();
         const activeSessionKey = selectedSessionRef.current;
-        if (client && activeSessionKey) {
-          refreshSessionsWithFollowUp(client);
-        }
         if (activeSessionKey) {
           updateSessionActivity(activeSessionKey, { working: false, unread: false });
         }
         return;
       }
-      setStreamTextSynced(null);
-      setChatRunId(null);
-      setThinking(false);
+      clearActiveStreamingState();
       const activeSessionKey = selectedSessionRef.current;
       if (activeSessionKey) {
         updateSessionActivity(activeSessionKey, { working: false, unread: false });
@@ -5403,39 +5453,19 @@ export default function App() {
           applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
           const isToolFinal = isToolMessage(parsed.message);
           const cachedStreamText = (sessionCacheRef.current.get(targetKey)?.streamText ?? "").trim();
-          // Preserve streamed assistant text before tool-use finals clear it.
-          if (isToolFinal && cachedStreamText) {
+          const committedStreamMessage = buildStreamCommittedAssistantMessage(cachedStreamText);
+          if (isToolFinal && committedStreamMessage) {
             updateCacheField(targetKey, (cached) => ({
               ...cached,
-              messages: [
-                ...cached.messages,
-                {
-                  id: generateUUID(),
-                  role: "assistant" as const,
-                  text: cachedStreamText,
-                  timestamp: Date.now(),
-                },
-              ],
+              messages: [...cached.messages, committedStreamMessage],
               streamText: null,
             }));
             updateSessionActivity(targetKey, { working: true });
           }
-          let msg = toChatMessageSafe(parsed.message);
-          if (!isToolFinal && msg && msg.role !== "user" && !msg.text.trim() && cachedStreamText) {
-            msg = { ...msg, text: cachedStreamText };
-          }
-          if (!isToolFinal && (!msg || !msg.text.trim()) && cachedStreamText) {
-            msg = {
-              id: generateUUID(),
-              role: "assistant",
-              text: cachedStreamText,
-              timestamp: Date.now(),
-              raw: parsed.message,
-            };
-          }
-          const hasRenderableAttachment = Boolean(msg?.attachments && msg.attachments.length > 0);
-          const hasRenderableText = Boolean(msg?.text.trim());
-          if (!isToolFinal && msg && (hasRenderableText || hasRenderableAttachment)) {
+          const msg = !isToolFinal
+            ? buildFinalAssistantMessage(parsed.message, cachedStreamText)
+            : null;
+          if (!isToolFinal && msg) {
             updateCacheField(targetKey, (cached) => ({
               ...cached,
               messages: [...cached.messages, msg],
@@ -5446,21 +5476,13 @@ export default function App() {
             updateSessionActivity(targetKey, { working: false, unread: true });
           }
           // Refresh session list so sidebar picks up lastMessagePreview & derivedTitle
-          const client = clientRef.current;
-          if (client) {
-            refreshSessionsWithFollowUp(client);
-          }
+          refreshSessionListsSoon();
           return;
         }
 
         if (parsed.state === "aborted" || parsed.state === "error") {
           clearAgentFinalizeTimer(parsed.runId);
-          updateCacheField(targetKey, (cached) => ({
-            ...cached,
-            streamText: null,
-            chatRunId: null,
-            thinking: false,
-          }));
+          clearCachedStreamingState(targetKey);
           updateSessionActivity(targetKey, { working: false });
           return;
         }
@@ -5505,19 +5527,13 @@ export default function App() {
           chatRunRef.current = parsed.runId;
           setChatRunId(parsed.runId);
         } else {
-          const client = clientRef.current;
-          if (client && activeSessionKey) {
-            void loadHistory(client, activeSessionKey);
-          }
+          reloadActiveSessionHistory();
           return;
         }
       }
       const activeRunAfterSync = chatRunRef.current;
       if (activeRunAfterSync && parsed.runId && parsed.runId !== activeRunAfterSync) {
-        const client = clientRef.current;
-        if (client && activeSessionKey) {
-          void loadHistory(client, activeSessionKey);
-        }
+        reloadActiveSessionHistory();
         return;
       }
       const toolUpdates = extractToolUpdatesFromMessage(parsed.message);
@@ -5528,70 +5544,37 @@ export default function App() {
       applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
       const isToolFinal = isToolMessage(parsed.message);
       const streamedText = (streamTextRef.current ?? "").trim();
-      // When a tool-use final arrives, the model output text before calling the
-      // tool. That text lives in streamText but toChatMessageSafe returns null
-      // for tool messages. Commit the accumulated text as a visible assistant
-      // message before it gets cleared, otherwise it silently disappears.
-      if (isToolFinal && streamedText) {
-        if (!shouldSkipAssistantFinal(parsed.runId, streamedText)) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: generateUUID(),
-              role: "assistant" as const,
-              text: streamedText,
-              timestamp: Date.now(),
-            },
-          ]);
+      const committedStreamMessage = buildStreamCommittedAssistantMessage(streamedText);
+      if (isToolFinal && committedStreamMessage) {
+        if (!shouldSkipAssistantFinal(parsed.runId, committedStreamMessage.text)) {
+          setMessages((prev) => [...prev, committedStreamMessage]);
         }
-        setStreamTextSynced(null);
+        clearActiveStreamingState();
         // Model will continue after tool execution — keep activity working.
         if (activeSessionKey) {
           updateSessionActivity(activeSessionKey, { working: true, unread: false });
         }
-        setChatRunId(null);
-        setThinking(false);
         return;
       }
-      let msg = toChatMessageSafe(parsed.message);
-      if (!isToolFinal && msg && msg.role !== "user" && !msg.text.trim() && streamedText) {
-        msg = { ...msg, text: streamedText };
-      }
-      if (!isToolFinal && (!msg || !msg.text.trim()) && streamedText) {
-        msg = {
-          id: generateUUID(),
-          role: "assistant",
-          text: streamedText,
-          timestamp: Date.now(),
-          raw: parsed.message,
-        };
-      }
-      const hasRenderableAttachment = Boolean(msg?.attachments && msg.attachments.length > 0);
-      const hasRenderableText = Boolean(msg?.text.trim());
-      if (msg && (hasRenderableText || hasRenderableAttachment)) {
+      const msg = buildFinalAssistantMessage(parsed.message, streamedText);
+      if (msg) {
+        const hasRenderableText = Boolean(msg.text.trim());
         if (!hasRenderableText || !shouldSkipAssistantFinal(parsed.runId, msg.text)) {
           setMessages((prev) => [...prev, msg]);
           notifyReplyCompleted();
         }
       }
-      setStreamTextSynced(null);
-      setChatRunId(null);
-      setThinking(false);
+      clearActiveStreamingState();
       if (activeSessionKey) {
         updateSessionActivity(activeSessionKey, { working: false, unread: false });
       }
-      const client = clientRef.current;
-      if (client) {
-        refreshSessionsWithFollowUp(client);
-      }
+      refreshSessionListsSoon();
       return;
     }
 
     if (parsed.state === "aborted") {
       clearAgentFinalizeTimer(parsed.runId);
-      setStreamTextSynced(null);
-      setChatRunId(null);
-      setThinking(false);
+      clearActiveStreamingState();
       if (activeSessionKey) {
         updateSessionActivity(activeSessionKey, { working: false, unread: false });
       }
@@ -5600,9 +5583,7 @@ export default function App() {
 
     if (parsed.state === "error") {
       clearAgentFinalizeTimer(parsed.runId);
-      setStreamTextSynced(null);
-      setChatRunId(null);
-      setThinking(false);
+      clearActiveStreamingState();
       if (activeSessionKey) {
         updateSessionActivity(activeSessionKey, { working: false, unread: false });
       }
