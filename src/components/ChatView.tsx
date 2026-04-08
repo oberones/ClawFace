@@ -1071,7 +1071,6 @@ export default function ChatView(props: ChatViewProps) {
 
   const connectionStatus = props.connectionStatus ?? (props.connected ? "connected" : "disconnected");
   const isSessionSwitching = props.sessionTransitionState === "switching";
-  const isThreadBusy = Boolean(props.isCurrentSessionLoading || isSessionSwitching);
   const hasRenderableThreadContent = displayedMessages.length > 0 || Boolean(props.streamText) || props.thinking;
   const threadState = hasRenderableThreadContent
     ? { kind: "ready" as const }
