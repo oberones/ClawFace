@@ -1269,6 +1269,59 @@ A dedicated auto-scroll hook or equivalent abstraction.
 ### Done when
 - scroll behavior is easier to reason about than it is now
 - future thread changes do not require spelunking through giant component code
+- `make typecheck` and `make build` pass for the extraction
+
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as a dedicated auto-scroll state extraction.
+
+#### New module added
+- `src/hooks/useAutoScroll.ts`
+
+#### What moved into `useAutoScroll`
+The new hook now owns the steady-state scroll behavior for the thread surface, including:
+- `scrollRef`
+- visible message count state for incremental history reveal
+- auto-scroll enable/disable state
+- near-bottom detection
+- scroll restoration bookkeeping when revealing older messages
+- load-older trigger gating near the top of the thread
+- auto-scroll-to-bottom behavior for message/tool/stream updates
+- auto-scroll state reset used during session switches
+
+#### What stays in `ChatView`
+`ChatView.tsx` still owns the scroll behavior that is tightly coupled to session-transition choreography and explicit message navigation, including:
+- transition-driven forced scroll positioning during animated session changes
+- `scrollToMessage(...)` navigation buttons
+- transition snapshot/render timing that happens to interact with scroll position
+
+That is intentional.
+This ticket extracts the **core auto-scroll state machine**, not every scroll-adjacent behavior in the file.
+
+#### What this ticket accomplished
+- removed a coherent scroll/viewport concern from the main `ChatView.tsx` body
+- made incremental history reveal and near-top load-more behavior easier to reason about in isolation
+- clarified the boundary between:
+  - steady-state thread auto-scroll behavior
+  - transition-specific scroll choreography
+
+#### Review follow-up applied during validation
+This ticket also incorporated PR review follow-up before closure:
+- `useAutoScroll` callback dependencies were tightened so callbacks do not depend on the entire options object
+- related review cleanup elsewhere in the branch was also applied before final validation, including:
+  - hard-failing device identity generation when no CSPRNG is available
+  - tightening `useSlashCommands` callback dependencies
+  - replacing repeated markdown token casts with a single local token-text reader helper
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `1.2.5` — clean up streaming message update flow — now that the thread surface has a cleaner scroll-state boundary.
 
 ---
 
