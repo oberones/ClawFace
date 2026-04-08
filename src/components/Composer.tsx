@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Attachment } from "../lib/types.ts";
 import { formatBytes, formatCompactTokens, truncate } from "../lib/format.ts";
 import { useAttachmentIngestion } from "../hooks/useAttachmentIngestion.ts";
@@ -75,9 +75,16 @@ export function Composer(props: ComposerProps) {
   const actionScale = props.uiSettings.composerActionScale;
   const actionFontSize = props.uiSettings.composeActionsFontSize;
   const sendFontSize = props.uiSettings.composeSendFontSize;
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const attachmentIngestion = useAttachmentIngestion({
     attachments: props.input.attachments,
-    onAttachmentsChange: props.input.onAttachmentsChange,
+    onAttachmentsChange: (next) => {
+      setAttachmentError(null);
+      props.input.onAttachmentsChange(next);
+    },
+    onError: (message) => {
+      setAttachmentError(message);
+    },
   });
 
   return (
@@ -96,6 +103,7 @@ export function Composer(props: ComposerProps) {
         )}
 
         {props.composerWarning && <div className="composer-warning">{props.composerWarning}</div>}
+        {attachmentError && <div className="composer-warning">Attachment error: {attachmentError}</div>}
 
         <div className="composer-input-wrap">
           <textarea
