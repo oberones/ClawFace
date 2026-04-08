@@ -18,7 +18,21 @@ type UseAutoScrollOptions = {
 };
 
 export function useAutoScroll(options: UseAutoScrollOptions) {
-  const [visibleMessageCount, setVisibleMessageCount] = useState(options.messageRenderStep);
+  const {
+    messageCount,
+    lastMessageRole,
+    orderedTools,
+    streamText,
+    thinking,
+    canLoadOlder,
+    loadingOlder,
+    showToolActivity,
+    autoScrollAssistantResponses,
+    messageRenderStep,
+    onLoadOlder,
+  } = options;
+
+  const [visibleMessageCount, setVisibleMessageCount] = useState(messageRenderStep);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const restoreScrollRef = useRef<{ height: number; top: number } | null>(null);
@@ -26,31 +40,31 @@ export function useAutoScroll(options: UseAutoScrollOptions) {
 
   useEffect(() => {
     const container = scrollRef.current;
-    if (!container || !autoScrollEnabled || !options.showToolActivity) {
+    if (!container || !autoScrollEnabled || !showToolActivity) {
       return;
     }
     container.scrollTop = container.scrollHeight;
-  }, [options.orderedTools, autoScrollEnabled, options.showToolActivity]);
+  }, [orderedTools, autoScrollEnabled, showToolActivity]);
 
   useEffect(() => {
     const container = scrollRef.current;
     if (!container || !autoScrollEnabled) {
       return;
     }
-    if (options.lastMessageRole === "assistant" && !options.autoScrollAssistantResponses) {
+    if (lastMessageRole === "assistant" && !autoScrollAssistantResponses) {
       return;
     }
-    if (options.streamText && !options.autoScrollAssistantResponses) {
+    if (streamText && !autoScrollAssistantResponses) {
       return;
     }
     container.scrollTop = container.scrollHeight;
   }, [
     visibleMessageCount,
-    options.lastMessageRole,
-    options.streamText,
-    options.thinking,
+    lastMessageRole,
+    streamText,
+    thinking,
     autoScrollEnabled,
-    options.autoScrollAssistantResponses,
+    autoScrollAssistantResponses,
   ]);
 
   const onScroll = useCallback<React.UIEventHandler<HTMLDivElement>>((event) => {
@@ -62,25 +76,25 @@ export function useAutoScroll(options: UseAutoScrollOptions) {
     if (container.scrollTop > 80) {
       return;
     }
-    if (visibleMessageCount < options.messageCount) {
+    if (visibleMessageCount < messageCount) {
       restoreScrollRef.current = {
         height: container.scrollHeight,
         top: container.scrollTop,
       };
-      setVisibleMessageCount((prev) => Math.min(options.messageCount, prev + options.messageRenderStep));
+      setVisibleMessageCount((prev) => Math.min(messageCount, prev + messageRenderStep));
       return;
     }
-    if (options.canLoadOlder && !options.loadingOlder && !olderLoadRequestedRef.current) {
+    if (canLoadOlder && !loadingOlder && !olderLoadRequestedRef.current) {
       olderLoadRequestedRef.current = true;
-      options.onLoadOlder();
+      onLoadOlder();
     }
-  }, [options, visibleMessageCount]);
+  }, [canLoadOlder, loadingOlder, messageCount, messageRenderStep, onLoadOlder, visibleMessageCount]);
 
   useEffect(() => {
-    if (options.messageCount < visibleMessageCount) {
-      setVisibleMessageCount(Math.max(options.messageRenderStep, options.messageCount));
+    if (messageCount < visibleMessageCount) {
+      setVisibleMessageCount(Math.max(messageRenderStep, messageCount));
     }
-  }, [options.messageCount, options.messageRenderStep, visibleMessageCount]);
+  }, [messageCount, messageRenderStep, visibleMessageCount]);
 
   useEffect(() => {
     const pending = restoreScrollRef.current;
@@ -94,18 +108,18 @@ export function useAutoScroll(options: UseAutoScrollOptions) {
   }, [visibleMessageCount]);
 
   useEffect(() => {
-    if (options.loadingOlder) {
+    if (loadingOlder) {
       return;
     }
     olderLoadRequestedRef.current = false;
-  }, [options.loadingOlder]);
+  }, [loadingOlder]);
 
   const resetAutoScrollState = useCallback(() => {
-    setVisibleMessageCount(options.messageRenderStep);
+    setVisibleMessageCount(messageRenderStep);
     setAutoScrollEnabled(true);
     restoreScrollRef.current = null;
     olderLoadRequestedRef.current = false;
-  }, [options.messageRenderStep]);
+  }, [messageRenderStep]);
 
   return {
     scrollRef,

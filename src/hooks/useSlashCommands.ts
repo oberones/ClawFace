@@ -69,7 +69,7 @@ export function useSlashCommands(options: UseSlashCommandsOptions) {
       options.onDraftChange(`/${suggestion.name} `);
     }
     setActiveCommand(0);
-  }, [options]);
+  }, [options.onDraftChange]);
 
   const moveSelection = useCallback((delta: number) => {
     if (commandSuggestions.length === 0) {
