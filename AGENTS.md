@@ -193,6 +193,12 @@ Milestone 1 is centered on:
 - prefer smaller, clearer component and state boundaries
 - treat OpenClaw-native capability exposure as core to the product
 - preserve useful behavior while reducing architectural centralization
+- allow temporary breakage during active refactors if it buys a cleaner structural cut
+- but do **not** mark a ticket, slice, or milestone step complete until validation passes
+- for this repo, the default completion gate should be:
+  - `make typecheck`
+  - `make build`
+- use `make verify` when the change set is large enough to justify the stronger pass
 
 ## Do not do this
 - do not turn the app into a generic multi-provider shell

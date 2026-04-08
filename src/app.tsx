@@ -1459,6 +1459,8 @@ type SessionViewState = {
   thinking: boolean;
   chatRunId: string | null;
   thinkingLevel: string | null;
+  draft: string;
+  attachments: Attachment[];
   lastLoadedAt: number;
 };
 
@@ -3471,6 +3473,7 @@ export default function App() {
     isCurrentSessionLoading: false,
     transitionState: "idle",
   });
+  const connected = connectionState.status === "connected";
   const { selectedSessionKey, sessions, isCurrentSessionLoading, transitionState } = sessionState;
   const setSessions = useCallback((value: React.SetStateAction<GatewaySessionRow[]>) => {
     setSessionState((prev) => ({
@@ -3685,6 +3688,8 @@ export default function App() {
       thinking: false,
       chatRunId: null,
       thinkingLevel: null,
+      draft: "",
+      attachments: [],
       lastLoadedAt: 0,
     };
   }, []);
@@ -3710,6 +3715,8 @@ export default function App() {
       thinking: thinkingRef.current,
       chatRunId: chatRunRef.current,
       thinkingLevel: thinkingLevelRef.current,
+      draft,
+      attachments: [...attachments],
       lastLoadedAt: Date.now(),
     });
   }
@@ -3733,6 +3740,8 @@ export default function App() {
     setThinking(cached.thinking);
     setChatRunId(cached.chatRunId);
     setThinkingLevel(cached.thinkingLevel);
+    setDraft(cached.draft);
+    setAttachments(cached.attachments);
     return true;
   }
 
@@ -5294,6 +5303,7 @@ export default function App() {
       const mergedTools = shouldPreserveActiveStreaming
         ? mergeToolItems(historyTools, toolItemsRef.current)
         : historyTools;
+      const existingViewState = sessionCacheRef.current.get(key) ?? getEmptySessionViewState();
       sessionCacheRef.current.set(key, {
         messages: historyMessages,
         streamText: shouldPreserveActiveStreaming ? activeStreamText : null,
@@ -5301,6 +5311,8 @@ export default function App() {
         thinking: shouldPreserveActiveStreaming ? thinkingRef.current : false,
         chatRunId: shouldPreserveActiveStreaming ? chatRunRef.current : null,
         thinkingLevel: resolvedThinkingLevel,
+        draft: existingViewState.draft,
+        attachments: existingViewState.attachments,
         lastLoadedAt: Date.now(),
       });
       if (!isActiveSession) {
@@ -5803,6 +5815,8 @@ export default function App() {
     setChatRunId(null);
     setThinking(false);
     setThinkingLevel(null);
+    setDraft("");
+    setAttachments([]);
     sessionCacheRef.current.set(key, {
       messages: [],
       streamText: null,
@@ -5810,6 +5824,8 @@ export default function App() {
       thinking: false,
       chatRunId: null,
       thinkingLevel: null,
+      draft: "",
+      attachments: [],
       lastLoadedAt: Date.now(),
     });
     updateSessionActivity(key, { working: false, unread: false });
@@ -6624,7 +6640,6 @@ export default function App() {
     }
   }
 
-  const connected = connectionState.status === "connected";
   const protocolWarning =
     typeof window !== "undefined" &&
       window.location.protocol === "https:" &&

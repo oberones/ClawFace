@@ -9,7 +9,7 @@ type ShortcutCombo = {
   key: string;
 };
 
-type AppActionShortcutId = "toggleSidebar" | "newSession";
+type AppActionShortcutId = "toggleSidebar" | "newSession" | "toggleFiles";
 
 type SettingsModalProps = {
   open: boolean;
