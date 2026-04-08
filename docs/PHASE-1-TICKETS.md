@@ -1933,6 +1933,76 @@ A more intentional shell reliability policy around reconnect and active-session 
 - active session behavior during reconnects/interruptions feels less fragile
 - `make typecheck` and `make build` pass for the hardening pass
 
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as a focused shell-reliability hardening pass.
+
+#### Why this ticket was added
+The earlier Slice 1.1 tickets around connection/session shell behavior had already been partially absorbed by the subsequent thread/composer refactor work.
+Rather than pretending the old ticket numbers still mapped cleanly to the remaining risk, this follow-up ticket was added to target the highest remaining Phase 1 reliability concern directly: reconnect and active-session shell behavior.
+
+#### What changed
+##### 1. Disconnect/close behavior is now more explicit
+When the gateway connection closes, the shell now:
+- clears active streaming state
+- clears active run/thinking state for the current session
+- marks the selected session as no longer working
+
+Importantly, this cleanup now happens synchronously enough to prevent subsequent logic from reading stale run/thinking refs.
+
+##### 2. Active streaming cleanup now clears refs, not just React state
+`clearActiveStreamingState()` now:
+- clears pending streamed-text buffers
+- cancels any pending stream flush RAF
+- clears `streamTextRef.current`
+- clears `chatRunRef.current`
+- clears `thinkingRef.current`
+- updates the corresponding React state
+
+This prevents reconnect/history-load logic from accidentally treating the session as still actively streaming during the gap between state updates and ref-sync effects.
+
+##### 3. Reconnect success now actively resyncs the selected session
+On reconnect (`onHello`), if there is a selected session, the app now proactively reloads its history instead of only refreshing the session list.
+
+That makes reconnect behavior less passive and reduces the chance of the thread surface continuing to show stale in-memory state after transport recovery.
+
+##### 4. Reconnect history reload is now sequenced and deduped more carefully
+The reconnect reload path now:
+- refreshes sessions first
+- re-resolves the active selected session key after session reconciliation
+- skips history load if the resolved session already has an in-flight history request
+- only then reloads history for the selected session
+
+This avoids firing `chat.history` against a stale selected key during reconnect and reduces redundant parallel history loads.
+
+#### Why this matters
+Before this ticket, the shell could end up in awkward states like:
+- transport disconnected, but the active session still looked like it had a live run
+- reconnect succeeded, but the selected thread still relied on stale in-memory state until some later event happened to refresh it
+- cleanup logic updated React state but left refs stale long enough for history reload logic to mis-detect active streaming
+
+This ticket made those rules more explicit and less fragile without reopening the entire event architecture.
+
+#### What this ticket intentionally does *not* solve yet
+- it does not fully redesign reconnect semantics for every possible backend/runtime edge case
+- it does not guarantee perfect recovery semantics across every interrupted tool run
+- it does not eliminate the need for future shell/runtime policy refinement in later milestones
+
+That is fine.
+For Phase 1, the goal was to make reconnect and active-session behavior materially more intentional and less obviously brittle.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Reassess whether Phase 1 still has any remaining high-leverage work. At this point, the likely best move is to either:
+- declare Phase 1 complete,
+- or identify one final sharply-scoped Phase 1 ticket only if it clearly improves the core shell reliability/product direction.
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:
@@ -1942,6 +2012,22 @@ Phase 1 is done when:
 - `ChatView.tsx` has materially reduced responsibilities
 - thread rendering has meaningful component boundaries
 - composer logic has been extracted and clarified
+
+## Phase 1 assessment (2026-04-08)
+
+Phase 1 should now be treated as effectively complete.
+
+### Why
+The core shell stabilization goals have been materially achieved:
+- connection/session state is explicit enough to be reasoned about
+- reconnect and active-session shell behavior has been hardened
+- thread rendering, streaming, auto-scroll, and thread-state handling have all been meaningfully decomposed and clarified
+- composer behavior, slash-command handling, and session-scoped input behavior are substantially cleaner than at the start of the phase
+- `ChatView.tsx` remains important, but no longer acts as a single undifferentiated gravity well for every core behavior
+
+### What this means
+Further Phase 1 work should only be added if a clearly high-leverage reliability issue appears.
+Otherwise, the correct next move is to proceed to **Phase 2 — Desktop-native media and attachment workflows**.
 - slash-command logic is more isolated
 - streaming behavior is cleaner and more stable
 - the app feels more dependable in the core chat shell
