@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import type { Attachment } from "../lib/types.ts";
 import { formatBytes, formatCompactTokens, truncate } from "../lib/format.ts";
+import { useAttachmentIngestion } from "../hooks/useAttachmentIngestion.ts";
 
 type UiSettings = {
   composerActionScale: number;
@@ -70,55 +71,39 @@ export type ComposerProps = {
   };
 };
 
-async function fileToAttachment(file: File, idPrefix: string): Promise<Attachment> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = typeof reader.result === "string" ? reader.result : "";
-      resolve({
-        id: `${idPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.name}`,
-        name: file.name || `upload.${file.type.split("/")[1] || "bin"}`,
-        size: file.size,
-        type: file.type || "application/octet-stream",
-        dataUrl,
-        isImage: file.type.startsWith("image/"),
-      });
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 export function Composer(props: ComposerProps) {
   const actionScale = props.uiSettings.composerActionScale;
   const actionFontSize = props.uiSettings.composeActionsFontSize;
   const sendFontSize = props.uiSettings.composeSendFontSize;
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const attachmentIngestion = useAttachmentIngestion({
+    attachments: props.input.attachments,
+    onAttachmentsChange: (next) => {
+      setAttachmentError(null);
+      props.input.onAttachmentsChange(next);
+    },
+    onError: (message) => {
+      setAttachmentError(message);
+    },
+  });
 
   return (
     <footer className="composer-shell">
       <div
-        className={`composer-inner ${props.composerLaunchActive ? "is-launching" : ""}`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const files = Array.from(e.dataTransfer?.files ?? []);
-          if (files.length === 0) {
-            return;
-          }
-          Promise.all(files.map((file) => fileToAttachment(file, "drop")))
-            .then((next) => {
-              props.input.onAttachmentsChange([...props.input.attachments, ...next]);
-            })
-            .catch(() => {
-              // ignore
-            });
-        }}
+        className={`composer-inner ${props.composerLaunchActive ? "is-launching" : ""} ${attachmentIngestion.isDragActive ? "is-drag-active" : ""}`}
+        {...attachmentIngestion.dragBindings}
       >
+        {attachmentIngestion.isDragActive && (
+          <div className="composer-drop-overlay" aria-hidden="true">
+            <div className="composer-drop-card">
+              <div className="composer-drop-title">Drop files to attach</div>
+              <div className="composer-drop-copy">Images, screenshots, and files will be staged in the composer.</div>
+            </div>
+          </div>
+        )}
+
         {props.composerWarning && <div className="composer-warning">{props.composerWarning}</div>}
+        {attachmentError && <div className="composer-warning">Attachment error: {attachmentError}</div>}
 
         <div className="composer-input-wrap">
           <textarea
@@ -128,33 +113,7 @@ export function Composer(props: ComposerProps) {
             onCompositionStart={props.input.onCompositionStart}
             onCompositionEnd={props.input.onCompositionEnd}
             onKeyDown={props.input.onKeyDown}
-            onPaste={(e) => {
-              const items = e.clipboardData?.items;
-              if (!items) {
-                return;
-              }
-              const imageFiles: File[] = [];
-              for (let i = 0; i < items.length; i += 1) {
-                const item = items[i];
-                if (item && item.kind === "file" && item.type.startsWith("image/")) {
-                  const file = item.getAsFile();
-                  if (file) {
-                    imageFiles.push(file);
-                  }
-                }
-              }
-              if (imageFiles.length === 0) {
-                return;
-              }
-              e.preventDefault();
-              Promise.all(imageFiles.map((file) => fileToAttachment(file, "paste")))
-                .then((next) => {
-                  props.input.onAttachmentsChange([...props.input.attachments, ...next]);
-                })
-                .catch(() => {
-                  // ignore
-                });
-            }}
+            onPaste={attachmentIngestion.handlePaste}
             placeholder="Type a message or /command"
             className="composer-textarea"
             style={{
@@ -202,7 +161,7 @@ export function Composer(props: ComposerProps) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => props.input.onAttachmentsChange(props.input.attachments.filter((item) => item.id !== att.id))}
+                  onClick={() => attachmentIngestion.removeAttachment(att.id)}
                   className="attachment-preview-remove"
                   aria-label={`Remove ${att.name}`}
                 >
@@ -229,16 +188,7 @@ export function Composer(props: ComposerProps) {
                 type="file"
                 multiple
                 className="hidden"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []);
-                  Promise.all(files.map((file) => fileToAttachment(file, "upload")))
-                    .then((next) => {
-                      props.input.onAttachmentsChange([...props.input.attachments, ...next]);
-                    })
-                    .catch(() => {
-                      // ignore
-                    });
-                }}
+                onChange={attachmentIngestion.handleFileInputChange}
               />
             </label>
 
