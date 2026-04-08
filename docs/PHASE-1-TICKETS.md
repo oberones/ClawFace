@@ -1348,6 +1348,56 @@ A more stable streaming UX.
 - streamed replies render smoothly
 - finalization behavior is clear and consistent
 - the renderer has fewer hacky transitions around streaming state
+- `make typecheck` and `make build` pass for the cleanup
+
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as a first-pass streaming/finalization cleanup.
+
+#### What changed
+The streaming message update path in `src/app.tsx` was cleaned up by extracting shared helper behavior from duplicated active-session and non-active-session finalization branches.
+
+#### Shared helpers introduced
+The refactor introduced shared helpers for the core streaming/finalization rules, including:
+- `buildFinalAssistantMessage(...)`
+- `buildStreamCommittedAssistantMessage(...)`
+- `clearActiveStreamingState()`
+- `clearCachedStreamingState(key)`
+- `refreshSessionListsSoon()`
+- `reloadActiveSessionHistory()`
+
+#### What this accomplished
+These helpers reduced duplicated logic around:
+- materializing a final assistant message from `parsed.message` plus accumulated streamed text
+- preserving streamed text before tool-use final events clear it
+- clearing active streaming state (`streamText`, `chatRunId`, `thinking`)
+- clearing cached per-session streaming state for non-active sessions
+- refreshing sidebar/session-preview state after finalization
+- reloading active session history when run-mismatch or fallback finalization paths no longer trust the in-memory streaming state
+
+#### Why this matters
+Before this ticket, active-session finalization, non-active-session finalization, and fallback lifecycle handling each contained slightly different inline logic for the same semantic behaviors.
+That made the streaming path harder to reason about and more likely to drift into inconsistent behavior over time.
+
+After this ticket, the code is still not tiny, but the major streaming/finalization rules are less copy-pasted and more explicit.
+
+#### What this ticket intentionally does *not* solve yet
+- it does not fully redesign the event model for chat vs agent events
+- it does not completely unify every side effect between active and non-active finalization paths
+- it does not yet solve every possible interrupted-run or mid-transition edge case
+
+That is acceptable for Phase 1.
+The goal here was to make the current streaming path materially clearer and less fragile, not to replace the whole runtime event architecture.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `1.2.6` — define explicit thread loading/empty/error states — now that thread rendering, scroll behavior, and streaming/finalization behavior are all materially cleaner.
 
 ---
 

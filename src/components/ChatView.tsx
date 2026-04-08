@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState, ToolItem } from "../lib/types.ts";
-import { ChatThread } from "./ChatThread.tsx";
+import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
 import { Composer } from "./Composer.tsx";
 import {
   buildDesktopLocalImageUrl,
@@ -1072,6 +1072,34 @@ export default function ChatView(props: ChatViewProps) {
   const connectionStatus = props.connectionStatus ?? (props.connected ? "connected" : "disconnected");
   const isSessionSwitching = props.sessionTransitionState === "switching";
   const isThreadBusy = Boolean(props.isCurrentSessionLoading || isSessionSwitching);
+  const hasRenderableThreadContent = displayedMessages.length > 0 || Boolean(props.streamText) || props.thinking;
+  const threadState = hasRenderableThreadContent
+    ? { kind: "ready" as const }
+    : isSessionSwitching
+      ? {
+          kind: "loading" as const,
+          title: "Switching Sessions",
+          copy: "Preparing the selected session and restoring its thread context.",
+        }
+      : props.isCurrentSessionLoading
+        ? {
+            kind: "loading" as const,
+            title: "Loading Session",
+            copy: "Loading the current session history and thread state.",
+          }
+        : props.sessionKey
+          ? {
+              kind: "empty" as const,
+              title: "No Messages Yet",
+              copy: "This session is ready, but nothing has been sent yet. Type a message or use a /command.",
+              showHints: true,
+            }
+          : {
+              kind: "empty" as const,
+              title: "New Conversation",
+              copy: "Type a message to get started, or use a /command.",
+              showHints: true,
+            };
   const statusLabel =
     connectionStatus === "connected"
       ? "Gateway connected"
@@ -1196,15 +1224,11 @@ export default function ChatView(props: ChatViewProps) {
                 </div>
               )}
 
-              {outgoingThreadSnapshot.displayedMessages.length === 0 && (
-                <article className="empty-state">
-                  <div className="empty-state-greeting" aria-hidden="true">🦞</div>
-                  <div className="empty-state-title">New Conversation</div>
-                  <div className="empty-state-copy">
-                    Type a message to get started, or use a <code>/command</code>.
-                  </div>
-                </article>
-              )}
+              {outgoingThreadSnapshot.displayedMessages.length === 0 && renderThreadStateCard({
+                kind: "empty",
+                title: "No Messages Yet",
+                copy: "This session is ready, but nothing has been sent yet.",
+              })}
 
               {props.uiSettings.showToolActivity &&
                 renderToolPanel(outgoingThreadSnapshot.toolBeforeFirst, "snapshot-tool-before-first", { snapshot: true })}
@@ -1261,8 +1285,7 @@ export default function ChatView(props: ChatViewProps) {
           hiddenMessageCount={hiddenMessageCount}
           loadingOlder={props.loadingOlder}
           messages={displayedMessages}
-          isThreadBusy={isThreadBusy}
-          isSessionSwitching={isSessionSwitching}
+          threadState={threadState}
           showToolActivity={props.uiSettings.showToolActivity}
           showMessageTimestamp={props.uiSettings.showMessageTimestamp}
           timestampFontSize={props.uiSettings.messageTimestampFontSize}
