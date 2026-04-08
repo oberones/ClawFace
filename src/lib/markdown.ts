@@ -17,6 +17,13 @@ type MathToken = {
   displayMode?: boolean;
 };
 
+function readMathTokenText(token: unknown): string {
+  if (token && typeof token === "object" && "text" in token && typeof (token as { text?: unknown }).text === "string") {
+    return (token as { text: string }).text;
+  }
+  return "";
+}
+
 const SUPPORTED_MATH_ENVIRONMENTS = new Set<string>([
   "array",
   "aligned",
@@ -186,7 +193,7 @@ markdownParser.use({
         };
       },
       renderer(token) {
-        return `${renderMath((token as unknown as MathToken).text, true)}\n`;
+        return `${renderMath(readMathTokenText(token), true)}\n`;
       },
     },
     {
@@ -209,7 +216,7 @@ markdownParser.use({
         };
       },
       renderer(token) {
-        return `${renderMath((token as unknown as MathToken).text, true)}\n`;
+        return `${renderMath(readMathTokenText(token), true)}\n`;
       },
     },
     {
@@ -235,7 +242,7 @@ markdownParser.use({
         };
       },
       renderer(token) {
-        return `${renderMath((token as unknown as MathToken).text, true)}\n`;
+        return `${renderMath(readMathTokenText(token), true)}\n`;
       },
     },
     {
@@ -258,7 +265,7 @@ markdownParser.use({
         };
       },
       renderer(token) {
-        return `${renderMath((token as unknown as MathToken).text, true)}\n`;
+        return `${renderMath(readMathTokenText(token), true)}\n`;
       },
     },
     {
@@ -281,7 +288,7 @@ markdownParser.use({
         };
       },
       renderer(token) {
-        return renderMath((token as unknown as MathToken).text, false);
+        return renderMath(readMathTokenText(token), false);
       },
     },
     {
@@ -304,7 +311,7 @@ markdownParser.use({
         };
       },
       renderer(token) {
-        return renderMath((token as unknown as MathToken).text, false);
+        return renderMath(readMathTokenText(token), false);
       },
     },
   ],

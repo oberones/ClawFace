@@ -47,18 +47,18 @@ async function fingerprintPublicKey(publicKey: Uint8Array): Promise<string> {
 }
 
 async function generateIdentity(): Promise<DeviceIdentity> {
-  const fallbackKey = () => {
-    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+  const secureRandomPrivateKey = () => {
+    if (typeof utils.randomPrivateKey === "function") {
+      return utils.randomPrivateKey();
+    }
+    if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
       const buf = new Uint8Array(32);
       crypto.getRandomValues(buf);
       return buf;
     }
-    return new Uint8Array(32);
+    throw new Error("No cryptographically secure random source available for device identity generation.");
   };
-  const privateKey =
-    typeof utils.randomPrivateKey === "function"
-      ? utils.randomPrivateKey()
-      : fallbackKey();
+  const privateKey = secureRandomPrivateKey();
   const publicKey = await getPublicKeyAsync(privateKey);
   const deviceId = await fingerprintPublicKey(publicKey);
   return {
