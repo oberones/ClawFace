@@ -2,6 +2,20 @@ import React from "react";
 import type { Attachment, ChatMessage, ToolItem } from "../lib/types.ts";
 import { CopyButton, MessageRow } from "./MessageRow.tsx";
 
+export type ThreadState =
+  | { kind: "ready" }
+  | {
+      kind: "loading";
+      title: string;
+      copy: string;
+    }
+  | {
+      kind: "empty";
+      title: string;
+      copy: string;
+      showHints?: boolean;
+    };
+
 export type ChatThreadProps = {
   sessionKey: string | null;
   chatImpulseActive: boolean;
@@ -9,8 +23,7 @@ export type ChatThreadProps = {
   hiddenMessageCount: number;
   loadingOlder: boolean;
   messages: ChatMessage[];
-  isThreadBusy: boolean;
-  isSessionSwitching: boolean;
+  threadState: ThreadState;
   showToolActivity: boolean;
   showMessageTimestamp: boolean;
   timestampFontSize: number;
@@ -30,6 +43,26 @@ export type ChatThreadProps = {
   onHandleMarkdownClick: React.MouseEventHandler<HTMLElement>;
 };
 
+export function renderThreadStateCard(state: Exclude<ThreadState, { kind: "ready" }>) {
+  return (
+    <article className="empty-state">
+      <div className="empty-state-greeting" aria-hidden="true">🦞</div>
+      <div className="empty-state-title">{state.title}</div>
+      <div className="empty-state-copy">
+        {state.copy}
+      </div>
+      {state.kind === "empty" && state.showHints && (
+        <div className="empty-state-hints">
+          <span className="empty-state-hint">/model</span>
+          <span className="empty-state-hint">/status</span>
+          <span className="empty-state-hint">/usage</span>
+          <span className="empty-state-hint">/compact</span>
+        </div>
+      )}
+    </article>
+  );
+}
+
 export function ChatThread(props: ChatThreadProps) {
   return (
     <div
@@ -45,33 +78,7 @@ export function ChatThread(props: ChatThreadProps) {
         </div>
       )}
 
-      {props.messages.length === 0 && props.isThreadBusy && (
-        <article className="empty-state">
-          <div className="empty-state-greeting" aria-hidden="true">🦞</div>
-          <div className="empty-state-title">{props.isSessionSwitching ? "Switching Sessions" : "Loading Session"}</div>
-          <div className="empty-state-copy">
-            {props.isSessionSwitching
-              ? "Preparing the selected session and restoring its thread context."
-              : "Loading the current session history and thread state."}
-          </div>
-        </article>
-      )}
-
-      {props.messages.length === 0 && !props.isThreadBusy && (
-        <article className="empty-state">
-          <div className="empty-state-greeting" aria-hidden="true">🦞</div>
-          <div className="empty-state-title">New Conversation</div>
-          <div className="empty-state-copy">
-            Type a message to get started, or use a <code>/command</code>.
-          </div>
-          <div className="empty-state-hints">
-            <span className="empty-state-hint">/model</span>
-            <span className="empty-state-hint">/status</span>
-            <span className="empty-state-hint">/usage</span>
-            <span className="empty-state-hint">/compact</span>
-          </div>
-        </article>
-      )}
+      {props.threadState.kind !== "ready" && props.messages.length === 0 && renderThreadStateCard(props.threadState)}
 
       {props.showToolActivity && props.onRenderToolPanel(props.toolBeforeFirst, "tool-before-first")}
 
