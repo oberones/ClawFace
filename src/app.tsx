@@ -3978,7 +3978,15 @@ export default function App() {
   };
 
   const clearActiveStreamingState = () => {
-    setStreamTextSynced(null);
+    pendingStreamTextRef.current = null;
+    if (streamFlushRafRef.current !== null) {
+      window.cancelAnimationFrame(streamFlushRafRef.current);
+      streamFlushRafRef.current = null;
+    }
+    streamTextRef.current = null;
+    chatRunRef.current = null;
+    thinkingRef.current = false;
+    setStreamText(null);
     setChatRunId(null);
     setThinking(false);
   };
@@ -3999,13 +4007,18 @@ export default function App() {
     }
   };
 
-  const reloadActiveSessionHistory = () => {
-    const client = clientRef.current;
-    const activeSessionKey = selectedSessionRef.current;
-    if (client && activeSessionKey) {
-      void loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
-      refreshSessionsWithFollowUp(client);
+  const reloadActiveSessionHistory = async (clientOverride?: GatewayClient | null) => {
+    const client = clientOverride ?? clientRef.current;
+    if (!client) {
+      return;
     }
+    await refreshSessions(client);
+    const activeSessionKey = selectedSessionRef.current;
+    if (!activeSessionKey || historyLoadInFlightRef.current.has(activeSessionKey)) {
+      return;
+    }
+    await loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
+    refreshSessionsWithFollowUp(client);
   };
 
   const scheduleAgentFinalizeFallback = (params: {
@@ -4030,7 +4043,7 @@ export default function App() {
       if (params.phase === "end") {
         if (!streamedText) {
           clearActiveStreamingState();
-          reloadActiveSessionHistory();
+          void reloadActiveSessionHistory();
           const activeSessionKey = selectedSessionRef.current;
           if (activeSessionKey) {
             updateSessionActivity(activeSessionKey, { working: false, unread: false });
@@ -4710,9 +4723,19 @@ export default function App() {
         void loadAgents(client);
         void loadModels(client);
         void refreshSessions(client);
+        const activeSessionKey = selectedSessionRef.current;
+        if (activeSessionKey) {
+          updateSessionActivity(activeSessionKey, { unread: false });
+          void reloadActiveSessionHistory(client);
+        }
       },
       onClose: (info) => {
         gatewayMethodsRef.current.clear();
+        const activeSessionKey = selectedSessionRef.current;
+        clearActiveStreamingState();
+        if (activeSessionKey) {
+          updateSessionActivity(activeSessionKey, { working: false, unread: false });
+        }
         const reason = info.reason?.trim() ?? "";
         if (reason.toLowerCase().includes("pairing")) {
           setConnectionState({
@@ -5527,13 +5550,13 @@ export default function App() {
           chatRunRef.current = parsed.runId;
           setChatRunId(parsed.runId);
         } else {
-          reloadActiveSessionHistory();
+          void reloadActiveSessionHistory();
           return;
         }
       }
       const activeRunAfterSync = chatRunRef.current;
       if (activeRunAfterSync && parsed.runId && parsed.runId !== activeRunAfterSync) {
-        reloadActiveSessionHistory();
+        void reloadActiveSessionHistory();
         return;
       }
       const toolUpdates = extractToolUpdatesFromMessage(parsed.message);
