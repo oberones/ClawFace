@@ -34,32 +34,40 @@ type ModelItem = {
 export type ComposerProps = {
   composerLaunchActive: boolean;
   composerWarning: string | null;
-  draft: string;
-  attachments: Attachment[];
-  connected: boolean;
-  sendDisabled: boolean;
-  sendLabel?: string;
   uiSettings: UiSettings;
-  commandSuggestions: CommandSuggestion[];
-  showSlashMenu: boolean;
-  activeCommand: number;
-  thinkingMenuOpen: boolean;
-  thinkingMenuRef: React.RefObject<HTMLDivElement>;
-  activeThinking: string;
-  thinkChoices: string[];
-  sessionInfo: SessionInfo;
-  models: ModelItem[];
-  onDraftChange: (value: string) => void;
-  onAttachmentsChange: (next: Attachment[]) => void;
-  onKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement>;
-  onCompositionStart: () => void;
-  onCompositionEnd: () => void;
-  onApplySuggestion: (item: CommandSuggestion) => void;
-  onSend: () => void;
-  onCompact?: () => void;
-  onThinkingMenuToggle: () => void;
-  onThinkingSelect: (value: string) => void;
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  input: {
+    draft: string;
+    attachments: Attachment[];
+    textareaRef: React.RefObject<HTMLTextAreaElement>;
+    onDraftChange: (value: string) => void;
+    onAttachmentsChange: (next: Attachment[]) => void;
+    onKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement>;
+    onCompositionStart: () => void;
+    onCompositionEnd: () => void;
+  };
+  slash: {
+    commandSuggestions: CommandSuggestion[];
+    showSlashMenu: boolean;
+    activeCommand: number;
+    onApplySuggestion: (item: CommandSuggestion) => void;
+  };
+  runtime: {
+    connected: boolean;
+    sendDisabled: boolean;
+    sendLabel?: string;
+    onSend: () => void;
+  };
+  footer: {
+    thinkingMenuOpen: boolean;
+    thinkingMenuRef: React.RefObject<HTMLDivElement>;
+    activeThinking: string;
+    thinkChoices: string[];
+    sessionInfo: SessionInfo;
+    models: ModelItem[];
+    onCompact?: () => void;
+    onThinkingMenuToggle: () => void;
+    onThinkingSelect: (value: string) => void;
+  };
 };
 
 async function fileToAttachment(file: File, idPrefix: string): Promise<Attachment> {
@@ -103,7 +111,7 @@ export function Composer(props: ComposerProps) {
           }
           Promise.all(files.map((file) => fileToAttachment(file, "drop")))
             .then((next) => {
-              props.onAttachmentsChange([...props.attachments, ...next]);
+              props.input.onAttachmentsChange([...props.input.attachments, ...next]);
             })
             .catch(() => {
               // ignore
@@ -114,12 +122,12 @@ export function Composer(props: ComposerProps) {
 
         <div className="composer-input-wrap">
           <textarea
-            ref={props.textareaRef}
-            value={props.draft}
-            onChange={(e) => props.onDraftChange(e.target.value)}
-            onCompositionStart={props.onCompositionStart}
-            onCompositionEnd={props.onCompositionEnd}
-            onKeyDown={props.onKeyDown}
+            ref={props.input.textareaRef}
+            value={props.input.draft}
+            onChange={(e) => props.input.onDraftChange(e.target.value)}
+            onCompositionStart={props.input.onCompositionStart}
+            onCompositionEnd={props.input.onCompositionEnd}
+            onKeyDown={props.input.onKeyDown}
             onPaste={(e) => {
               const items = e.clipboardData?.items;
               if (!items) {
@@ -141,7 +149,7 @@ export function Composer(props: ComposerProps) {
               e.preventDefault();
               Promise.all(imageFiles.map((file) => fileToAttachment(file, "paste")))
                 .then((next) => {
-                  props.onAttachmentsChange([...props.attachments, ...next]);
+                  props.input.onAttachmentsChange([...props.input.attachments, ...next]);
                 })
                 .catch(() => {
                   // ignore
@@ -156,14 +164,14 @@ export function Composer(props: ComposerProps) {
             }}
           />
 
-          {props.showSlashMenu && props.commandSuggestions.length > 0 && (
+          {props.slash.showSlashMenu && props.slash.commandSuggestions.length > 0 && (
             <div className="slash-menu" style={{ fontSize: "var(--claw-font-size)" }}>
-              {props.commandSuggestions.map((cmd, idx) => (
+              {props.slash.commandSuggestions.map((cmd, idx) => (
                 <button
                   key={`${cmd.name}-${cmd.value ?? cmd.description}`}
                   type="button"
-                  onClick={() => props.onApplySuggestion(cmd)}
-                  className={`slash-item ${idx === props.activeCommand ? "active" : ""}`}
+                  onClick={() => props.slash.onApplySuggestion(cmd)}
+                  className={`slash-item ${idx === props.slash.activeCommand ? "active" : ""}`}
                 >
                   <span className="slash-name">/{cmd.name}</span>
                   <span className="slash-detail">{cmd.value ?? cmd.description}</span>
@@ -173,9 +181,9 @@ export function Composer(props: ComposerProps) {
           )}
         </div>
 
-        {props.attachments.length > 0 && (
+        {props.input.attachments.length > 0 && (
           <div className="attachment-preview-list">
-            {props.attachments.map((att) => (
+            {props.input.attachments.map((att) => (
               <div key={att.id} className={`attachment-preview-item ${att.isImage ? "is-image" : "is-file"}`}>
                 {att.isImage ? (
                   <div className="attachment-preview-thumb">
@@ -194,7 +202,7 @@ export function Composer(props: ComposerProps) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => props.onAttachmentsChange(props.attachments.filter((item) => item.id !== att.id))}
+                  onClick={() => props.input.onAttachmentsChange(props.input.attachments.filter((item) => item.id !== att.id))}
                   className="attachment-preview-remove"
                   aria-label={`Remove ${att.name}`}
                 >
@@ -225,7 +233,7 @@ export function Composer(props: ComposerProps) {
                   const files = Array.from(e.target.files ?? []);
                   Promise.all(files.map((file) => fileToAttachment(file, "upload")))
                     .then((next) => {
-                      props.onAttachmentsChange([...props.attachments, ...next]);
+                      props.input.onAttachmentsChange([...props.input.attachments, ...next]);
                     })
                     .catch(() => {
                       // ignore
@@ -236,8 +244,8 @@ export function Composer(props: ComposerProps) {
 
             <button
               type="button"
-              onClick={props.onSend}
-              disabled={props.sendDisabled}
+              onClick={props.runtime.onSend}
+              disabled={props.runtime.sendDisabled}
               className="ui-btn ui-btn-primary"
               style={{
                 fontSize: sendFontSize,
@@ -245,16 +253,16 @@ export function Composer(props: ComposerProps) {
                 minHeight: "auto",
               }}
             >
-              {props.sendLabel ?? "Send"}
+              {props.runtime.sendLabel ?? "Send"}
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "-2px" }}><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
             </button>
           </div>
 
           <div className="footer-stats" style={{ fontSize: `${props.uiSettings.footerStatsFontSize}px` }}>
-            {props.onCompact && (
+            {props.footer.onCompact && (
               <button
                 type="button"
-                onClick={props.onCompact}
+                onClick={props.footer.onCompact}
                 className="ui-btn ui-btn-light compact-btn"
                 title="Compact session context"
                 style={{
@@ -270,18 +278,18 @@ export function Composer(props: ComposerProps) {
               Context:{" "}
               {(() => {
                 const total =
-                  props.sessionInfo.totalTokens ??
-                  (Number.isFinite(props.sessionInfo.inputTokens) || Number.isFinite(props.sessionInfo.outputTokens)
-                    ? (props.sessionInfo.inputTokens ?? 0) + (props.sessionInfo.outputTokens ?? 0)
+                  props.footer.sessionInfo.totalTokens ??
+                  (Number.isFinite(props.footer.sessionInfo.inputTokens) || Number.isFinite(props.footer.sessionInfo.outputTokens)
+                    ? (props.footer.sessionInfo.inputTokens ?? 0) + (props.footer.sessionInfo.outputTokens ?? 0)
                     : null);
                 const used = Number.isFinite(total) ? total : null;
-                const modelId = props.sessionInfo.modelId || props.sessionInfo.modelLabel;
+                const modelId = props.footer.sessionInfo.modelId || props.footer.sessionInfo.modelLabel;
                 const model =
-                  props.models.find((item) => item.id === modelId) ??
-                  props.models.find((item) => `${item.provider}/${item.id}` === modelId) ??
-                  props.models.find((item) => `${item.provider}/${item.name}` === modelId) ??
+                  props.footer.models.find((item) => item.id === modelId) ??
+                  props.footer.models.find((item) => `${item.provider}/${item.id}` === modelId) ??
+                  props.footer.models.find((item) => `${item.provider}/${item.name}` === modelId) ??
                   null;
-                const limit = model?.contextWindow ?? props.sessionInfo.contextLimit ?? null;
+                const limit = model?.contextWindow ?? props.footer.sessionInfo.contextLimit ?? null;
                 if (!Number.isFinite(used)) {
                   return "-";
                 }
@@ -292,14 +300,14 @@ export function Composer(props: ComposerProps) {
                 return formatCompactTokens(used);
               })()}
             </span>
-            <span>In: {formatCompactTokens(props.sessionInfo.inputTokens)}</span>
-            <span>Out: {formatCompactTokens(props.sessionInfo.outputTokens)}</span>
-            <span>Total: {formatCompactTokens(props.sessionInfo.totalTokens)}</span>
+            <span>In: {formatCompactTokens(props.footer.sessionInfo.inputTokens)}</span>
+            <span>Out: {formatCompactTokens(props.footer.sessionInfo.outputTokens)}</span>
+            <span>Total: {formatCompactTokens(props.footer.sessionInfo.totalTokens)}</span>
 
-            <div className={`relative ${props.thinkingMenuOpen ? "menu-open-ctx" : ""}`} ref={props.thinkingMenuRef}>
+            <div className={`relative ${props.footer.thinkingMenuOpen ? "menu-open-ctx" : ""}`} ref={props.footer.thinkingMenuRef}>
               <button
                 type="button"
-                onClick={props.onThinkingMenuToggle}
+                onClick={props.footer.onThinkingMenuToggle}
                 className="ui-btn ui-btn-light"
                 style={{
                   fontSize: `${props.uiSettings.footerStatsFontSize}px`,
@@ -307,17 +315,17 @@ export function Composer(props: ComposerProps) {
                   minHeight: "auto",
                 }}
               >
-                Thinking: {props.activeThinking}
+                Thinking: {props.footer.activeThinking}
               </button>
-              {props.thinkingMenuOpen && (
+              {props.footer.thinkingMenuOpen && (
                 <div className="thinking-menu">
-                  {props.thinkChoices.map((level) => {
-                    const isActive = level === props.activeThinking;
+                  {props.footer.thinkChoices.map((level) => {
+                    const isActive = level === props.footer.activeThinking;
                     return (
                       <button
                         key={level}
                         type="button"
-                        onClick={() => props.onThinkingSelect(level)}
+                        onClick={() => props.footer.onThinkingSelect(level)}
                         className={`thinking-item ${isActive ? "active" : ""}`}
                       >
                         {level}
