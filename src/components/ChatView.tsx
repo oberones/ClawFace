@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState, ToolItem } from "../lib/types.ts";
+import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
 import { Composer } from "./Composer.tsx";
 import {
@@ -39,8 +40,7 @@ type ChatViewProps = {
   toolItems: ToolItem[];
   draft: string;
   onDraftChange: (value: string) => void;
-  attachments: Attachment[];
-  onAttachmentsChange: (next: Attachment[]) => void;
+  stagedAttachments: StagedAttachmentsState;
   onSend: () => void;
   onAbort: () => void;
   canAbort: boolean;
@@ -1364,10 +1364,8 @@ export default function ChatView(props: ChatViewProps) {
         }}
         input={{
           draft: props.draft,
-          attachments: props.attachments,
           textareaRef: composerTextareaRef,
           onDraftChange: props.onDraftChange,
-          onAttachmentsChange: props.onAttachmentsChange,
           onKeyDown,
           onCompositionStart: () => {
             isComposingRef.current = true;
@@ -1376,6 +1374,7 @@ export default function ChatView(props: ChatViewProps) {
             isComposingRef.current = false;
           },
         }}
+        stagedAttachments={props.stagedAttachments}
         slash={{
           commandSuggestions,
           showSlashMenu,
