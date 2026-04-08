@@ -13,7 +13,7 @@ import {
 } from "./MessageRow.tsx";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
-import { BASE_COMMANDS, type SlashCommand } from "../lib/slash-commands.ts";
+import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
 
 export type SessionInfo = {
@@ -911,51 +911,21 @@ export default function ChatView(props: ChatViewProps) {
     return () => window.removeEventListener("resize", autoResizeComposer);
   }, [autoResizeComposer]);
 
-  const showSlashMenu = props.draft.trim().startsWith("/");
-  const commandQuery = props.draft.trim().replace(/^\//, "");
-  const tokens = commandQuery.split(/\s+/).filter(Boolean);
-  const commandName = tokens[0] ?? "";
-  const commandArgs = tokens.slice(1).join(" ");
-
-  const commandSuggestions = useMemo<Array<SlashCommand & { value?: string }>>(() => {
-    if (!showSlashMenu) {
-      return [];
-    }
-    const thinkCommand = commandName === "think" || commandName === "thinking" || commandName === "t";
-    if (commandName && (commandName === "model" || thinkCommand)) {
-      if (commandName === "model") {
-        return props.models
-          .filter((model) => `${model.provider}/${model.id}`.toLowerCase().includes(commandArgs.toLowerCase()))
-          .slice(0, 8)
-          .map((model) => ({
-            name: "model",
-            description: model.name,
-            value: `${model.provider}/${model.id}`,
-          }));
-      }
-      const thinkLevels = ["off", "minimal", "low", "medium", "high", "xhigh"];
-      return thinkLevels
-        .filter((level) => level.startsWith(commandArgs.toLowerCase()))
-        .map((level) => ({ name: commandName, description: "Thinking level", value: level }));
-    }
-    return BASE_COMMANDS.filter((cmd) => cmd.name.toLowerCase().startsWith(commandName.toLowerCase()));
-  }, [showSlashMenu, commandName, commandArgs, props.models]);
-
-  const requiresArgs =
-    commandName === "model" ||
-    commandName === "think" ||
-    commandName === "thinking" ||
-    commandName === "t";
-  const exactCommand = BASE_COMMANDS.find((cmd) => cmd.name === commandName) ?? null;
-
-  const applySuggestion = (suggestion: SlashCommand & { value?: string }) => {
-    if (suggestion.value) {
-      props.onDraftChange(`/${suggestion.name} ${suggestion.value} `);
-    } else {
-      props.onDraftChange(`/${suggestion.name} `);
-    }
-    setActiveCommand(0);
-  };
+  const {
+    showSlashMenu,
+    commandName,
+    commandArgs,
+    commandSuggestions,
+    requiresArgs,
+    exactCommand,
+    applySuggestion,
+    moveSelection,
+    applyActiveSuggestion,
+  } = useSlashCommands({
+    draft: props.draft,
+    models: props.models,
+    onDraftChange: props.onDraftChange,
+  });
 
   const onKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (event) => {
     const nativeEvent = event.nativeEvent as KeyboardEvent;
@@ -975,13 +945,14 @@ export default function ChatView(props: ChatViewProps) {
     ) {
       event.preventDefault();
       const delta = event.key === "ArrowDown" ? 1 : -1;
-      const next = (activeCommand + delta + commandSuggestions.length) % commandSuggestions.length;
-      setActiveCommand(next);
+      moveSelection(delta);
       return;
     }
     if (showSlashMenu && event.key === "Tab" && commandSuggestions.length > 0) {
       event.preventDefault();
-      applySuggestion(commandSuggestions[activeCommand]!);
+      if (applyActiveSuggestion()) {
+        return;
+      }
       return;
     }
     if (event.key === "Enter" && !event.shiftKey) {
@@ -991,7 +962,9 @@ export default function ChatView(props: ChatViewProps) {
           sendWithPhysics();
           return;
         }
-        applySuggestion(commandSuggestions[activeCommand]!);
+        if (applyActiveSuggestion()) {
+          return;
+        }
         return;
       }
       if (showSlashMenu && exactCommand && !requiresArgs) {

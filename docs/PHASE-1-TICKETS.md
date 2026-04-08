@@ -1428,6 +1428,54 @@ A dedicated slash-command hook/module.
 
 ### Done when
 - slash-command behavior is no longer smeared through generic composer logic
+- `make typecheck` and `make build` pass for the extraction
+
+### Implementation notes (2026-04-07)
+
+This ticket has now been completed as a dedicated slash-command behavior extraction.
+
+#### New module added
+- `src/hooks/useSlashCommands.ts`
+
+#### What moved into `useSlashCommands`
+The new hook now owns the slash-command interpretation layer, including:
+- slash-menu visibility detection from the draft
+- command tokenization/parsing
+- `commandName` / `commandArgs` derivation
+- suggestion generation for base commands
+- suggestion generation for model-specific completions
+- suggestion generation for thinking-level completions
+- required-args detection
+- exact-command lookup
+- active suggestion state helpers
+- suggestion application back into the draft
+
+#### What `ChatView` still owns
+`ChatView.tsx` still owns the outer keyboard event handler and the final send decision points, including:
+- deciding when Enter should send vs apply a suggestion
+- calling `sendWithPhysics`
+- composition-state handling tied to the textarea/input event lifecycle
+
+That is intentional for this ticket.
+The goal of `1.3.2` was to extract slash-command behavior into a dedicated hook boundary, not to redesign all composer send semantics at the same time.
+
+#### What this ticket accomplished
+- established a real `useSlashCommands` hook boundary
+- removed inline slash-command parsing and suggestion derivation from `ChatView.tsx`
+- clarified the boundary between:
+  - generic composer/input event handling
+  - slash-command interpretation/state
+- created a cleaner seam for later composer behavior cleanup in `1.3.3`
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `1.3.3` — clarify composer behavior during send/stream/switch/reconnect — now that both the component boundary and slash-command hook boundary are in place.
 
 ---
 
