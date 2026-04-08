@@ -1394,44 +1394,52 @@ export default function ChatView(props: ChatViewProps) {
       <Composer
         composerLaunchActive={composerLaunchActive}
         composerWarning={composerWarning}
-        draft={props.draft}
-        attachments={props.attachments}
-        connected={props.connected}
-        sendDisabled={sendDisabled}
-        sendLabel={sendLabel}
         uiSettings={{
           composerActionScale: actionScale,
           footerStatsFontSize: props.uiSettings.footerStatsFontSize,
           composeActionsFontSize: Math.round(12 * actionScale),
           composeSendFontSize: Math.round(14 * actionScale),
         }}
-        commandSuggestions={commandSuggestions}
-        showSlashMenu={showSlashMenu}
-        activeCommand={activeCommand}
-        thinkingMenuOpen={thinkingMenuOpen}
-        thinkingMenuRef={thinkingMenuRef}
-        activeThinking={activeThinking}
-        thinkChoices={thinkChoices}
-        sessionInfo={props.sessionInfo}
-        models={props.models}
-        onDraftChange={props.onDraftChange}
-        onAttachmentsChange={props.onAttachmentsChange}
-        onKeyDown={onKeyDown}
-        onCompositionStart={() => {
-          isComposingRef.current = true;
+        input={{
+          draft: props.draft,
+          attachments: props.attachments,
+          textareaRef: composerTextareaRef,
+          onDraftChange: props.onDraftChange,
+          onAttachmentsChange: props.onAttachmentsChange,
+          onKeyDown,
+          onCompositionStart: () => {
+            isComposingRef.current = true;
+          },
+          onCompositionEnd: () => {
+            isComposingRef.current = false;
+          },
         }}
-        onCompositionEnd={() => {
-          isComposingRef.current = false;
+        slash={{
+          commandSuggestions,
+          showSlashMenu,
+          activeCommand,
+          onApplySuggestion: applySuggestion,
         }}
-        onApplySuggestion={applySuggestion}
-        onSend={sendWithPhysics}
-        onCompact={props.onCompact}
-        onThinkingMenuToggle={() => setThinkingMenuOpen((prev) => !prev)}
-        onThinkingSelect={(level) => {
-          setThinkingMenuOpen(false);
-          props.onThinkingSelect(level);
+        runtime={{
+          connected: props.connected,
+          sendDisabled,
+          sendLabel,
+          onSend: sendWithPhysics,
         }}
-        textareaRef={composerTextareaRef}
+        footer={{
+          thinkingMenuOpen,
+          thinkingMenuRef,
+          activeThinking,
+          thinkChoices,
+          sessionInfo: props.sessionInfo,
+          models: props.models,
+          onCompact: props.onCompact,
+          onThinkingMenuToggle: () => setThinkingMenuOpen((prev) => !prev),
+          onThinkingSelect: (level) => {
+            setThinkingMenuOpen(false);
+            props.onThinkingSelect(level);
+          },
+        }}
       />
 
       {imageLightbox && (
