@@ -1152,6 +1152,12 @@ export default function ChatView(props: ChatViewProps) {
           : connectionStatus === "error"
             ? "warning"
             : "disconnected";
+  const composerRuntimeState = !props.connected
+    ? "offline"
+    : props.canAbort || props.thinking
+      ? "busy"
+      : "ready";
+
   const composerWarning =
     connectionStatus === "connecting"
       ? props.disabledReason || "Connecting to the gateway…"
@@ -1161,7 +1167,12 @@ export default function ChatView(props: ChatViewProps) {
           ? props.disabledReason || "Gateway connection error. Check settings and retry."
           : !props.connected
             ? props.disabledReason || "Gateway disconnected. Update settings to reconnect."
-            : null;
+            : composerRuntimeState === "busy"
+              ? "A run is already in progress. You can keep editing, but stop it or wait for it to finish before sending again."
+              : null;
+
+  const sendDisabled = composerRuntimeState !== "ready";
+  const sendLabel = composerRuntimeState === "busy" ? "Busy" : "Send";
 
   return (
     <section className="claw-chat-area chat-shell">
@@ -1386,6 +1397,8 @@ export default function ChatView(props: ChatViewProps) {
         draft={props.draft}
         attachments={props.attachments}
         connected={props.connected}
+        sendDisabled={sendDisabled}
+        sendLabel={sendLabel}
         uiSettings={{
           composerActionScale: actionScale,
           footerStatsFontSize: props.uiSettings.footerStatsFontSize,

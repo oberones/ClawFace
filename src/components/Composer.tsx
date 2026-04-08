@@ -37,6 +37,8 @@ export type ComposerProps = {
   draft: string;
   attachments: Attachment[];
   connected: boolean;
+  sendDisabled: boolean;
+  sendLabel?: string;
   uiSettings: UiSettings;
   commandSuggestions: CommandSuggestion[];
   showSlashMenu: boolean;
@@ -235,7 +237,7 @@ export function Composer(props: ComposerProps) {
             <button
               type="button"
               onClick={props.onSend}
-              disabled={!props.connected}
+              disabled={props.sendDisabled}
               className="ui-btn ui-btn-primary"
               style={{
                 fontSize: sendFontSize,
@@ -243,7 +245,7 @@ export function Composer(props: ComposerProps) {
                 minHeight: "auto",
               }}
             >
-              Send
+              {props.sendLabel ?? "Send"}
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "-2px" }}><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
             </button>
           </div>
