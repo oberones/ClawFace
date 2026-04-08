@@ -2003,6 +2003,75 @@ Reassess whether Phase 1 still has any remaining high-leverage work. At this poi
 - declare Phase 1 complete,
 - or identify one final sharply-scoped Phase 1 ticket only if it clearly improves the core shell reliability/product direction.
 
+---
+
+# Phase 2 working tickets
+
+## Ticket 2.1 — Drag and drop attachments
+### Goal
+Make attachment ingestion feel like a first-class desktop-native workflow instead of incidental file handling.
+
+### Scope
+- drag/drop attachment ingestion
+- visual drop affordance
+- paste/upload/drop consistency
+- first-pass attachment ingestion boundary extraction
+
+### Tasks
+- extract attachment ingestion logic out of inline composer rendering
+- introduce explicit drag-active/drop-affordance UI
+- handle common ingestion edge cases (same-file reselect, file-only drag state, async failures)
+- validate that attachment staging still behaves correctly after the refactor
+
+### Deliverable
+A more intentional drag/drop attachment workflow.
+
+### Done when
+- drag/drop visibly behaves like a supported workflow
+- attachment ingestion is no longer raw file wrangling inline in `Composer`
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as the first user-facing Phase 2 slice.
+
+#### New module added
+- `src/hooks/useAttachmentIngestion.ts`
+
+#### What moved out of `Composer`
+Attachment ingestion behavior is no longer hand-written inline in the composer render body for:
+- drag/drop file ingestion
+- paste-image ingestion
+- file-input upload ingestion
+- staged attachment removal
+
+That behavior now lives behind a dedicated `useAttachmentIngestion(...)` hook.
+
+#### User-facing improvement added
+The composer now exposes an explicit drag-active/drop-affordance state:
+- the compose surface reacts visually when files are dragged over it
+- a visible drop overlay explains that files will be staged in the composer
+
+This turns drag/drop from a hidden capability into an intentional workflow.
+
+#### Review follow-up applied before closure
+This ticket also incorporated PR review follow-up before closure:
+- async ingestion errors are now caught instead of risking unhandled promise rejections
+- ingestion now appends against the latest attachment state rather than a stale render-time array capture
+- drag-active UI is gated to actual file drags only
+- file input is cleared after use so selecting the same file twice still triggers ingestion
+- composer now surfaces attachment-ingestion errors to the user via warning UI instead of silently failing
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Continue Phase 2 by formalizing staged attachment lifecycle/state ownership before moving on to richer attachment preview/rendering work.
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:
