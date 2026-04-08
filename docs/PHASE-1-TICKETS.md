@@ -1422,6 +1422,69 @@ A cleaner thread state UX.
 
 ### Done when
 - the thread never feels visually undefined or under-specified in core state transitions
+- `make typecheck` and `make build` pass for the cleanup
+
+### Implementation notes (2026-04-08)
+
+This ticket has now been completed as a first-pass explicit thread-state cleanup.
+
+#### What changed
+The thread surface no longer relies on a couple of loosely-interpreted boolean checks to decide whether it is "loading" or "empty".
+Instead, it now uses an explicit thread-state model.
+
+#### New thread-state model
+`src/components/ChatThread.tsx` now exposes an explicit `ThreadState` union and a shared `renderThreadStateCard(...)` helper.
+
+Current first-pass states:
+- `ready`
+- `loading`
+- `empty`
+
+#### What `ChatView` now does explicitly
+`ChatView.tsx` now computes thread state in one place before rendering:
+- `ready` when the thread has visible messages, streaming content, or thinking activity
+- `loading` when the session is switching or current-session history is loading
+- `empty` when there is no renderable thread content
+
+Within `empty`, the UI now distinguishes between:
+- **selected but empty session** → `No Messages Yet`
+- **new conversation / no active thread context** → `New Conversation`
+
+#### Snapshot/overlay consistency improvement
+The outgoing thread snapshot overlay now reuses the same shared thread-state card renderer for its empty state instead of hardcoding a separate special-case empty card.
+
+That reduces one more inconsistency between the main thread and transition overlay rendering paths.
+
+#### Why this matters
+Before this ticket, thread state was mostly inferred from combinations like:
+- `messages.length === 0 && isThreadBusy`
+- `messages.length === 0 && !isThreadBusy`
+
+That was too implicit for a UI that already has meaningful distinctions between:
+- loading a session
+- switching a session
+- empty-but-ready session state
+- actively rendered thread content
+
+This ticket makes those states more explicit without inventing fake error-state behavior that the current app does not yet model cleanly.
+
+#### What this ticket intentionally does *not* solve yet
+- it does not introduce a fully-modeled thread load error state because the current app does not yet expose a clean source of truth for that state
+- it does not redesign session-transition choreography
+- it does not yet move the entire thread-state model into a dedicated thread-view model layer
+
+That is acceptable for Phase 1.
+The goal here was to replace ambiguous state handling with a cleaner explicit model in the common cases.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Reassess remaining Phase 1 work now that the thread and composer slices have both been materially cleaned up. The next target should be chosen based on the highest remaining leverage rather than continuing in strict numeric order.
 
 ---
 
@@ -1835,9 +1898,8 @@ If executing Phase 1 immediately, the recommended order is:
 ## Step 5
 - Ticket 1.2.5
 - Ticket 1.2.6
-- Ticket 1.1.3
-- Ticket 1.1.6
 - Ticket 1.3.4
+- Ticket P1-X4
 
 ## Step 6
 - Ticket P1-X2
@@ -1846,6 +1908,30 @@ If executing Phase 1 immediately, the recommended order is:
 This keeps discovery first, then state boundaries, then component extraction, then behavior hardening.
 
 ---
+
+## Ticket P1-X4 — Harden reconnect and active-session shell policy
+### Goal
+Make reconnect/disconnect/session-switch behavior feel intentionally governed rather than incidentally correct.
+
+### Scope
+- reconnect and disconnected shell behavior
+- how the selected session behaves while transport is reconnecting
+- activity/working-state semantics during reconnect and aborted streams
+- user-visible shell guidance during unstable connection periods
+
+### Tasks
+- audit current reconnect/disconnect behavior against the new thread/composer/session boundaries
+- identify where shell policy is still implicit or branchy
+- define a small explicit rule set for reconnect + active-session behavior
+- implement the smallest coherent hardening pass without reopening the entire event architecture
+
+### Deliverable
+A more intentional shell reliability policy around reconnect and active-session behavior.
+
+### Done when
+- reconnect/disconnect behavior is easier to reason about than it is now
+- active session behavior during reconnects/interruptions feels less fragile
+- `make typecheck` and `make build` pass for the hardening pass
 
 # Definition of Phase 1 done
 

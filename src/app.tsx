@@ -4710,9 +4710,19 @@ export default function App() {
         void loadAgents(client);
         void loadModels(client);
         void refreshSessions(client);
+        const activeSessionKey = selectedSessionRef.current;
+        if (activeSessionKey) {
+          updateSessionActivity(activeSessionKey, { unread: false });
+          void loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
+        }
       },
       onClose: (info) => {
         gatewayMethodsRef.current.clear();
+        const activeSessionKey = selectedSessionRef.current;
+        clearActiveStreamingState();
+        if (activeSessionKey) {
+          updateSessionActivity(activeSessionKey, { working: false, unread: false });
+        }
         const reason = info.reason?.trim() ?? "";
         if (reason.toLowerCase().includes("pairing")) {
           setConnectionState({
