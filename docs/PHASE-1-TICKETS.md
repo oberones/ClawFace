@@ -2072,6 +2072,78 @@ Validation outcome:
 #### Recommended next step
 Continue Phase 2 by formalizing staged attachment lifecycle/state ownership before moving on to richer attachment preview/rendering work.
 
+## Ticket 2.1.X — Formalize staged attachment lifecycle/state ownership
+### Goal
+Make staged attachments a clearer UI/domain surface instead of a raw array passed around by convention.
+
+### Scope
+- staged attachment state ownership
+- attachment operations (append/remove/clear/replace)
+- reducing raw attachment-array surgery in UI boundaries
+- aligning ingestion logic to the staged attachment lifecycle boundary
+
+### Tasks
+- introduce a staged attachment state hook/domain surface
+- route attachment ingestion through explicit staged attachment operations
+- remove raw setter leakage that bypasses the intended lifecycle boundary
+- tighten the attachment interface between app/chat/composer
+
+### Deliverable
+A clearer staged attachment lifecycle boundary.
+
+### Done when
+- staged attachments have a named lifecycle surface
+- UI boundaries rely less on raw array replacement semantics
+- `make typecheck` and `make build` pass for the cleanup
+
+### Implementation notes (2026-04-09)
+
+This follow-up has now been completed as the second attachment-focused Phase 2 cleanup pass.
+
+#### New modules/types added
+- `src/hooks/useStagedAttachments.ts`
+- `src/lib/staged-attachments.ts`
+
+#### What changed
+Attachment state is no longer treated only as a plain array with ad hoc replacement callbacks.
+Instead, the app now has a small explicit staged-attachment lifecycle surface with named operations:
+- `replaceAttachments(...)`
+- `appendAttachments(...)`
+- `removeAttachment(...)`
+- `clearAttachments()`
+
+#### App-level ownership improvement
+`app.tsx` now owns staged attachments through `useStagedAttachments()` rather than directly exposing a raw attachment-state setter as the primary interface.
+Key lifecycle sites (restore, rollback, clear-on-send/new-session flows) now use named operations instead of generic array mutation semantics.
+
+#### Boundary improvement between app/chat/composer
+The `ChatView` / `Composer` boundary now passes a grouped staged-attachments interface instead of raw:
+- `attachments`
+- `onAttachmentsChange(next)`
+
+This makes the attachment boundary more explicit and prepares the app for richer preview/rendering work.
+
+#### Ingestion alignment
+`useAttachmentIngestion()` now works against the staged-attachment lifecycle operations rather than reintroducing its own raw array ownership assumptions.
+It also now uses the shared staged-attachment type surface instead of redefining a parallel local ops type.
+
+#### Review follow-up applied before closure
+This follow-up also incorporated PR review follow-up before closure:
+- removed raw `setAttachments` from the public staged-attachment hook surface
+- switched rollback/replacement paths to `replaceAttachments(...)`
+- typed ingestion operations against the shared staged-attachment contract
+- tightened ingestion hook dependencies to specific operation references instead of depending on the entire ops object
+
+#### Validation status
+This follow-up is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `2.3` — attachment preview and rendering pipeline — now that ingestion and staged attachment ownership are both materially cleaner.
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:
