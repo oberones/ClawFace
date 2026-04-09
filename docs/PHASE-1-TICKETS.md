@@ -2245,6 +2245,73 @@ A more intentional clipboard workflow for staged attachments.
 - the composer gives clearer feedback when paste stages attachments
 - `make typecheck` and `make build` pass for the slice
 
+### Implementation notes (2026-04-09)
+
+This ticket has now been completed as the first clipboard-focused Phase 2 slice.
+
+#### What changed
+Clipboard image ingestion is now treated as a more intentional workflow instead of being purely a side effect of the generic attachment path.
+
+#### User-facing improvements landed
+- the composer now shows explicit feedback when pasted image content is staged as attachments
+- mixed clipboard handling is now more intentional:
+  - if clipboard contains text plus image content, text paste is preserved in the draft
+  - pasted image content is still staged as attachment(s)
+- clipboard-driven staging now feels more deliberate instead of silently mutating composer state
+
+#### Hook/runtime cleanup landed
+This ticket also tightened clipboard workflow internals by:
+- cleaning up paste feedback timers on unmount
+- making mixed clipboard behavior explicit in the ingestion hook
+- tightening Composer-side memoization around attachment operation wiring
+
+#### Why this matters
+Before this ticket, clipboard image handling mostly "worked," but behaved more like an incidental branch of generic attachment ingestion than a product-defined workflow.
+
+After this ticket, the app does a better job of telling the user what happened and avoids the most obvious mixed-clipboard failure mode where image staging could clobber normal text paste behavior.
+
+#### What this ticket intentionally does *not* solve yet
+- it does not model every possible clipboard payload combination
+- it does not yet provide a richer dedicated clipboard affordance beyond inline composer feedback
+- it does not yet add attachment-type-specific clipboard previews beyond staged attachment rendering
+
+That is fine for this slice.
+The goal was to make clipboard attachment staging intentional in the common cases.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to the next Phase 2 product-facing slice: make tool activity and media outputs feel more first-class in the thread.
+
+## Ticket 2.4 — Make tool activity and media outputs more first-class in the thread
+### Goal
+Make non-text runtime output feel like a core part of ClawFace rather than secondary clutter around chat bubbles.
+
+### Scope
+- tool activity rendering boundaries
+- thread placement and readability of tool activity
+- clearer UI ownership for non-message runtime output
+- preparing for richer media/tool result surfaces later
+
+### Tasks
+- identify the current tool/media rendering cluster in `ChatView`
+- extract a dedicated tool-activity render boundary
+- preserve current behavior while reducing inline panel/render boilerplate
+- create a cleaner seam for richer OpenClaw-native result surfaces later
+
+### Deliverable
+A cleaner first-class thread surface for tool activity/media-adjacent output.
+
+### Done when
+- tool activity rendering is less smeared through `ChatView`
+- the thread surface is easier to evolve toward richer non-text outputs
+- `make typecheck` and `make build` pass for the slice
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:
