@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { Attachment } from "../lib/types.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { formatCompactTokens } from "../lib/format.ts";
@@ -77,14 +77,16 @@ export function Composer(props: ComposerProps) {
   const actionFontSize = props.uiSettings.composeActionsFontSize;
   const sendFontSize = props.uiSettings.composeSendFontSize;
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const attachmentIngestion = useAttachmentIngestion({
-    attachmentOps: {
-      appendAttachments: (next) => {
-        setAttachmentError(null);
-        props.stagedAttachments.appendAttachments(next);
-      },
-      removeAttachment: props.stagedAttachments.removeAttachment,
+  const { appendAttachments, removeAttachment } = props.stagedAttachments;
+  const attachmentOps = useMemo(() => ({
+    appendAttachments: (next: Attachment[]) => {
+      setAttachmentError(null);
+      appendAttachments(next);
     },
+    removeAttachment,
+  }), [appendAttachments, removeAttachment]);
+  const attachmentIngestion = useAttachmentIngestion({
+    attachmentOps,
     onError: (message) => {
       setAttachmentError(message);
     },
@@ -107,6 +109,9 @@ export function Composer(props: ComposerProps) {
 
         {props.composerWarning && <div className="composer-warning">{props.composerWarning}</div>}
         {attachmentError && <div className="composer-warning">Attachment error: {attachmentError}</div>}
+        {attachmentIngestion.lastPasteFeedback && (
+          <div className="composer-warning composer-info">{attachmentIngestion.lastPasteFeedback}</div>
+        )}
 
         <div className="composer-input-wrap">
           <textarea
