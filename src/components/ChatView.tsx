@@ -4,14 +4,13 @@ import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState,
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
 import { Composer } from "./Composer.tsx";
+import { buildMotionVars, MessageRow } from "./MessageRow.tsx";
 import {
   buildDesktopLocalImageUrl,
-  buildMotionVars,
   filePathFromImageSource,
   isDesktopRuntime,
   isLikelyLocalFileSource,
-  MessageRow,
-} from "./MessageRow.tsx";
+} from "../lib/message-image-source.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
