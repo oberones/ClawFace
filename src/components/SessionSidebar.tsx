@@ -434,17 +434,17 @@ export default function SessionSidebar(props: SessionSidebarProps) {
           const contentSnippet = result.contentSnippet;
           const activityLabel = isActive
             ? "Current"
-            : activity?.working
-              ? "Working"
-              : activity?.unread
-                ? "New activity"
+            : activity?.unread
+              ? "New activity"
+              : activity?.working
+                ? "Working"
                 : null;
           const activityClass = isActive
             ? "is-active"
-            : activity?.working
-              ? "is-working"
-              : activity?.unread
-                ? "is-unread"
+            : activity?.unread
+              ? "is-unread"
+              : activity?.working
+                ? "is-working"
                 : "";
           return (
             <article

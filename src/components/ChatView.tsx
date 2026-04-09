@@ -1156,7 +1156,7 @@ export default function ChatView(props: ChatViewProps) {
               <div className="chat-brand-subtitle">OpenClaw control surface · v{__APP_VERSION__}</div>
             </div>
             <div
-              className={`session-runtime-pill is-${currentSessionRuntime.tone}`}
+              className={`session-runtime-pill${currentSessionRuntime.tone === "active" ? " is-active" : currentSessionRuntime.tone === "warning" ? " is-warning" : ""}`}
               title={currentSessionRuntime.detail}
               aria-label={`Current session status: ${currentSessionRuntime.label}. ${currentSessionRuntime.detail}`}
             >
