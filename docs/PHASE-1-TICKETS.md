@@ -2144,6 +2144,83 @@ Validation outcome:
 #### Recommended next step
 Proceed to `2.3` — attachment preview and rendering pipeline — now that ingestion and staged attachment ownership are both materially cleaner.
 
+## Ticket 2.3 — Attachment preview and rendering pipeline
+### Goal
+Make attachments a first-class rendering concern instead of scattered inline logic in composer and message surfaces.
+
+### Scope
+- staged attachment preview rendering
+- message-side attachment list rendering
+- file/image attachment render boundary extraction
+- shared image-source utility normalization where needed
+
+### Tasks
+- extract staged preview rendering from the composer body
+- extract message-side attachment rendering boundaries from `MessageRow`
+- separate file/image attachment render concerns where practical
+- remove circular/shared-helper coupling by introducing a dedicated image-source utility module
+
+### Deliverable
+A clearer attachment preview/rendering pipeline.
+
+### Done when
+- composer and message attachment previews are no longer mostly inline render blocks
+- shared image-source logic has a real utility home instead of component-level coupling
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-09)
+
+This ticket has now been completed as the first dedicated attachment preview/rendering slice.
+
+#### New components/modules added
+- `src/components/StagedAttachmentTray.tsx`
+- `src/components/MessageAttachmentList.tsx`
+- `src/components/MessageFileAttachment.tsx`
+- `src/components/MessageImageAttachment.tsx`
+- `src/lib/message-image-source.ts`
+
+#### What changed
+##### Composer / staged side
+The staged attachment preview block was extracted from `Composer.tsx` into `StagedAttachmentTray`, making staged attachments a first-class render surface instead of inline composer clutter.
+
+##### Message / thread side
+Message attachment rendering was split into explicit boundaries:
+- `MessageAttachmentList`
+- `MessageFileAttachment`
+- `MessageImageAttachment`
+
+This removed a meaningful amount of attachment-specific rendering logic from `MessageRow.tsx`.
+
+##### Shared image-source utility layer
+Image/path/source normalization helpers were moved into `src/lib/message-image-source.ts`.
+This broke the accidental circular dependency between `MessageRow` and `MessageImageAttachment` and gave the attachment rendering path a cleaner utility layer.
+
+#### Why this matters
+Before this ticket:
+- staged attachment preview rendering lived inline in `Composer`
+- message-side file/image rendering lived inline or semi-inline in `MessageRow`
+- shared image-source helper logic was coupled badly enough to create a circular module dependency
+
+After this ticket, attachment preview/rendering is much closer to a deliberate pipeline than a collection of scattered inline conditions.
+
+#### What this ticket intentionally does *not* solve yet
+- it does not fully unify staged-preview and message-rendering visuals into a single design system
+- it does not yet add richer file metadata or media-specific polish
+- it does not yet define the clipboard workflow as a first-class product behavior
+
+That is acceptable.
+This slice was about establishing explicit rendering boundaries first.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
+
+#### Recommended next step
+Proceed to `2.2` — paste image / clipboard workflow — now that attachment ingestion, state ownership, and preview/rendering boundaries are all materially cleaner.
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:
