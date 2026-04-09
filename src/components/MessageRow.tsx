@@ -213,13 +213,12 @@ export const MessageRow = React.memo(
               attachments={message.attachments}
               renderImageAttachment={(att) => (
                 <MessageImageAttachment
-                  key={att.id}
                   attachment={att}
                   onOpen={props.onOpenImage}
                   resolveRemoteImage={props.onResolveRemoteImage}
                 />
               )}
-              renderFileAttachment={(att) => <MessageFileAttachment key={att.id} attachment={att} />}
+              renderFileAttachment={(att) => <MessageFileAttachment attachment={att} />}
             />
           )}
           {props.showTimestamp && (

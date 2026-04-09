@@ -14,11 +14,13 @@ export function MessageAttachmentList(props: MessageAttachmentListProps) {
 
   return (
     <div className="attachments-wrap">
-      {props.attachments.map((attachment) =>
-        attachment.isImage
-          ? props.renderImageAttachment(attachment)
-          : props.renderFileAttachment(attachment)
-      )}
+      {props.attachments.map((attachment, index) => (
+        <React.Fragment key={attachment.id ?? index}>
+          {attachment.isImage
+            ? props.renderImageAttachment(attachment)
+            : props.renderFileAttachment(attachment)}
+        </React.Fragment>
+      ))}
     </div>
   );
 }
