@@ -236,10 +236,29 @@ export class GatewayClient {
     if (this.closed) {
       return;
     }
-    this.ws = new WebSocket(this.opts.url);
-    this.ws.addEventListener("open", () => this.queueConnect());
-    this.ws.addEventListener("message", (ev) => this.handleMessage(String(ev.data ?? "")));
-    this.ws.addEventListener("close", (ev) => {
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(this.opts.url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.pendingConnectError = {
+        code: "INVALID_URL",
+        message,
+      };
+      this.ws = null;
+      this.flushPending(new Error(`gateway connect failed: ${message}`));
+      this.opts.onClose?.({
+        code: CONNECT_FAILED_CLOSE_CODE,
+        reason: message,
+        error: this.pendingConnectError,
+      });
+      this.scheduleReconnect();
+      return;
+    }
+    this.ws = ws;
+    ws.addEventListener("open", () => this.queueConnect());
+    ws.addEventListener("message", (ev) => this.handleMessage(String(ev.data ?? "")));
+    ws.addEventListener("close", (ev) => {
       const reason = String(ev.reason ?? "");
       const connectError = this.pendingConnectError;
       this.pendingConnectError = undefined;
@@ -248,7 +267,7 @@ export class GatewayClient {
       this.opts.onClose?.({ code: ev.code, reason, error: connectError });
       this.scheduleReconnect();
     });
-    this.ws.addEventListener("error", () => {
+    ws.addEventListener("error", () => {
       // close handler will fire
     });
   }
@@ -283,7 +302,7 @@ export class GatewayClient {
   }
 
   private buildConnectParams(plan: ConnectPlan): GatewayConnectParams {
-    const params: GatewayConnectParams = {
+    return {
       minProtocol: 3,
       maxProtocol: 3,
       client: plan.client,
@@ -295,15 +314,6 @@ export class GatewayClient {
       userAgent: navigator.userAgent,
       locale: navigator.language,
     };
-
-    console.info("[GatewayClient] outbound connect params", params);
-    try {
-      (window as typeof window & { __clawfaceLastConnectPayload?: unknown }).__clawfaceLastConnectPayload = params;
-    } catch {
-      // ignore debug payload cache errors
-    }
-
-    return params;
   }
 
   private selectConnectAuth(params: { role: string; deviceId: string }): SelectedConnectAuth {
