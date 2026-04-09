@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Attachment } from "../lib/types.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 
@@ -41,6 +41,15 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   const dragDepthRef = useRef(0);
   const pasteFeedbackTimerRef = useRef<number | null>(null);
   const { appendAttachments, removeAttachment: removeStagedAttachment } = options.attachmentOps;
+
+  useEffect(() => {
+    return () => {
+      if (pasteFeedbackTimerRef.current !== null) {
+        window.clearTimeout(pasteFeedbackTimerRef.current);
+        pasteFeedbackTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const setPasteFeedback = useCallback((message: string | null) => {
     if (pasteFeedbackTimerRef.current !== null) {
