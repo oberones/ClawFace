@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import type { Attachment } from "../lib/types.ts";
+import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { formatBytes, formatCompactTokens, truncate } from "../lib/format.ts";
 import { useAttachmentIngestion } from "../hooks/useAttachmentIngestion.ts";
 
@@ -38,14 +39,13 @@ export type ComposerProps = {
   uiSettings: UiSettings;
   input: {
     draft: string;
-    attachments: Attachment[];
     textareaRef: React.RefObject<HTMLTextAreaElement>;
     onDraftChange: (value: string) => void;
-    onAttachmentsChange: (next: Attachment[]) => void;
     onKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement>;
     onCompositionStart: () => void;
     onCompositionEnd: () => void;
   };
+  stagedAttachments: StagedAttachmentsState;
   slash: {
     commandSuggestions: CommandSuggestion[];
     showSlashMenu: boolean;
@@ -77,10 +77,12 @@ export function Composer(props: ComposerProps) {
   const sendFontSize = props.uiSettings.composeSendFontSize;
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const attachmentIngestion = useAttachmentIngestion({
-    attachments: props.input.attachments,
-    onAttachmentsChange: (next) => {
-      setAttachmentError(null);
-      props.input.onAttachmentsChange(next);
+    attachmentOps: {
+      appendAttachments: (next) => {
+        setAttachmentError(null);
+        props.stagedAttachments.appendAttachments(next);
+      },
+      removeAttachment: props.stagedAttachments.removeAttachment,
     },
     onError: (message) => {
       setAttachmentError(message);
@@ -140,9 +142,9 @@ export function Composer(props: ComposerProps) {
           )}
         </div>
 
-        {props.input.attachments.length > 0 && (
+        {props.stagedAttachments.attachments.length > 0 && (
           <div className="attachment-preview-list">
-            {props.input.attachments.map((att) => (
+            {props.stagedAttachments.attachments.map((att) => (
               <div key={att.id} className={`attachment-preview-item ${att.isImage ? "is-image" : "is-file"}`}>
                 {att.isImage ? (
                   <div className="attachment-preview-thumb">
