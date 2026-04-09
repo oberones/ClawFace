@@ -54,6 +54,10 @@ This phase is effectively underway / mostly complete.
 
 # Phase 1 — Core chat shell stabilization
 
+## Status
+Effectively complete.
+The shell-reliability, thread, streaming, and composer stabilization work planned for Phase 1 has been materially delivered and validated.
+
 ## Goal
 Make the app’s core chat/session shell reliable enough to serve as a serious daily-use base.
 
@@ -138,6 +142,10 @@ Sending messages feels immediate and dependable.
 
 # Phase 2 — Desktop-native media and attachment workflows
 
+## Status
+In progress.
+Major attachment/media foundations have already landed, including drag/drop, staged attachment lifecycle cleanup, attachment preview/rendering boundaries, and the first clipboard-focused workflow pass.
+
 ## Goal
 Make ClawFace obviously better than a web tab for media-heavy interaction.
 
@@ -154,6 +162,9 @@ This is a key signature strength for the product, and it also forces the platfor
 ## Vertical slices
 
 ### Slice 2.1 — Drag and drop attachments
+#### Status
+Substantially complete.
+Drag/drop ingestion, visible drop affordance, and staged attachment lifecycle ownership are now materially cleaner and validated.
 #### User value
 The user can drag screenshots, images, and files into the chat naturally.
 
@@ -176,6 +187,9 @@ The user can drag screenshots, images, and files into the chat naturally.
 ---
 
 ### Slice 2.2 — Paste image and clipboard workflow
+#### Status
+First slice complete.
+Clipboard image staging now has explicit feedback and mixed clipboard handling no longer clobbers normal text paste in the common case.
 #### User value
 Pasting screenshots and images into the conversation is effortless.
 
@@ -195,6 +209,9 @@ Pasting screenshots and images into the conversation is effortless.
 ---
 
 ### Slice 2.3 — Attachment preview and rendering pipeline
+#### Status
+First slice complete.
+Composer-side and message-side attachment rendering now have explicit component boundaries, and shared image-source logic has been moved out of component-level coupling.
 #### User value
 Attachments feel like first-class objects, not raw blobs.
 
@@ -217,6 +234,10 @@ Attachments feel like first-class objects, not raw blobs.
 
 # Phase 3 — Tool visibility and OpenClaw actionfulness
 
+## Status
+Starting early via a Phase 2/3 bridge slice.
+A first tool-activity render boundary and readability pass has already begun because it directly supports the Milestone 1 promise of visible OpenClaw actionfulness.
+
 ## Goal
 Make OpenClaw’s use of tools visible and understandable in the product.
 
@@ -228,6 +249,9 @@ Once chat/session/media basics are stable, the next biggest differentiation is t
 ## Vertical slices
 
 ### Slice 3.1 — Basic tool activity timeline
+#### Status
+In progress via Ticket 2.4 follow-on work.
+Tool activity is now beginning to move into a dedicated thread surface, but the slice is not yet fully documented as complete.
 #### User value
 The user can tell when tools are running and what kind of work is happening.
 
