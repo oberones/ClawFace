@@ -3503,7 +3503,6 @@ export default function App() {
   const [draft, setDraft] = useState("");
   const {
     attachments,
-    setAttachments,
     replaceAttachments,
     appendAttachments,
     removeAttachment,
@@ -6265,7 +6264,7 @@ export default function App() {
     } catch (err) {
       setMessages((prev) => prev.filter((message) => message.id !== optimisticMessageId));
       setDraft(draftBeforeSend);
-      setAttachments(attachmentsBeforeSend);
+      replaceAttachments(attachmentsBeforeSend);
       updateCacheField(selectedSessionKey, (cached) => ({
         ...cached,
         messages: cached.messages.filter((message) => message.id !== optimisticMessageId),
