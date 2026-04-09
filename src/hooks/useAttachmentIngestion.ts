@@ -37,19 +37,37 @@ export type UseAttachmentIngestionOptions = {
 
 export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   const [isDragActive, setIsDragActive] = useState(false);
+  const [lastPasteFeedback, setLastPasteFeedback] = useState<string | null>(null);
   const dragDepthRef = useRef(0);
+  const pasteFeedbackTimerRef = useRef<number | null>(null);
   const { appendAttachments, removeAttachment: removeStagedAttachment } = options.attachmentOps;
+
+  const setPasteFeedback = useCallback((message: string | null) => {
+    if (pasteFeedbackTimerRef.current !== null) {
+      window.clearTimeout(pasteFeedbackTimerRef.current);
+      pasteFeedbackTimerRef.current = null;
+    }
+    setLastPasteFeedback(message);
+    if (message) {
+      pasteFeedbackTimerRef.current = window.setTimeout(() => {
+        setLastPasteFeedback(null);
+        pasteFeedbackTimerRef.current = null;
+      }, 2200);
+    }
+  }, []);
 
   const appendFiles = useCallback(async (files: File[], idPrefix: string) => {
     if (files.length === 0) {
-      return;
+      return false;
     }
     try {
       const next = await Promise.all(files.map((file) => fileToAttachment(file, idPrefix)));
       appendAttachments(next);
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to ingest attachments.";
       options.onError?.(message);
+      return false;
     }
   }, [appendAttachments, options.onError]);
 
@@ -116,9 +134,36 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
     if (imageFiles.length === 0) {
       return;
     }
+
+    const plainText = event.clipboardData?.getData("text/plain")?.trim() ?? "";
+    const shouldPreserveTextPaste = plainText.length > 0;
+
+    if (shouldPreserveTextPaste) {
+      void (async () => {
+        const appended = await appendFiles(imageFiles, "paste");
+        if (appended) {
+          setPasteFeedback(
+            imageFiles.length === 1
+              ? "Pasted text kept in the draft and image staged as an attachment."
+              : `Pasted text kept in the draft and ${imageFiles.length} images staged as attachments.`,
+          );
+        }
+      })();
+      return;
+    }
+
     event.preventDefault();
-    void appendFiles(imageFiles, "paste");
-  }, [appendFiles]);
+    void (async () => {
+      const appended = await appendFiles(imageFiles, "paste");
+      if (appended) {
+        setPasteFeedback(
+          imageFiles.length === 1
+            ? "Pasted image staged as an attachment."
+            : `${imageFiles.length} pasted images staged as attachments.`,
+        );
+      }
+    })();
+  }, [appendFiles, setPasteFeedback]);
 
   const handleFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.currentTarget.files ?? []);
@@ -139,6 +184,7 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
 
   return {
     isDragActive,
+    lastPasteFeedback,
     dragBindings,
     handlePaste,
     handleFileInputChange,

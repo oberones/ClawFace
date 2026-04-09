@@ -2809,6 +2809,12 @@ body::before {
   color: #7f1d1d;
 }
 
+.composer-info {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
 .composer-textarea {
   min-height: 78px;
   resize: none;

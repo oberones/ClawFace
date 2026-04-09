@@ -108,6 +108,9 @@ export function Composer(props: ComposerProps) {
 
         {props.composerWarning && <div className="composer-warning">{props.composerWarning}</div>}
         {attachmentError && <div className="composer-warning">Attachment error: {attachmentError}</div>}
+        {attachmentIngestion.lastPasteFeedback && (
+          <div className="composer-warning composer-info">{attachmentIngestion.lastPasteFeedback}</div>
+        )}
 
         <div className="composer-input-wrap">
           <textarea
