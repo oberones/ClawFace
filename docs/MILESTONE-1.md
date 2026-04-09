@@ -64,7 +64,7 @@ Milestone 1 is materially underway and no longer mostly hypothetical.
 - staged attachment lifecycle ownership has been clarified
 - attachment preview/rendering boundaries are substantially cleaner
 - clipboard image workflow has a first intentional product pass
-- tool activity is now beginning to get a more first-class thread surface
+- tool activity now has a first dedicated thread surface and clearer runtime-facing presentation
 
 ### What remains most important for Milestone 1
 - continue improving visible tool/result clarity so OpenClaw feels actionful rather than opaque

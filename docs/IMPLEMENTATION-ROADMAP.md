@@ -250,8 +250,8 @@ Once chat/session/media basics are stable, the next biggest differentiation is t
 
 ### Slice 3.1 — Basic tool activity timeline
 #### Status
-In progress via Ticket 2.4 follow-on work.
-Tool activity is now beginning to move into a dedicated thread surface, but the slice is not yet fully documented as complete.
+First slice complete via Ticket 2.4 bridge work.
+Tool activity now has a dedicated thread render boundary and a more legible first-pass runtime presentation.
 #### User value
 The user can tell when tools are running and what kind of work is happening.
 
