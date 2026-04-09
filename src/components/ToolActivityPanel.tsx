@@ -3,7 +3,9 @@ import type { ToolItem } from "../lib/types.ts";
 
 function summarizeTool(tool: ToolItem) {
   const outputPreview = (tool.output ?? "").replace(/\s+/g, " ").trim();
-  const argsPreview = JSON.stringify(tool.args ?? {}).replace(/\s+/g, " ").trim().slice(0, 120);
+  const argsPreview = tool.args == null
+    ? ""
+    : JSON.stringify(tool.args).replace(/\s+/g, " ").trim().slice(0, 120);
   const normalizedOutput = outputPreview.toLowerCase();
   const looksFailed = /\b(error|failed|exception|denied|not found|timeout)\b/.test(normalizedOutput);
   const phase = tool.status === "result" ? (looksFailed ? "failed" : "completed") : "running";
@@ -112,13 +114,19 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
                     <div className="tool-expanded-title" style={{ fontSize: props.toolMinorFontSize }}>
                       Args
                     </div>
-                    <pre className="tool-pre">{JSON.stringify(tool.args ?? {}, null, 2)}</pre>
+                    <pre className="tool-pre">{tool.args == null ? "(no args)" : JSON.stringify(tool.args, null, 2)}</pre>
                   </div>
                   <div>
                     <div className="tool-expanded-title" style={{ fontSize: props.toolMinorFontSize }}>
                       Output
                     </div>
-                    <pre className="tool-pre">{tool.output ?? (tool.status === "result" ? "(no output returned)" : "(still running)")}</pre>
+                    <pre className="tool-pre">
+                      {tool.output?.trim().length
+                        ? tool.output
+                        : tool.status === "result"
+                          ? "(no output returned)"
+                          : "(still running)"}
+                    </pre>
                   </div>
                 </div>
               )}
