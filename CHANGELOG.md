@@ -108,3 +108,63 @@ This version should be treated as the explicit starting point before deeper impl
 - This release does **not** represent a polished product milestone
 - This release is primarily a **project-baseline declaration** and planning checkpoint
 - Future releases should track actual implementation progress against Milestone 1 and later roadmap phases
+
+## v0.2.9 (2026-04-09)
+
+### Fix
+
+- address PR feedback
+- resolve gateway connection bug
+
+## v0.2.8 (2026-04-09)
+
+### Feat
+
+- add new ToolActivityPanel
+- follow up on ticket 2.3
+- make attachment preview/rendering a first-class concern
+- tighten attachment interface
+- make attachment ingestion a dedicated hook
+- harden reconnect success path
+- tighten explicit thread-state model further
+- cleanup fallback/relaod side of the streaming path
+- extract core auto scroll state machine out of ChatView
+- extract composer and slashcommand components - ticket 1.3.3
+- update slash parsing behavior - ticket 1.3.2
+- dedicated composer component
+- extract message rendering model
+- extract ChatThread from ChatView
+- give ChatView explicit shell-level session-switch signals
+- make session ownership more explicit
+- complete Phase 1 connection-state shell tickets
+- first concrete implementation work
+
+### Fix
+
+- gateway websocket connection issues
+- address PR feedback
+- address PR feedback
+- address PR feedback
+- update mixed clipboard behavior
+- enforce keys at MessageAttachmentList boundary, remove redundant keys from callbacks
+- address PR feedback
+- address PR feedback
+- address PR feedback
+- address PR feedback
+- addres PR feedback
+- address PR feedback
+- address PR feedback
+- address PR feedback
+- prevent isCurrentSessionLoading from sticking on fast session switch
+- address PR feedback
+
+### Refactor
+
+- move Compose away from a flat prop bag into grouped subdomains
+
+## v0.0.1 (2026-04-07)
+
+### Feat
+
+- add file manager, UI polish, and improved error handling
+- improve session sidebar search, activity state, and session model defaults
