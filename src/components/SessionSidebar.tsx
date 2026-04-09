@@ -432,10 +432,24 @@ export default function SessionSidebar(props: SessionSidebarProps) {
           const title = rawTitle ? sanitizeUserText(rawTitle) || rawTitle : session.key;
           const preview = session.lastMessagePreview ? sanitizeUserText(session.lastMessagePreview) : "";
           const contentSnippet = result.contentSnippet;
+          const activityLabel = isActive
+            ? "Current"
+            : activity?.working
+              ? "Working"
+              : activity?.unread
+                ? "New activity"
+                : null;
+          const activityClass = isActive
+            ? "is-active"
+            : activity?.working
+              ? "is-working"
+              : activity?.unread
+                ? "is-unread"
+                : "";
           return (
             <article
               key={session.key}
-              className={`session-card${isActive ? " is-active" : activity?.unread ? " is-unread" : activity?.working ? " is-working" : ""}`}
+              className={`session-card${activityClass ? ` ${activityClass}` : ""}`}
               onMouseMove={props.enableAnimations ? (e) => tiltMove(session.key, e) : undefined}
               onMouseLeave={props.enableAnimations ? (e) => tiltLeave(session.key, e) : undefined}
               onClick={(e) => {
@@ -454,11 +468,16 @@ export default function SessionSidebar(props: SessionSidebarProps) {
             >
               <div className="session-main-row">
                 <div className="session-main">
-                  <span className={`session-dot${isActive ? " is-active" : activity?.unread ? " is-unread" : activity?.working ? " is-working" : ""}`} />
+                  <span className={`session-dot${activityClass ? ` ${activityClass}` : ""}`} />
                   {!props.collapsed && (
                     <span className="session-copy">
-                      <span className="session-title" style={{ fontSize: "calc(var(--claw-sidebar-font-size) + 1px)" }}>
-                        {highlightMatch(title, committedQuery)}
+                      <span className="session-title-row">
+                        <span className="session-title" style={{ fontSize: "calc(var(--claw-sidebar-font-size) + 1px)" }}>
+                          {highlightMatch(title, committedQuery)}
+                        </span>
+                        {activityLabel && (
+                          <span className={`session-activity-badge ${activityClass}`}>{activityLabel}</span>
+                        )}
                       </span>
                       {contentSnippet ? (
                         <span
