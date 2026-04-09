@@ -77,13 +77,14 @@ export function Composer(props: ComposerProps) {
   const actionFontSize = props.uiSettings.composeActionsFontSize;
   const sendFontSize = props.uiSettings.composeSendFontSize;
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const { appendAttachments, removeAttachment } = props.stagedAttachments;
   const attachmentOps = useMemo(() => ({
     appendAttachments: (next: Attachment[]) => {
       setAttachmentError(null);
-      props.stagedAttachments.appendAttachments(next);
+      appendAttachments(next);
     },
-    removeAttachment: props.stagedAttachments.removeAttachment,
-  }), [props.stagedAttachments]);
+    removeAttachment,
+  }), [appendAttachments, removeAttachment]);
   const attachmentIngestion = useAttachmentIngestion({
     attachmentOps,
     onError: (message) => {
