@@ -165,6 +165,14 @@ export type ConnectionState = {
 
 export type SessionTransitionState = "idle" | "switching";
 
+export type SessionRuntimeStatus =
+  | "idle"
+  | "loading"
+  | "switching"
+  | "thinking"
+  | "streaming"
+  | "working";
+
 export type SessionState = {
   selectedSessionKey: string | null;
   sessions: GatewaySessionRow[];
