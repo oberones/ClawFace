@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { Attachment } from "../lib/types.ts";
 import {
   buildDesktopLocalImageUrl,
+  DESKTOP_LOCAL_IMAGE_SCHEME,
   extractImageSourceCandidates,
   filePathFromImageSource,
   isDesktopRuntime,
@@ -10,9 +11,7 @@ import {
   normalizeHttpImageUrl,
   summarizeSourceForError,
   toDesktopRenderableSrc,
-} from "./MessageRow.tsx";
-
-const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
+} from "../lib/message-image-source.ts";
 
 type MessageImageAttachmentProps = {
   attachment: Attachment;
