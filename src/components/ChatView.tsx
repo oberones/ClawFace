@@ -65,7 +65,7 @@ type ChatViewProps = {
 };
 
 const MESSAGE_RENDER_STEP = 60;
-const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
+const EMPTY_STRING_SET = new Set<string>();
 const SESSION_SWITCH_OUT_MS = 260;
 const SESSION_SWITCH_IN_MS = 800;
 const STACK_LIFT_MS = 380;
@@ -995,8 +995,8 @@ export default function ChatView(props: ChatViewProps) {
         toolFontSize={toolFontSize}
         toolMinorFontSize={toolMinorFontSize}
         expandedById={toolExpanded}
-        poppingToolIdSet={snapshotMode ? new Set<string>() : poppingToolIdSet}
-        sessionFlyInToolIdSet={snapshotMode ? new Set<string>() : sessionFlyInToolIdSet}
+        poppingToolIdSet={snapshotMode ? EMPTY_STRING_SET : poppingToolIdSet}
+        sessionFlyInToolIdSet={snapshotMode ? EMPTY_STRING_SET : sessionFlyInToolIdSet}
         buildMotionVars={buildMotionVars}
         onToggleExpanded={(toolId, nextExpanded) => {
           setToolExpanded((prev) => ({ ...prev, [toolId]: nextExpanded }));
