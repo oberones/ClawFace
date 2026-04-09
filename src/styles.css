@@ -2734,6 +2734,41 @@ body::before {
   text-overflow: ellipsis;
 }
 
+.tool-expanded-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.tool-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  border: 1px solid transparent;
+}
+
+.tool-status-chip.done {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.tool-status-chip.running {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.tool-meta-time {
+  color: var(--claw-neutral-500);
+}
+
 .tool-expanded {
   margin-top: 6px;
   display: grid;

@@ -3,6 +3,7 @@ import { createPortal, flushSync } from "react-dom";
 import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState, ToolItem } from "../lib/types.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
+import { ToolActivityPanel } from "./ToolActivityPanel.tsx";
 import { Composer } from "./Composer.tsx";
 import { buildMotionVars, MessageRow } from "./MessageRow.tsx";
 import {
@@ -64,7 +65,7 @@ type ChatViewProps = {
 };
 
 const MESSAGE_RENDER_STEP = 60;
-const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
+const EMPTY_STRING_SET = new Set<string>();
 const SESSION_SWITCH_OUT_MS = 260;
 const SESSION_SWITCH_IN_MS = 800;
 const STACK_LIFT_MS = 380;
@@ -985,81 +986,23 @@ export default function ChatView(props: ChatViewProps) {
     const panelFlyIn = !snapshotMode && sessionFlyInToolPanelKeySet.has(key);
     const panelMotionStyle = buildMotionVars(key);
     return (
-      <section
+      <ToolActivityPanel
         key={key}
-        className={`tool-panel ${panelFlyIn ? "session-fly-in" : ""}`}
-        data-tool-panel-key={key}
-        style={panelMotionStyle}
-      >
-        <div className="tool-panel-header">
-          <div className="tool-panel-title" style={{ fontSize: toolMinorFontSize }}>
-            Tool Activity ({tools.length})
-          </div>
-        </div>
-
-        <div className="tool-grid">
-          {tools.map((tool) => {
-            const expanded = snapshotMode ? false : (toolExpanded[tool.id] ?? false);
-            const statusLabel = tool.status === "result" ? "done" : "running";
-            const outputPreview = (tool.output ?? "").replace(/\s+/g, " ").trim();
-            const argsPreview = JSON.stringify(tool.args ?? {}).replace(/\s+/g, " ").trim().slice(0, 120);
-            const summary = (outputPreview || argsPreview).slice(0, 120);
-            const drawerPop = !snapshotMode && poppingToolIdSet.has(tool.id);
-            const sessionFlyIn = !snapshotMode && sessionFlyInToolIdSet.has(tool.id);
-            const motionStyle = buildMotionVars(tool.id);
-            return (
-              <article
-                key={tool.id}
-                className={`tool-entry ${expanded ? "is-expanded" : ""} ${drawerPop ? "drawer-pop" : ""} ${sessionFlyIn ? "session-fly-in" : ""}`}
-                data-tool-id={tool.id}
-                style={{ ...motionStyle, fontSize: toolFontSize }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (snapshotMode) {
-                      return;
-                    }
-                    setToolExpanded((prev) => ({ ...prev, [tool.id]: !expanded }));
-                  }}
-                  className="tool-entry-toggle"
-                  aria-expanded={expanded}
-                >
-                  <span className="tool-title-wrap">
-                    <span className={`tool-status-dot ${statusLabel === "done" ? "done" : "running"}`} />
-                    <span className="tool-title">{tool.name}</span>
-                    <span className="tool-status-text" style={{ fontSize: toolMinorFontSize }}>
-                      {statusLabel}
-                    </span>
-                  </span>
-                  {!expanded && summary && (
-                    <span className="tool-summary" style={{ fontSize: toolMinorFontSize }}>
-                      {summary}
-                    </span>
-                  )}
-                </button>
-
-                {expanded && (
-                  <div className="tool-expanded">
-                    <div>
-                      <div className="tool-expanded-title" style={{ fontSize: toolMinorFontSize }}>
-                        Args
-                      </div>
-                      <pre className="tool-pre">{JSON.stringify(tool.args ?? {}, null, 2)}</pre>
-                    </div>
-                    <div>
-                      <div className="tool-expanded-title" style={{ fontSize: toolMinorFontSize }}>
-                        Output
-                      </div>
-                      <pre className="tool-pre">{tool.output ?? "(no output)"}</pre>
-                    </div>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      </section>
+        tools={tools}
+        panelKey={key}
+        panelFlyIn={panelFlyIn}
+        panelMotionStyle={panelMotionStyle}
+        toolFontSize={toolFontSize}
+        toolMinorFontSize={toolMinorFontSize}
+        expandedById={toolExpanded}
+        poppingToolIdSet={snapshotMode ? EMPTY_STRING_SET : poppingToolIdSet}
+        sessionFlyInToolIdSet={snapshotMode ? EMPTY_STRING_SET : sessionFlyInToolIdSet}
+        buildMotionVars={buildMotionVars}
+        onToggleExpanded={(toolId, nextExpanded) => {
+          setToolExpanded((prev) => ({ ...prev, [toolId]: nextExpanded }));
+        }}
+        snapshotMode={snapshotMode}
+      />
     );
   };
 
