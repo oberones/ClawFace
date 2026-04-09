@@ -360,6 +360,13 @@ body::before {
   gap: 8px;
 }
 
+.session-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .session-title {
   color: var(--claw-text);
   font-weight: 660;
@@ -368,6 +375,42 @@ body::before {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.session-activity-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, white);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--claw-text-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.session-activity-badge.is-working {
+  color: #2f5f9c;
+  background: color-mix(in srgb, #eef5ff 82%, white);
+  border-color: color-mix(in srgb, #5b9bf6 46%, white);
+}
+
+.session-activity-badge.is-unread {
+  color: #a24735;
+  background: color-mix(in srgb, #fff0ec 82%, white);
+  border-color: color-mix(in srgb, #e8614d 46%, white);
+}
+
+.session-activity-badge.is-active {
+  color: color-mix(in srgb, var(--claw-accent) 82%, #244c74);
+  background: color-mix(in srgb, var(--claw-accent-soft) 78%, white);
+  border-color: color-mix(in srgb, var(--claw-accent) 34%, white);
 }
 
 .session-preview {
@@ -471,6 +514,13 @@ body::before {
   min-width: 0;
 }
 
+.chat-header-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .chat-brand-title {
   font-size: 23px;
   font-weight: 700;
@@ -496,6 +546,74 @@ body::before {
 .status-pill.disconnected {
   color: #8f5e4e;
   background: #f7ece8;
+}
+
+.session-runtime-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: min(420px, 48vw);
+  padding: 7px 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, white);
+  background: rgba(248, 252, 255, 0.82);
+}
+
+.session-runtime-pill.is-active {
+  background: color-mix(in srgb, #eefbf4 82%, white);
+  border-color: color-mix(in srgb, #8ad0a7 56%, white);
+}
+
+.session-runtime-pill.is-warning {
+  background: color-mix(in srgb, #fff6e8 82%, white);
+  border-color: color-mix(in srgb, #e8b46f 56%, white);
+}
+
+.session-runtime-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px rgba(86, 102, 123, 0.1);
+  background: #94a3b8;
+}
+
+.session-runtime-dot.is-idle {
+  background: #94a3b8;
+}
+
+.session-runtime-dot.is-loading,
+.session-runtime-dot.is-switching {
+  background: #64748b;
+}
+
+.session-runtime-dot.is-thinking,
+.session-runtime-dot.is-streaming,
+.session-runtime-dot.is-working {
+  background: #2f855a;
+}
+
+.session-runtime-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.session-runtime-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--claw-text);
+  line-height: 1.1;
+}
+
+.session-runtime-detail {
+  font-size: 11px;
+  color: var(--claw-text-soft);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-header-actions {
@@ -2128,6 +2246,17 @@ body::before {
   .chat-header-main {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .chat-header-identity {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .session-runtime-pill {
+    max-width: 100%;
   }
 
   .topbar-status {
