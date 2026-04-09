@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import type { Attachment } from "../lib/types.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
-import { formatBytes, formatCompactTokens, truncate } from "../lib/format.ts";
+import { formatCompactTokens } from "../lib/format.ts";
 import { useAttachmentIngestion } from "../hooks/useAttachmentIngestion.ts";
+import { StagedAttachmentTray } from "./StagedAttachmentTray.tsx";
 
 type UiSettings = {
   composerActionScale: number;
@@ -142,37 +143,10 @@ export function Composer(props: ComposerProps) {
           )}
         </div>
 
-        {props.stagedAttachments.attachments.length > 0 && (
-          <div className="attachment-preview-list">
-            {props.stagedAttachments.attachments.map((att) => (
-              <div key={att.id} className={`attachment-preview-item ${att.isImage ? "is-image" : "is-file"}`}>
-                {att.isImage ? (
-                  <div className="attachment-preview-thumb">
-                    <img src={att.dataUrl} alt={att.name} className="attachment-preview-img" />
-                  </div>
-                ) : (
-                  <div className="attachment-preview-file-icon">
-                    <span className="attachment-preview-file-ext">
-                      {att.name.split(".").pop()?.toUpperCase().slice(0, 4) || "FILE"}
-                    </span>
-                  </div>
-                )}
-                <div className="attachment-preview-info">
-                  <span className="attachment-preview-name" title={att.name}>{truncate(att.name, 20)}</span>
-                  <span className="attachment-preview-size">{formatBytes(att.size)}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => attachmentIngestion.removeAttachment(att.id)}
-                  className="attachment-preview-remove"
-                  aria-label={`Remove ${att.name}`}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        <StagedAttachmentTray
+          attachments={props.stagedAttachments.attachments}
+          onRemoveAttachment={attachmentIngestion.removeAttachment}
+        />
 
         <div className="composer-actions-row">
           <div className="composer-actions">

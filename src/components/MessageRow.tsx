@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Attachment, ChatMessage } from "../lib/types.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
-import { formatBytes, truncate } from "../lib/format.ts";
+import { MessageAttachmentList } from "./MessageAttachmentList.tsx";
+import { MessageFileAttachment } from "./MessageFileAttachment.tsx";
+import { MessageImageAttachment } from "./MessageImageAttachment.tsx";
 
 const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 
@@ -211,7 +213,7 @@ function decodeCompactBase64AsUtf8(value: string): string | null {
   }
 }
 
-function normalizeDataImageUrl(value: string): string | null {
+export function normalizeDataImageUrl(value: string): string | null {
   const trimmed = value.trim();
   const match = /^data:(image\/[a-z0-9.+-]+)(?:;[a-z0-9.+-]+=[^;,]+)*;base64,([\s\S]+)$/i.exec(trimmed);
   if (!match) {
@@ -250,7 +252,7 @@ function normalizeDataImageUrl(value: string): string | null {
   return null;
 }
 
-function summarizeSourceForError(value: string): string {
+export function summarizeSourceForError(value: string): string {
   const trimmed = stripPathDecorators(value).replace(/\s+/g, " ").trim();
   if (!trimmed) {
     return "empty";
@@ -266,7 +268,7 @@ function summarizeSourceForError(value: string): string {
   return `${trimmed.slice(0, 64)}...`;
 }
 
-function extractImageSourceCandidates(value: string): string[] {
+export function extractImageSourceCandidates(value: string): string[] {
   const initial = stripPathDecorators(value);
   if (!initial) {
     return [];
@@ -511,7 +513,7 @@ export function filePathFromImageSource(value: string): string | null {
   return null;
 }
 
-function normalizeHttpImageUrl(value: string): string | null {
+export function normalizeHttpImageUrl(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
     return null;
@@ -533,7 +535,7 @@ export function isDesktopRuntime(): boolean {
   return window.location.protocol === "file:";
 }
 
-function toDesktopRenderableSrc(value: string): string {
+export function toDesktopRenderableSrc(value: string): string {
   if (!isDesktopRuntime()) {
     return value;
   }
@@ -566,278 +568,6 @@ export function isLikelyLocalFileSource(value: string): boolean {
     return true;
   }
   return false;
-}
-
-function MessageImageAttachment(props: {
-  attachment: Attachment;
-  onOpen: (attachment: Attachment) => void;
-  resolveRemoteImage?: (filePath: string) => Promise<string | null>;
-}) {
-  const [resolvedSrc, setResolvedSrc] = useState(toDesktopRenderableSrc(props.attachment.dataUrl));
-  const [failedToLoad, setFailedToLoad] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const desktopReadImageFile = window.desktopInfo?.readImageFile;
-  const desktopFetchImageUrl = window.desktopInfo?.fetchImageUrl;
-  const localPathCandidate = filePathFromImageSource(resolvedSrc || props.attachment.dataUrl);
-  const usesDesktopLocalScheme = resolvedSrc.trim().toLowerCase().startsWith(`${DESKTOP_LOCAL_IMAGE_SCHEME}:`);
-  const requiresDesktopDecode =
-    isDesktopRuntime() &&
-    typeof desktopReadImageFile === "function" &&
-    Boolean(localPathCandidate) &&
-    !usesDesktopLocalScheme;
-  const desktopBridgeMissing =
-    isDesktopRuntime() && typeof desktopReadImageFile !== "function";
-  const webLocalFileBlocked = !isDesktopRuntime() && isLikelyLocalFileSource(resolvedSrc);
-  const desktopResolveTriedRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    setResolvedSrc(toDesktopRenderableSrc(props.attachment.dataUrl));
-    setFailedToLoad(false);
-    setLoadError(null);
-  }, [props.attachment.dataUrl]);
-
-  const tryResolveLocalImage = useCallback(async (): Promise<Attachment | null> => {
-    const sourceValue = (resolvedSrc || props.attachment.dataUrl).trim();
-    const sourceCandidates = extractImageSourceCandidates(sourceValue);
-    const sourceKind = sourceValue.toLowerCase().startsWith("data:image/")
-      ? "data-url"
-      : sourceValue.toLowerCase().startsWith("http:")
-      ? "http-url"
-      : sourceValue.toLowerCase().startsWith("https:")
-      ? "https-url"
-      : sourceValue.toLowerCase().startsWith("file:")
-      ? "file-url"
-      : sourceValue.toLowerCase().includes("__claw/local-image")
-      ? "proxy-url"
-      : "raw";
-    let filePath: string | null = null;
-    for (const candidate of sourceCandidates) {
-      filePath = filePathFromImageSource(candidate);
-      if (filePath) {
-        break;
-      }
-    }
-    if (!filePath) {
-      if (sourceKind === "data-url") {
-        for (const candidate of sourceCandidates) {
-          const normalizedDataUrl = normalizeDataImageUrl(candidate);
-          if (normalizedDataUrl && normalizedDataUrl !== sourceValue) {
-            setResolvedSrc(normalizedDataUrl);
-            setFailedToLoad(false);
-            setLoadError(null);
-            return {
-              ...props.attachment,
-              dataUrl: normalizedDataUrl,
-            };
-          }
-        }
-        setFailedToLoad(true);
-        setLoadError(`img-decode-failed:${sourceKind}:${summarizeSourceForError(sourceValue)}`);
-        return null;
-      }
-      let remoteUrl: string | null = null;
-      for (const candidate of sourceCandidates) {
-        remoteUrl = normalizeHttpImageUrl(candidate);
-        if (remoteUrl) {
-          break;
-        }
-      }
-      if (remoteUrl && typeof desktopFetchImageUrl === "function") {
-        try {
-          const fetched = await desktopFetchImageUrl(remoteUrl);
-          const nextDataUrl =
-            fetched?.ok && typeof fetched.dataUrl === "string" ? fetched.dataUrl.trim() : "";
-          if (nextDataUrl) {
-            setResolvedSrc(nextDataUrl);
-            setFailedToLoad(false);
-            setLoadError(null);
-            return {
-              ...props.attachment,
-              dataUrl: nextDataUrl,
-            };
-          }
-          setFailedToLoad(true);
-          setLoadError(fetched?.error ?? "remote-fetch-failed");
-          return null;
-        } catch {
-          setFailedToLoad(true);
-          setLoadError("remote-fetch-failed");
-          return null;
-        }
-      }
-      setFailedToLoad(true);
-      setLoadError(`path-parse-failed:${sourceKind}:${summarizeSourceForError(sourceValue)}`);
-      return null;
-    }
-    const tryResolveRemote = async (): Promise<Attachment | null> => {
-      if (!props.resolveRemoteImage) {
-        return null;
-      }
-      const remoteDataUrl = await props.resolveRemoteImage(filePath);
-      const nextDataUrl = typeof remoteDataUrl === "string" ? remoteDataUrl.trim() : "";
-      if (!nextDataUrl) {
-        return null;
-      }
-      setResolvedSrc(nextDataUrl);
-      setFailedToLoad(false);
-      setLoadError(null);
-      return {
-        ...props.attachment,
-        dataUrl: nextDataUrl,
-      };
-    };
-
-    let localError: string | null = null;
-    const readImageFile = desktopReadImageFile;
-    if (readImageFile) {
-      try {
-        const result = await readImageFile(filePath);
-        if (result.ok && typeof result.dataUrl === "string" && result.dataUrl.trim()) {
-          const nextDataUrl = result.dataUrl.trim();
-          setResolvedSrc(nextDataUrl);
-          setFailedToLoad(false);
-          setLoadError(null);
-          return {
-            ...props.attachment,
-            dataUrl: nextDataUrl,
-          };
-        }
-        localError = result.error ?? "read-failed";
-      } catch {
-        localError = "read-failed";
-      }
-    } else {
-      localError = "desktop-api-unavailable";
-    }
-
-    const remoteResolved = await tryResolveRemote();
-    if (remoteResolved) {
-      return remoteResolved;
-    }
-
-    if (localError) {
-      setFailedToLoad(true);
-      setLoadError(localError);
-      return null;
-    }
-    setFailedToLoad(true);
-    setLoadError("read-failed");
-    return null;
-  }, [desktopFetchImageUrl, desktopReadImageFile, props.attachment, props.resolveRemoteImage, resolvedSrc]);
-
-  useEffect(() => {
-    if (!requiresDesktopDecode || !localPathCandidate) {
-      return;
-    }
-    if (desktopResolveTriedRef.current.has(localPathCandidate)) {
-      return;
-    }
-    desktopResolveTriedRef.current.add(localPathCandidate);
-    void tryResolveLocalImage();
-  }, [localPathCandidate, props.attachment.dataUrl, requiresDesktopDecode, resolvedSrc, tryResolveLocalImage]);
-
-  const openAttachment = useCallback(async () => {
-    if (requiresDesktopDecode || failedToLoad) {
-      const recovered = await tryResolveLocalImage();
-      if (recovered) {
-        props.onOpen(recovered);
-        return;
-      }
-    }
-    if (!failedToLoad) {
-      const next =
-        resolvedSrc === props.attachment.dataUrl
-          ? props.attachment
-          : {
-              ...props.attachment,
-              dataUrl: resolvedSrc,
-            };
-      props.onOpen(next);
-      return;
-    }
-    props.onOpen(props.attachment);
-  }, [failedToLoad, props, requiresDesktopDecode, resolvedSrc, tryResolveLocalImage]);
-
-  const onPreviewImageError = useCallback(() => {
-    const pathCandidate = filePathFromImageSource(resolvedSrc || props.attachment.dataUrl);
-    if (isDesktopRuntime() && pathCandidate && !usesDesktopLocalScheme) {
-      const desktopSrc = buildDesktopLocalImageUrl(pathCandidate);
-      if (desktopSrc !== resolvedSrc) {
-        setResolvedSrc(desktopSrc);
-        setFailedToLoad(false);
-        setLoadError(null);
-        return;
-      }
-    }
-    if (
-      isDesktopRuntime() &&
-      (typeof desktopReadImageFile === "function" || typeof desktopFetchImageUrl === "function")
-    ) {
-      void tryResolveLocalImage();
-      return;
-    }
-    setFailedToLoad(true);
-    if (!loadError) {
-      setLoadError("img-decode-failed");
-    }
-  }, [
-    desktopReadImageFile,
-    desktopFetchImageUrl,
-    loadError,
-    props.attachment.dataUrl,
-    resolvedSrc,
-    tryResolveLocalImage,
-    usesDesktopLocalScheme,
-  ]);
-
-  return (
-    <button
-      type="button"
-      className="attachment-image-button"
-      onClick={() => {
-        void openAttachment();
-      }}
-      aria-label={`Open image ${props.attachment.name}`}
-      title="Click to view larger"
-    >
-      <div className="attachment-image">
-        {webLocalFileBlocked ? (
-          <div className="attachment-image-fallback">
-            Web cannot read local file paths. Open this session in desktop app.
-          </div>
-        ) : requiresDesktopDecode && !failedToLoad ? (
-          <div className="attachment-image-fallback">Loading local image...</div>
-        ) : failedToLoad ? (
-          <div className="attachment-image-fallback">
-            {loadError
-              ? `Image load failed: ${loadError}`
-              : desktopBridgeMissing
-              ? "Image load failed: desktop-api-unavailable"
-              : "Click to load local image"}
-          </div>
-        ) : (
-          <img
-            src={resolvedSrc}
-            alt={props.attachment.name}
-            className="attachment-image-preview"
-            onError={onPreviewImageError}
-          />
-        )}
-      </div>
-    </button>
-  );
-}
-
-function renderAttachment(att: Attachment) {
-  return (
-    <div key={att.id} className="attachment-file">
-      <div>
-        <div className="attachment-file-name">{truncate(att.name, 32)}</div>
-        <div className="attachment-file-size">{formatBytes(att.size)}</div>
-      </div>
-      <div className="attachment-file-kind">FILE</div>
-    </div>
-  );
 }
 
 function handleMarkdownClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -990,21 +720,18 @@ export const MessageRow = React.memo(
             />
           )}
           {message.attachments && message.attachments.length > 0 && (
-            <div className="attachments-wrap">
-              {message.attachments.map((att) => {
-                if (att.isImage) {
-                  return (
-                    <MessageImageAttachment
-                      key={att.id}
-                      attachment={att}
-                      onOpen={props.onOpenImage}
-                      resolveRemoteImage={props.onResolveRemoteImage}
-                    />
-                  );
-                }
-                return renderAttachment(att);
-              })}
-            </div>
+            <MessageAttachmentList
+              attachments={message.attachments}
+              renderImageAttachment={(att) => (
+                <MessageImageAttachment
+                  key={att.id}
+                  attachment={att}
+                  onOpen={props.onOpenImage}
+                  resolveRemoteImage={props.onResolveRemoteImage}
+                />
+              )}
+              renderFileAttachment={(att) => <MessageFileAttachment key={att.id} attachment={att} />}
+            />
           )}
           {props.showTimestamp && (
             <div className="message-meta">
