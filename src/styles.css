@@ -2765,6 +2765,12 @@ body::before {
   border-color: #93c5fd;
 }
 
+.tool-status-chip.failed {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
 .tool-meta-time {
   color: var(--claw-neutral-500);
 }
@@ -2786,6 +2792,10 @@ body::before {
 
 .tool-status-dot.running {
   background: #f59e0b;
+}
+
+.tool-status-dot.failed {
+  background: #ef4444;
 }
 
 .tool-title {
