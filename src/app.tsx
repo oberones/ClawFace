@@ -4743,14 +4743,6 @@ export default function App() {
         if (activeSessionKey) {
           updateSessionActivity(activeSessionKey, { working: false, unread: false });
         }
-        const debugConnectPayload = (() => {
-          try {
-            const payload = (window as typeof window & { __clawfaceLastConnectPayload?: unknown }).__clawfaceLastConnectPayload;
-            return payload ? JSON.stringify(payload, null, 2) : null;
-          } catch {
-            return null;
-          }
-        })();
         const reason = info.reason?.trim() ?? "";
         if (reason.toLowerCase().includes("pairing")) {
           setConnectionState({
@@ -4769,13 +4761,10 @@ export default function App() {
             : reason
               ? `Disconnected (${info.code}): ${reason}`
               : `Disconnected (${info.code}). ${hint}`.trim();
-          const note = debugConnectPayload
-            ? `${baseNote}\n\nLast connect payload:\n${debugConnectPayload}`
-            : baseNote;
           setConnectionState({
             status: nextStatus,
             reason: reason || null,
-            note,
+            note: baseNote,
           });
         }
       },
