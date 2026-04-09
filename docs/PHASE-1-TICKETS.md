@@ -2355,6 +2355,168 @@ Validation outcome:
 #### Recommended next step
 Proceed to a runtime/session visibility slice so ClawFace continues evolving from a polished chat client into a more distinctly OpenClaw-native desktop frontend.
 
+## Ticket 3.1.1 — Audit runtime/session visibility outside tool entries
+### Goal
+Identify the most important runtime and session-state signals that are currently invisible, under-explained, or too buried in the thread.
+
+### Why
+Ticket 2.4 made tool activity more first-class inside the thread, but ClawFace still lacks a clearer shell-level picture of what OpenClaw is actively doing across the current session.
+
+If the app is going to feel like an OpenClaw-native workstation instead of just a chat shell, users need better visibility into runtime state such as:
+- whether the current session is actively running
+- whether work is queued, streaming, or waiting
+- whether recent runtime activity belongs to the current session or another one
+- whether important non-message activity is happening outside the immediate text thread
+
+### Scope
+- audit current runtime/session visibility in the shell
+- identify existing signals already available in app state and events
+- identify which signals belong in the thread vs shell vs sidebar
+- identify the lowest-risk first UI slice for improving runtime/session visibility
+
+### Tasks
+- review current runtime-related state in `src/app.tsx` and adjacent components
+- identify all current user-visible runtime/session status surfaces
+- note hidden or weakly surfaced signals already present in gateway events/state
+- identify candidate ownership boundaries for a future runtime/session visibility model
+- record findings and recommend the first implementation slice
+
+### Deliverable
+A short audit and decomposition note for runtime/session visibility work.
+
+### Done when
+- we know which runtime/session signals matter most to users
+- we know where those signals should live in the UI
+- we know the best first implementation slice for the next ticket
+
+### Implementation notes
+Pending.
+
+### Audit findings (2026-04-09)
+
+#### Current runtime/session signals already present in app state
+The app already tracks more runtime/session state than it currently communicates clearly.
+
+Observed signals in `src/app.tsx` include:
+- `sessionActivity[key] = { working, unread }`
+- active-session `chatRunId`
+- active-session `thinking`
+- active-session `streamText`
+- active-session `thinkingLevel`
+- `sessionState.isCurrentSessionLoading`
+- `sessionState.transitionState`
+- per-session cached view state via `sessionCacheRef`
+
+This means the product already knows important things such as:
+- whether the current session is actively running
+- whether another session is working in the background
+- whether another session has unread changes
+- whether the current session is loading or switching
+- whether the current session is streaming vs only "thinking"
+
+The main problem is no longer missing raw state. The problem is weak presentation and weak ownership boundaries for runtime visibility.
+
+#### Current user-visible runtime/session surfaces
+
+##### 1. Session sidebar activity dots
+`SessionSidebar.tsx` currently surfaces only two coarse per-session background signals:
+- `working`
+- `unread`
+
+Those signals affect:
+- card styling
+- sidebar dot styling
+
+This is useful, but minimal.
+The sidebar does not explain:
+- what "working" means
+- whether work is streaming, waiting on tools, or only marked busy
+- whether unread changes are assistant output, tool output, or both
+
+##### 2. Active thread runtime surface
+Inside `ChatThread.tsx` and `ChatView.tsx`, the active session currently exposes runtime state mainly as:
+- streamed assistant text
+- a thinking indicator
+- tool activity panels inside the thread
+- loading/switching empty-state cards
+
+This is a meaningful improvement over the old baseline, but it still keeps runtime visibility tightly bound to message rendering.
+
+##### 3. Header connection status
+`ChatView.tsx` has a shell-level status label for gateway connectivity:
+- connected
+- connecting
+- pairing-required
+- error
+- disconnected
+
+That is connection visibility, not runtime/session visibility.
+It helps with transport state, but it does not tell the user what the current session is doing.
+
+##### 4. Composer busy/offline messaging
+The composer currently distinguishes:
+- offline
+- busy
+- ready
+
+This helps prevent invalid send behavior, but it is still a control-state message, not a broader runtime/session visibility model.
+
+#### Gaps in the current UX
+
+##### 1. No shell-level "current session runtime" summary
+There is no clear shell-level summary for the active session such as:
+- Running
+- Streaming reply
+- Waiting on tool activity
+- Thinking
+- Idle
+
+Users can infer some of this from the thread, but they have to read the thread instead of being shown a coherent current-session state.
+
+##### 2. Sidebar background activity is under-explained
+The sidebar knows when sessions are `working` or `unread`, but those states are represented only as subtle visual styling.
+There is no stronger explanation or grouping for:
+- background sessions currently active
+- sessions with fresh results
+- sessions that need attention
+
+##### 3. Runtime activity is still thread-first instead of session-first
+Tool panels improved thread readability, but broader runtime visibility is still anchored to individual tool entries and stream bubbles.
+ClawFace still lacks a more session-oriented answer to:
+> what is my assistant doing right now, and where?
+
+##### 4. The app lacks a normalized runtime/session visibility model
+Relevant state is split across:
+- `sessionActivity`
+- active thread state (`thinking`, `streamText`, `chatRunId`)
+- session loading/transition state
+- thread-local tool rendering
+
+That is enough to implement UI, but not yet a good enough boundary for runtime/session visibility as a product feature.
+
+#### Recommended first implementation slice
+The lowest-risk, highest-leverage next slice is:
+
+### Ticket 3.1.2 — Introduce a shell-level current-session runtime status surface
+
+Suggested first-pass scope:
+- define a small derived runtime/session status model for the active session
+- surface it near the chat header/session info strip
+- distinguish at least:
+  - idle
+  - loading session
+  - switching session
+  - thinking
+  - streaming
+  - tool-active / working
+- keep detailed tool output in the thread, but make the current session's overall runtime state legible without reading the whole thread
+
+#### Why this should come first
+- it builds directly on state the app already has
+- it avoids a risky full `toolStore` or global runtime-store rewrite as the first move
+- it improves product clarity quickly
+- it creates a cleaner seam for later work on background-session visibility in the sidebar
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:

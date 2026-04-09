@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import type { Attachment, ChatMessage, ConnectionStatus, SessionTransitionState, ToolItem } from "../lib/types.ts";
+import type {
+  Attachment,
+  ChatMessage,
+  ConnectionStatus,
+  SessionRuntimeStatus,
+  SessionTransitionState,
+  ToolItem,
+} from "../lib/types.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
 import { ToolActivityPanel } from "./ToolActivityPanel.tsx";
@@ -1067,6 +1074,62 @@ export default function ChatView(props: ChatViewProps) {
       ? "busy"
       : "ready";
 
+  const currentSessionRuntime = useMemo<{
+    status: SessionRuntimeStatus;
+    label: string;
+    detail: string;
+    tone: "neutral" | "active" | "warning";
+  }>(() => {
+    if (isSessionSwitching) {
+      return {
+        status: "switching",
+        label: "Switching session",
+        detail: "Restoring the selected conversation and thread state.",
+        tone: "neutral",
+      };
+    }
+    if (props.isCurrentSessionLoading) {
+      return {
+        status: "loading",
+        label: "Loading session",
+        detail: "Fetching history and rebuilding the current thread.",
+        tone: "neutral",
+      };
+    }
+    if (props.streamText) {
+      return {
+        status: "streaming",
+        label: "Streaming reply",
+        detail: "The assistant is actively streaming output into this session.",
+        tone: "active",
+      };
+    }
+    if (props.thinking) {
+      return {
+        status: "thinking",
+        label: "Thinking",
+        detail: "The assistant is working before it starts streaming a reply.",
+        tone: "active",
+      };
+    }
+    if (props.canAbort || props.toolItems.some((item) => item.status !== "result")) {
+      return {
+        status: "working",
+        label: "Working",
+        detail: "This session still has active runtime work in progress.",
+        tone: "active",
+      };
+    }
+    return {
+      status: "idle",
+      label: "Idle",
+      detail: props.sessionKey
+        ? "This session is connected and ready for the next action."
+        : "Create or select a session to start working.",
+      tone: "neutral",
+    };
+  }, [isSessionSwitching, props.canAbort, props.isCurrentSessionLoading, props.sessionKey, props.streamText, props.thinking, props.toolItems]);
+
   const composerWarning =
     connectionStatus === "connecting"
       ? props.disabledReason || "Connecting to the gateway…"
@@ -1087,9 +1150,22 @@ export default function ChatView(props: ChatViewProps) {
     <section className="claw-chat-area chat-shell">
       <header className={`chat-header ${modelMenuOpen || thinkingMenuOpen ? "menu-layer-active" : ""}`}>
         <div className="chat-header-main">
-          <div>
-            <div className="chat-brand-title">ClawFace</div>
-            <div className="chat-brand-subtitle">OpenClaw control surface · v{__APP_VERSION__}</div>
+          <div className="chat-header-identity">
+            <div>
+              <div className="chat-brand-title">ClawFace</div>
+              <div className="chat-brand-subtitle">OpenClaw control surface · v{__APP_VERSION__}</div>
+            </div>
+            <div
+              className={`session-runtime-pill${currentSessionRuntime.tone === "active" ? " is-active" : currentSessionRuntime.tone === "warning" ? " is-warning" : ""}`}
+              title={currentSessionRuntime.detail}
+              aria-label={`Current session status: ${currentSessionRuntime.label}. ${currentSessionRuntime.detail}`}
+            >
+              <span className={`session-runtime-dot is-${currentSessionRuntime.status}`} />
+              <span className="session-runtime-copy">
+                <span className="session-runtime-label">{currentSessionRuntime.label}</span>
+                <span className="session-runtime-detail">{currentSessionRuntime.detail}</span>
+              </span>
+            </div>
           </div>
           <div className="topbar-status">
             <span className={`status-dot ${statusDotClass}`} />
