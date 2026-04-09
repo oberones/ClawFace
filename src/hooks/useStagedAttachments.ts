@@ -25,7 +25,6 @@ export function useStagedAttachments(initialValue: Attachment[] = []) {
 
   return {
     attachments,
-    setAttachments,
     replaceAttachments,
     appendAttachments,
     removeAttachment,
