@@ -23,7 +23,6 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
 
   return (
     <section
-      key={props.panelKey}
       className={`tool-panel ${props.panelFlyIn ? "session-fly-in" : ""}`}
       data-tool-panel-key={props.panelKey}
       style={props.panelMotionStyle}
