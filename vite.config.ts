@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import pkg from "./package.json";
 import { clawFsPlugin } from "./vite-fs-plugin.ts";
 
 const devPort = Number(process.env.PORT) || 5178;
@@ -123,6 +124,9 @@ function localImageProxyPlugin() {
 export default defineConfig({
   base: "./",
   plugins: [react(), localImageProxyPlugin(), clawFsPlugin()],
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   server: {
     port: devPort,
     strictPort: false,
