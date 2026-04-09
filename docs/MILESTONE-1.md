@@ -54,6 +54,23 @@ This milestone is for a single-user operator, not a multi-user team.
 
 ---
 
+## Current milestone status (2026-04-09)
+
+Milestone 1 is materially underway and no longer mostly hypothetical.
+
+### Already delivered or substantially underway
+- Phase 1 shell stabilization is effectively complete
+- drag/drop attachment workflows are implemented and validated
+- staged attachment lifecycle ownership has been clarified
+- attachment preview/rendering boundaries are substantially cleaner
+- clipboard image workflow has a first intentional product pass
+- tool activity is now beginning to get a more first-class thread surface
+
+### What remains most important for Milestone 1
+- continue improving visible tool/result clarity so OpenClaw feels actionful rather than opaque
+- keep strengthening distinctly desktop-native affordances where they clearly improve daily use
+- avoid over-expanding feature surface before the core daily-driver experience feels cohesive
+
 # 4. Product promise for Milestone 1
 
 When Milestone 1 is done, a user should be able to:
