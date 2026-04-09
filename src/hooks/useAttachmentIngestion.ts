@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { Attachment } from "../lib/types.ts";
+import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 
 async function fileToAttachment(file: File, idPrefix: string): Promise<Attachment> {
   return new Promise((resolve, reject) => {
@@ -30,19 +31,14 @@ function isFileDrag(event: React.DragEvent<HTMLElement>): boolean {
 }
 
 export type UseAttachmentIngestionOptions = {
-  attachments: Attachment[];
-  onAttachmentsChange: (next: Attachment[]) => void;
+  attachmentOps: Pick<StagedAttachmentsState, "appendAttachments" | "removeAttachment">;
   onError?: (message: string) => void;
 };
 
 export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   const [isDragActive, setIsDragActive] = useState(false);
   const dragDepthRef = useRef(0);
-  const attachmentsRef = useRef(options.attachments);
-
-  useEffect(() => {
-    attachmentsRef.current = options.attachments;
-  }, [options.attachments]);
+  const { appendAttachments, removeAttachment: removeStagedAttachment } = options.attachmentOps;
 
   const appendFiles = useCallback(async (files: File[], idPrefix: string) => {
     if (files.length === 0) {
@@ -50,12 +46,12 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
     }
     try {
       const next = await Promise.all(files.map((file) => fileToAttachment(file, idPrefix)));
-      options.onAttachmentsChange([...attachmentsRef.current, ...next]);
+      appendAttachments(next);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to ingest attachments.";
       options.onError?.(message);
     }
-  }, [options.onAttachmentsChange, options.onError]);
+  }, [appendAttachments, options.onError]);
 
   const handleDragEnter = useCallback((event: React.DragEvent<HTMLElement>) => {
     if (!isFileDrag(event)) {
@@ -131,8 +127,8 @@ export function useAttachmentIngestion(options: UseAttachmentIngestionOptions) {
   }, [appendFiles]);
 
   const removeAttachment = useCallback((attachmentId: string) => {
-    options.onAttachmentsChange(attachmentsRef.current.filter((item) => item.id !== attachmentId));
-  }, [options.onAttachmentsChange]);
+    removeStagedAttachment(attachmentId);
+  }, [removeStagedAttachment]);
 
   const dragBindings = useMemo(() => ({
     onDragEnter: handleDragEnter,

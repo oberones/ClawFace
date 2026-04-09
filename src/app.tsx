@@ -30,6 +30,7 @@ import {
   type UiSettings,
 } from "./lib/ui-settings.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
+import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 
 const STORAGE_KEYS = {
   gatewayUrl: "clawui.gateway.url",
@@ -3500,7 +3501,13 @@ export default function App() {
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const {
+    attachments,
+    replaceAttachments,
+    appendAttachments,
+    removeAttachment,
+    clearAttachments,
+  } = useStagedAttachments();
   const [streamText, setStreamText] = useState<string | null>(null);
   const [chatRunId, setChatRunId] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
@@ -3741,7 +3748,7 @@ export default function App() {
     setChatRunId(cached.chatRunId);
     setThinkingLevel(cached.thinkingLevel);
     setDraft(cached.draft);
-    setAttachments(cached.attachments);
+    replaceAttachments(cached.attachments);
     return true;
   }
 
@@ -5820,7 +5827,7 @@ export default function App() {
     setThinking(false);
     setThinkingLevel(null);
     setDraft("");
-    setAttachments([]);
+    clearAttachments();
     sessionCacheRef.current.set(key, {
       messages: [],
       streamText: null,
@@ -6227,7 +6234,7 @@ export default function App() {
       thinkingLevel: thinkingLevelRef.current,
     }));
     setDraft("");
-    setAttachments([]);
+    clearAttachments();
     chatRunRef.current = runId;
     setChatRunId(runId);
     setThinking(true);
@@ -6257,7 +6264,7 @@ export default function App() {
     } catch (err) {
       setMessages((prev) => prev.filter((message) => message.id !== optimisticMessageId));
       setDraft(draftBeforeSend);
-      setAttachments(attachmentsBeforeSend);
+      replaceAttachments(attachmentsBeforeSend);
       updateCacheField(selectedSessionKey, (cached) => ({
         ...cached,
         messages: cached.messages.filter((message) => message.id !== optimisticMessageId),
@@ -6712,8 +6719,13 @@ export default function App() {
             toolItems={toolItems}
             draft={draft}
             onDraftChange={setDraft}
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
+            stagedAttachments={{
+              attachments,
+              replaceAttachments,
+              appendAttachments,
+              removeAttachment,
+              clearAttachments,
+            }}
             onSend={() => void handleSend()}
             onAbort={() => void handleSlashCommand("/abort")}
             canAbort={Boolean(chatRunId)}
