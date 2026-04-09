@@ -1,7 +1,7 @@
 {
-  "name": "clawui",
+  "name": "clawface",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.8",
   "main": "electron/main.cjs",
   "type": "module",
   "engines": {
@@ -46,7 +46,7 @@
   },
   "build": {
     "appId": "com.openclaw.para",
-    "productName": "ClawUI",
+    "productName": "ClawFace",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "directories": {
       "output": "desktop-dist"

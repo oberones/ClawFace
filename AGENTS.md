@@ -183,6 +183,12 @@ Milestone 1 is centered on:
 - basic tool activity visibility
 - initial architecture cleanup
 
+## Recent debugging lessons worth remembering
+
+- The gateway's control-ui client id is `openclaw-control-ui`. Do not use legacy ids like `control-ui` or `clawui` in `connect.client.id`.
+- For packaged Electron builds loaded from `file://`, the gateway origin checker normalizes the browser origin to `null`, not `file://`. If gateway origin allowlisting is required, `gateway.controlUi.allowedOrigins` must include `"null"` for that packaged-app path.
+- During desktop connectivity debugging, `make typecheck` is a reliable in-repo validation pass from the Linux container, but `make build` should be treated as authoritative on the real macOS dev machine because Rollup optional native packages can differ by host OS/arch.
+
 ---
 
 # 7. How future agents should work in this repo

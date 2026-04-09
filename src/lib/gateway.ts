@@ -19,6 +19,12 @@ export type GatewayResponseFrame = {
   error?: { code: string; message: string; details?: unknown };
 };
 
+export type GatewayErrorInfo = {
+  code: string;
+  message: string;
+  details?: unknown;
+};
+
 export type GatewayHelloOk = {
   type: "hello-ok";
   protocol: number;
@@ -45,6 +51,61 @@ type Pending = {
   timeoutHandle: number | null;
 };
 
+type SelectedConnectAuth = {
+  authToken?: string;
+  authDeviceToken?: string;
+  authPassword?: string;
+  resolvedDeviceToken?: string;
+  storedToken?: string;
+  canFallbackToShared: boolean;
+};
+
+type GatewayConnectAuth = {
+  token?: string;
+  deviceToken?: string;
+  password?: string;
+};
+
+type GatewayConnectDevice = {
+  id: string;
+  publicKey: string;
+  signature: string;
+  signedAt: number;
+  nonce: string;
+};
+
+type GatewayConnectClientInfo = {
+  id: string;
+  version: string;
+  platform: string;
+  mode: string;
+  instanceId?: string;
+};
+
+type GatewayConnectParams = {
+  minProtocol: 3;
+  maxProtocol: 3;
+  client: GatewayConnectClientInfo;
+  role: string;
+  scopes: string[];
+  device?: GatewayConnectDevice;
+  caps: string[];
+  auth?: GatewayConnectAuth;
+  userAgent: string;
+  locale: string;
+};
+
+type ConnectPlan = {
+  role: string;
+  scopes: string[];
+  client: GatewayConnectClientInfo;
+  explicitGatewayToken?: string;
+  selectedAuth: SelectedConnectAuth;
+  auth?: GatewayConnectAuth;
+  deviceIdentity: Awaited<ReturnType<typeof loadOrCreateDeviceIdentity>> | null;
+  device?: GatewayConnectDevice;
+};
+
 export type GatewayClientOptions = {
   url: string;
   token?: string;
@@ -56,37 +117,76 @@ export type GatewayClientOptions = {
   instanceId?: string;
   onHello?: (hello: GatewayHelloOk) => void;
   onEvent?: (evt: GatewayEventFrame) => void;
-  onClose?: (info: { code: number; reason: string }) => void;
+  onClose?: (info: { code: number; reason: string; error?: GatewayErrorInfo }) => void;
   onGap?: (info: { expected: number; received: number }) => void;
 };
 
 const CONNECT_FAILED_CLOSE_CODE = 4008;
+const CONTROL_UI_OPERATOR_ROLE = "operator";
+const CONTROL_UI_OPERATOR_SCOPES = [
+  "operator.admin",
+  "operator.read",
+  "operator.write",
+  "operator.approvals",
+  "operator.pairing",
+] as const;
 
-function expandGatewayUrls(input: string): string[] {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return [];
+class GatewayRequestError extends Error {
+  readonly gatewayCode: string;
+  readonly details?: unknown;
+
+  constructor(error: GatewayErrorInfo) {
+    super(error.message);
+    this.name = "GatewayRequestError";
+    this.gatewayCode = error.code;
+    this.details = error.details;
   }
-  try {
-    const parsed = new URL(trimmed);
-    const path = parsed.pathname || "/";
-    if (path === "/" || path === "") {
-      const base = `${parsed.protocol}//${parsed.host}`;
-      const candidates = [trimmed, `${base}/gateway`, `${base}/ws`];
-      return [...new Set(candidates)];
-    }
-  } catch {
-    // ignore invalid URL
-  }
-  return [trimmed];
 }
 
-function formatCloseReason(err: unknown): string {
-  const fallback = "connect failed";
-  const raw =
-    typeof err === "string" ? err : err instanceof Error ? err.message : "";
-  const normalized = raw.trim() || fallback;
-  return normalized.length > 120 ? normalized.slice(0, 120) : normalized;
+function buildGatewayConnectAuth(selectedAuth: SelectedConnectAuth): GatewayConnectAuth | undefined {
+  const authToken = selectedAuth.authToken;
+  if (!(authToken || selectedAuth.authPassword)) {
+    return undefined;
+  }
+  return {
+    token: authToken,
+    deviceToken: selectedAuth.authDeviceToken ?? selectedAuth.resolvedDeviceToken,
+    password: selectedAuth.authPassword,
+  };
+}
+
+async function buildGatewayConnectDevice(params: {
+  deviceIdentity: Awaited<ReturnType<typeof loadOrCreateDeviceIdentity>> | null;
+  client: GatewayConnectClientInfo;
+  role: string;
+  scopes: string[];
+  authToken?: string;
+  connectNonce: string | null;
+}): Promise<GatewayConnectDevice | undefined> {
+  const { deviceIdentity } = params;
+  if (!deviceIdentity) {
+    return undefined;
+  }
+  const signedAtMs = Date.now();
+  const nonce = params.connectNonce ?? "";
+  const payload = buildDeviceAuthPayload({
+    deviceId: deviceIdentity.deviceId,
+    clientId: params.client.id,
+    clientMode: params.client.mode,
+    role: params.role,
+    scopes: params.scopes,
+    signedAtMs,
+    token: params.authToken ?? null,
+    nonce,
+  });
+  const signature = await signDevicePayload(deviceIdentity.privateKey, payload);
+  return {
+    id: deviceIdentity.deviceId,
+    publicKey: deviceIdentity.publicKey,
+    signature,
+    signedAt: signedAtMs,
+    nonce,
+  };
 }
 
 export class GatewayClient {
@@ -98,21 +198,9 @@ export class GatewayClient {
   private connectSent = false;
   private connectTimer: number | null = null;
   private backoffMs = 800;
-  private urlCandidates: string[];
-  private candidateIndex = 0;
-  private opened = false;
-  private clientIdCandidates: string[];
-  private clientIdIndex = 0;
+  private pendingConnectError: GatewayErrorInfo | undefined;
 
-  constructor(private opts: GatewayClientOptions) {
-    this.urlCandidates = expandGatewayUrls(opts.url);
-    const baseClientId = (opts.clientName ?? "clawui").trim() || "clawui";
-    const candidates = [baseClientId];
-    if (baseClientId !== "webchat") {
-      candidates.push("webchat");
-    }
-    this.clientIdCandidates = [...new Set(candidates)];
-  }
+  constructor(private opts: GatewayClientOptions) {}
 
   start() {
     this.closed = false;
@@ -121,8 +209,13 @@ export class GatewayClient {
 
   stop() {
     this.closed = true;
+    if (this.connectTimer !== null) {
+      window.clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
     this.ws?.close();
     this.ws = null;
+    this.pendingConnectError = undefined;
     this.flushPending(new Error("gateway client stopped"));
   }
 
@@ -143,43 +236,16 @@ export class GatewayClient {
     if (this.closed) {
       return;
     }
-    const target =
-      this.urlCandidates[this.candidateIndex] ??
-      this.urlCandidates[0] ??
-      this.opts.url;
-    this.opened = false;
-    try {
-      this.ws = new WebSocket(target);
-    } catch (err) {
-      console.warn("[gateway] invalid WebSocket URL:", target, err);
-      this.opts.onClose?.({
-        code: CONNECT_FAILED_CLOSE_CODE,
-        reason: `Invalid WebSocket URL: ${target}`,
-      });
-      this.scheduleReconnect();
-      return;
-    }
+    this.ws = new WebSocket(this.opts.url);
     this.ws.addEventListener("open", () => this.queueConnect());
     this.ws.addEventListener("message", (ev) => this.handleMessage(String(ev.data ?? "")));
     this.ws.addEventListener("close", (ev) => {
       const reason = String(ev.reason ?? "");
+      const connectError = this.pendingConnectError;
+      this.pendingConnectError = undefined;
       this.ws = null;
       this.flushPending(new Error(`gateway closed (${ev.code}): ${reason}`));
-      this.opts.onClose?.({ code: ev.code, reason });
-      if (
-        reason.toLowerCase().includes("client/id") &&
-        this.clientIdIndex + 1 < this.clientIdCandidates.length
-      ) {
-        this.clientIdIndex += 1;
-        window.setTimeout(() => this.connect(), 150);
-        return;
-      }
-      if (!this.opened && this.candidateIndex + 1 < this.urlCandidates.length) {
-        this.candidateIndex += 1;
-        window.setTimeout(() => this.connect(), 150);
-        return;
-      }
-      this.candidateIndex = 0;
+      this.opts.onClose?.({ code: ev.code, reason, error: connectError });
       this.scheduleReconnect();
     });
     this.ws.addEventListener("error", () => {
@@ -206,6 +272,138 @@ export class GatewayClient {
     this.pending.clear();
   }
 
+  private buildConnectClient(): GatewayConnectClientInfo {
+    return {
+      id: this.opts.clientName ?? "openclaw-control-ui",
+      version: this.opts.clientVersion ?? "control-ui",
+      platform: this.opts.platform ?? navigator.platform ?? "web",
+      mode: this.opts.mode ?? "webchat",
+      instanceId: this.opts.instanceId,
+    };
+  }
+
+  private buildConnectParams(plan: ConnectPlan): GatewayConnectParams {
+    const params: GatewayConnectParams = {
+      minProtocol: 3,
+      maxProtocol: 3,
+      client: plan.client,
+      role: plan.role,
+      scopes: plan.scopes,
+      device: plan.device,
+      caps: ["tool-events"],
+      auth: plan.auth,
+      userAgent: navigator.userAgent,
+      locale: navigator.language,
+    };
+
+    console.info("[GatewayClient] outbound connect params", params);
+    try {
+      (window as typeof window & { __clawfaceLastConnectPayload?: unknown }).__clawfaceLastConnectPayload = params;
+    } catch {
+      // ignore debug payload cache errors
+    }
+
+    return params;
+  }
+
+  private selectConnectAuth(params: { role: string; deviceId: string }): SelectedConnectAuth {
+    const explicitGatewayToken = this.opts.token?.trim() || undefined;
+    const authPassword = this.opts.password?.trim() || undefined;
+    const storedEntry = loadDeviceAuthToken({
+      deviceId: params.deviceId,
+      role: params.role,
+    });
+    const storedScopes = storedEntry?.scopes ?? [];
+    const storedTokenCanRead =
+      params.role !== CONTROL_UI_OPERATOR_ROLE ||
+      storedScopes.includes("operator.read") ||
+      storedScopes.includes("operator.write") ||
+      storedScopes.includes("operator.admin");
+    const storedToken = storedTokenCanRead ? storedEntry?.token : undefined;
+    const resolvedDeviceToken = !(explicitGatewayToken || authPassword)
+      ? (storedToken ?? undefined)
+      : undefined;
+    const authToken = explicitGatewayToken ?? resolvedDeviceToken;
+    return {
+      authToken,
+      authDeviceToken: undefined,
+      authPassword,
+      resolvedDeviceToken,
+      storedToken: storedToken ?? undefined,
+      canFallbackToShared: Boolean(storedToken && explicitGatewayToken),
+    };
+  }
+
+  private async buildConnectPlan(): Promise<ConnectPlan> {
+    const role = CONTROL_UI_OPERATOR_ROLE;
+    const scopes = [...CONTROL_UI_OPERATOR_SCOPES];
+    const client = this.buildConnectClient();
+    const explicitGatewayToken = this.opts.token?.trim() || undefined;
+
+    const isSecureContext = typeof crypto !== "undefined" && !!crypto.subtle;
+    let deviceIdentity: Awaited<ReturnType<typeof loadOrCreateDeviceIdentity>> | null = null;
+    let selectedAuth: SelectedConnectAuth = {
+      authToken: explicitGatewayToken,
+      authPassword: this.opts.password?.trim() || undefined,
+      canFallbackToShared: false,
+    };
+
+    if (isSecureContext) {
+      deviceIdentity = await loadOrCreateDeviceIdentity();
+      selectedAuth = this.selectConnectAuth({
+        role,
+        deviceId: deviceIdentity.deviceId,
+      });
+    }
+
+    return {
+      role,
+      scopes,
+      client,
+      explicitGatewayToken,
+      selectedAuth,
+      auth: buildGatewayConnectAuth(selectedAuth),
+      deviceIdentity,
+      device: await buildGatewayConnectDevice({
+        deviceIdentity,
+        client,
+        role,
+        scopes,
+        authToken: selectedAuth.authToken,
+        connectNonce: this.connectNonce,
+      }),
+    };
+  }
+
+  private handleConnectHello(hello: GatewayHelloOk, plan: ConnectPlan) {
+    if (hello?.auth?.deviceToken && plan.deviceIdentity) {
+      storeDeviceAuthToken({
+        deviceId: plan.deviceIdentity.deviceId,
+        role: hello.auth.role ?? plan.role,
+        token: hello.auth.deviceToken,
+        scopes: hello.auth.scopes ?? [],
+      });
+    }
+    this.backoffMs = 800;
+    this.opts.onHello?.(hello);
+  }
+
+  private handleConnectFailure(err: unknown, plan: ConnectPlan) {
+    if (err instanceof GatewayRequestError) {
+      this.pendingConnectError = {
+        code: err.gatewayCode,
+        message: err.message,
+        details: err.details,
+      };
+    } else {
+      this.pendingConnectError = undefined;
+    }
+    if (plan.selectedAuth.canFallbackToShared && plan.deviceIdentity) {
+      clearDeviceAuthToken({ deviceId: plan.deviceIdentity.deviceId, role: plan.role });
+    }
+    this.ws?.close(CONNECT_FAILED_CLOSE_CODE, "connect failed");
+  }
+
   private async sendConnect() {
     if (this.connectSent) {
       return;
@@ -216,104 +414,10 @@ export class GatewayClient {
       this.connectTimer = null;
     }
 
-    const isSecureContext = typeof crypto !== "undefined" && !!crypto.subtle;
-
-    const scopes = ["operator.admin", "operator.approvals", "operator.pairing"];
-    const role = "operator";
-    const clientId = this.currentClientId();
-    let deviceIdentity: Awaited<ReturnType<typeof loadOrCreateDeviceIdentity>> | null = null;
-    let canFallbackToShared = false;
-    let authToken = this.opts.token;
-
-    if (isSecureContext) {
-      deviceIdentity = await loadOrCreateDeviceIdentity();
-      const storedToken = loadDeviceAuthToken({
-        deviceId: deviceIdentity.deviceId,
-        role,
-      })?.token;
-      authToken = storedToken ?? this.opts.token;
-      canFallbackToShared = Boolean(storedToken && this.opts.token);
-    }
-
-    const auth =
-      authToken || this.opts.password
-        ? {
-            token: authToken,
-            password: this.opts.password,
-          }
-        : undefined;
-
-    let device:
-      | {
-          id: string;
-          publicKey: string;
-          signature: string;
-          signedAt: number;
-          nonce: string | undefined;
-        }
-      | undefined;
-
-    if (isSecureContext && deviceIdentity) {
-      const signedAtMs = Date.now();
-      const nonce = this.connectNonce ?? undefined;
-      const payload = buildDeviceAuthPayload({
-        deviceId: deviceIdentity.deviceId,
-        clientId,
-        clientMode: this.opts.mode ?? "webchat",
-        role,
-        scopes,
-        signedAtMs,
-        token: authToken ?? null,
-        nonce,
-      });
-      const signature = await signDevicePayload(deviceIdentity.privateKey, payload);
-      device = {
-        id: deviceIdentity.deviceId,
-        publicKey: deviceIdentity.publicKey,
-        signature,
-        signedAt: signedAtMs,
-        nonce,
-      };
-    }
-
-    const params = {
-      minProtocol: 3,
-      maxProtocol: 3,
-      client: {
-        id: clientId,
-        version: this.opts.clientVersion ?? "dev",
-        platform: this.opts.platform ?? navigator.platform ?? "web",
-        mode: this.opts.mode ?? "webchat",
-        instanceId: this.opts.instanceId,
-      },
-      role,
-      scopes,
-      device,
-      caps: ["tool-events"],
-      auth,
-      userAgent: navigator.userAgent,
-      locale: navigator.language,
-    };
-
-    void this.request<GatewayHelloOk>("connect", params)
-      .then((hello) => {
-        if (hello?.auth?.deviceToken && deviceIdentity) {
-          storeDeviceAuthToken({
-            deviceId: deviceIdentity.deviceId,
-            role: hello.auth.role ?? role,
-            token: hello.auth.deviceToken,
-            scopes: hello.auth.scopes ?? [],
-          });
-        }
-        this.backoffMs = 800;
-        this.opts.onHello?.(hello);
-      })
-      .catch((err) => {
-        if (canFallbackToShared && deviceIdentity) {
-          clearDeviceAuthToken({ deviceId: deviceIdentity.deviceId, role });
-        }
-        this.ws?.close(CONNECT_FAILED_CLOSE_CODE, formatCloseReason(err));
-      });
+    const plan = await this.buildConnectPlan();
+    void this.request<GatewayHelloOk>("connect", this.buildConnectParams(plan))
+      .then((hello) => this.handleConnectHello(hello, plan))
+      .catch((err: unknown) => this.handleConnectFailure(err, plan));
   }
 
   private handleMessage(raw: string) {
@@ -364,25 +468,18 @@ export class GatewayClient {
       if (res.ok) {
         pending.resolve(res.payload);
       } else {
-        pending.reject(new Error(res.error?.message ?? "request failed"));
+        pending.reject(
+          new GatewayRequestError({
+            code: res.error?.code ?? "UNAVAILABLE",
+            message: res.error?.message ?? "request failed",
+            details: res.error?.details,
+          }),
+        );
       }
     }
   }
 
-  private currentClientId() {
-    return (
-      this.clientIdCandidates[this.clientIdIndex] ??
-      this.clientIdCandidates[0] ??
-      this.opts.clientName ??
-      "clawui"
-    );
-  }
-
-  request<T = unknown>(
-    method: string,
-    params?: unknown,
-    options?: { timeoutMs?: number },
-  ): Promise<T> {
+  request<T = unknown>(method: string, params?: unknown, options?: { timeoutMs?: number }): Promise<T> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error("gateway not connected"));
     }
@@ -393,22 +490,14 @@ export class GatewayClient {
         ? Math.max(0, Math.floor(options.timeoutMs))
         : 0;
     const p = new Promise<T>((resolve, reject) => {
-      const pending: Pending = {
-        resolve: (v) => resolve(v as T),
-        reject,
-        timeoutHandle: null,
-      };
-      if (timeoutMs > 0) {
-        pending.timeoutHandle = window.setTimeout(() => {
-          const active = this.pending.get(id);
-          if (active !== pending) {
-            return;
-          }
-          this.pending.delete(id);
-          reject(new Error(`${method} timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-      }
-      this.pending.set(id, pending);
+      const timeoutHandle =
+        timeoutMs > 0
+          ? window.setTimeout(() => {
+              this.pending.delete(id);
+              reject(new Error(`gateway request timed out: ${method}`));
+            }, timeoutMs)
+          : null;
+      this.pending.set(id, { resolve: (v) => resolve(v as T), reject, timeoutHandle });
     });
     this.ws.send(JSON.stringify(frame));
     return p;
@@ -417,12 +506,11 @@ export class GatewayClient {
   private queueConnect() {
     this.connectNonce = null;
     this.connectSent = false;
-    this.opened = true;
     if (this.connectTimer !== null) {
       window.clearTimeout(this.connectTimer);
     }
     this.connectTimer = window.setTimeout(() => {
       void this.sendConnect();
-    }, 650);
+    }, 750);
   }
 }

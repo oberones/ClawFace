@@ -1087,7 +1087,10 @@ export default function ChatView(props: ChatViewProps) {
     <section className="claw-chat-area chat-shell">
       <header className={`chat-header ${modelMenuOpen || thinkingMenuOpen ? "menu-layer-active" : ""}`}>
         <div className="chat-header-main">
-          <div className="chat-brand-title">ClawUI</div>
+          <div>
+            <div className="chat-brand-title">ClawFace</div>
+            <div className="chat-brand-subtitle">OpenClaw control surface · v{__APP_VERSION__}</div>
+          </div>
           <div className="topbar-status">
             <span className={`status-dot ${statusDotClass}`} />
             <span>{statusLabel}</span>
