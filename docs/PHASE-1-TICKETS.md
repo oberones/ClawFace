@@ -2312,6 +2312,18 @@ A cleaner first-class thread surface for tool activity/media-adjacent output.
 - the thread surface is easier to evolve toward richer non-text outputs
 - `make typecheck` and `make build` pass for the slice
 
+### Current status (2026-04-09)
+In progress.
+
+#### Landed so far
+- `ToolActivityPanel.tsx` extracted from the large inline renderer in `ChatView`
+- tool activity now has a clearer dedicated render boundary
+- running/completed activity reads more like runtime activity and less like raw debug output
+- expanded tool entries now include lighter-weight metadata and clearer collapsed summaries
+
+#### Recommended next step
+Continue within this slice by improving tool output/result clarity before treating it as fully complete.
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:
@@ -2337,8 +2349,5 @@ The core shell stabilization goals have been materially achieved:
 ### What this means
 Further Phase 1 work should only be added if a clearly high-leverage reliability issue appears.
 Otherwise, the correct next move is to proceed to **Phase 2 — Desktop-native media and attachment workflows**.
-- slash-command logic is more isolated
-- streaming behavior is cleaner and more stable
-- the app feels more dependable in the core chat shell
 
 That is the bar for leaving Phase 1 and moving confidently into media-heavy and tool-visibility slices.
