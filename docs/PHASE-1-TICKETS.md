@@ -2312,17 +2312,48 @@ A cleaner first-class thread surface for tool activity/media-adjacent output.
 - the thread surface is easier to evolve toward richer non-text outputs
 - `make typecheck` and `make build` pass for the slice
 
-### Current status (2026-04-09)
-In progress.
+### Implementation notes (2026-04-09)
 
-#### Landed so far
-- `ToolActivityPanel.tsx` extracted from the large inline renderer in `ChatView`
-- tool activity now has a clearer dedicated render boundary
-- running/completed activity reads more like runtime activity and less like raw debug output
-- expanded tool entries now include lighter-weight metadata and clearer collapsed summaries
+This ticket has now been completed as the first tool-activity/thread-surface slice.
+
+#### New component added
+- `src/components/ToolActivityPanel.tsx`
+
+#### What changed
+The large inline tool panel renderer in `ChatView.tsx` was extracted into a dedicated `ToolActivityPanel` component.
+That created a real thread-surface boundary for tool activity instead of leaving it as one more cluster of inline rendering logic inside the main chat view.
+
+#### User-facing improvements landed
+- tool activity now reads more like runtime activity and less like raw debug clutter
+- tool entries use clearer running/completed/needs-attention phrasing
+- collapsed entries now surface more readable summaries (`Output: ...`, `Args: ...`, `Issue: ...`)
+- expanded entries include clearer metadata and more honest empty-state copy for args/output
+
+#### Why this matters
+Before this ticket, tool activity existed, but it still felt too much like an implementation detail bolted onto the thread.
+
+After this ticket, tool activity has a clearer dedicated surface and does a better job answering the user’s practical question:
+> what is OpenClaw doing, and what happened?
+
+That is a meaningful product move toward ClawFace feeling OpenClaw-native rather than like a generic chat shell with some extra boxes.
+
+#### What this ticket intentionally does *not* solve yet
+- it does not yet introduce a normalized tool failure/result domain model
+- it does not yet cover richer task/runtime surfaces outside the immediate thread
+- it does not fully solve broader runtime/session visibility outside tool entries themselves
+
+That is fine.
+This slice was about making tool activity first-class in the thread first.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` passes on the active macOS development machine
 
 #### Recommended next step
-Continue within this slice by improving tool output/result clarity before treating it as fully complete.
+Proceed to a runtime/session visibility slice so ClawFace continues evolving from a polished chat client into a more distinctly OpenClaw-native desktop frontend.
 
 # Definition of Phase 1 done
 
