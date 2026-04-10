@@ -3038,6 +3038,64 @@ It is a presentation-level grouping pass, which is exactly the right ambition fo
 #### Recommended next step
 If live usage still feels dense, the next 3.3 pass should focus on spacing and hierarchy inside multi-tool groups, not on broader state-model changes.
 
+## Ticket 3.3.3 — Improve density and hierarchy inside multi-tool groups
+### Goal
+Make multi-tool groups easier to scan by surfacing group-level status and reducing unnecessary internal visual weight.
+
+### Why
+After the first 3.3 passes, the biggest remaining thread-density issue is usually inside multi-tool groups themselves.
+
+The user should be able to answer quickly:
+- is this group still running?
+- did something in this group fail?
+- do I need to open each row, or is the group broadly done?
+
+### Scope
+- add stronger group-level status summary for multi-tool panels
+- reduce excess internal chrome/density inside multi-tool groups
+- preserve chronology and per-tool detail without trying to over-summarize the entire group
+
+### Deliverable
+A calmer multi-tool presentation with clearer group-level hierarchy.
+
+### Done when
+- multi-tool groups expose a stronger group-level status summary
+- multi-tool groups feel denser and easier to scan
+- tool chronology remains intact
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-10)
+
+This ticket is now complete.
+
+#### What changed
+- multi-tool panels now derive a group-level summary of:
+  - running tools
+  - failed tools
+  - completed tools
+- multi-tool headers now surface those counts as compact status pills
+- multi-tool panels now also carry a stronger group-level tone (`running`, `failed`, or `succeeded`)
+- multi-tool entries and panel spacing were tightened slightly to reduce internal dashboard-like weight
+
+#### User-facing improvements landed
+- the user can now scan a multi-tool panel header and quickly see whether the group is:
+  - still active
+  - contains failures
+  - broadly done
+- multi-tool groups now have better hierarchy without changing transcript order
+
+#### Why this is the right next 3.3 slice
+This improves the common “several tool calls in one step” case without adding risky grouping logic or hiding detail.
+
+It is a hierarchy pass, not a behavioral rewrite.
+
+#### Validation status
+- `make typecheck` passes
+- `make build` should still be treated as authoritative on the active macOS development machine per `docs/DEVELOPMENT_CONSTRAINTS.md`
+
+#### Recommended next step
+If we keep going in 3.3, the next pass should come from real usage review, probably around whether collapsed summaries themselves are still too verbose in dense tool bursts.
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:

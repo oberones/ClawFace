@@ -54,6 +54,23 @@ function summarizeTool(tool: ToolItem) {
   };
 }
 
+function summarizeToolGroup(tools: ToolItem[]) {
+  let running = 0;
+  let succeeded = 0;
+  let failed = 0;
+  for (const tool of tools) {
+    if (tool.outcome === "failed") {
+      failed += 1;
+    } else if (tool.outcome === "succeeded") {
+      succeeded += 1;
+    } else {
+      running += 1;
+    }
+  }
+  const tone = failed > 0 ? "failed" : running > 0 ? "running" : "succeeded";
+  return { running, succeeded, failed, tone };
+}
+
 type ToolActivityPanelProps = {
   tools: ToolItem[];
   panelKey: string;
@@ -75,10 +92,11 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
   }
 
   const isSingleToolPanel = props.tools.length === 1;
+  const groupSummary = isSingleToolPanel ? null : summarizeToolGroup(props.tools);
 
   return (
     <section
-      className={`tool-panel ${isSingleToolPanel ? "is-single" : "is-multi"} ${props.panelFlyIn ? "session-fly-in" : ""}`}
+      className={`tool-panel ${isSingleToolPanel ? "is-single" : `is-multi is-${groupSummary?.tone}-group`} ${props.panelFlyIn ? "session-fly-in" : ""}`}
       data-tool-panel-key={props.panelKey}
       style={props.panelMotionStyle}
     >
@@ -86,6 +104,17 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
         <div className="tool-panel-header">
           <div className="tool-panel-title" style={{ fontSize: props.toolMinorFontSize }}>
             Tools ({props.tools.length})
+          </div>
+          <div className="tool-panel-stats" style={{ fontSize: props.toolMinorFontSize }}>
+            {groupSummary && groupSummary.running > 0 && (
+              <span className="tool-panel-stat is-running">{groupSummary.running} running</span>
+            )}
+            {groupSummary && groupSummary.failed > 0 && (
+              <span className="tool-panel-stat is-failed">{groupSummary.failed} failed</span>
+            )}
+            {groupSummary && groupSummary.succeeded > 0 && (
+              <span className="tool-panel-stat is-succeeded">{groupSummary.succeeded} done</span>
+            )}
           </div>
         </div>
       )}
