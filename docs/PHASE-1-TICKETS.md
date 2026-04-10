@@ -2517,6 +2517,527 @@ Suggested first-pass scope:
 - it improves product clarity quickly
 - it creates a cleaner seam for later work on background-session visibility in the sidebar
 
+## Ticket 3.1.2 — Introduce a shell-level current-session runtime status surface
+### Goal
+Make the active session's runtime state legible from the shell without requiring the user to parse the thread first.
+
+### Scope
+- derive a small current-session runtime status model from existing app state
+- surface current-session runtime state near the chat header/session info strip
+- distinguish coarse states such as idle/loading/switching/thinking/streaming/working
+- improve background-session visibility in the sidebar using existing `working` / `unread` signals
+
+### Tasks
+- define a first-pass current-session runtime status model
+- surface that status in `ChatView` near the shell header
+- improve the sidebar's background-session activity presentation so it is not only encoded as subtle color treatment
+- preserve compatibility with existing connection/tool/thread logic
+
+### Deliverable
+A clearer shell-level runtime/session visibility layer for both the active session and background sessions.
+
+### Done when
+- the current session exposes an explicit runtime state in the shell
+- background-session activity is more legible in the sidebar
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-09)
+
+This ticket has now been completed as the first runtime/session visibility slice after the tool-activity bridge work.
+
+#### What changed
+- `ChatView.tsx` now derives a small current-session runtime status model for the active session.
+- The shell header now includes a dedicated runtime-status pill separate from gateway connection state.
+- The runtime-status surface distinguishes first-pass session states including:
+  - `Idle`
+  - `Loading session`
+  - `Switching session`
+  - `Thinking`
+  - `Streaming reply`
+  - `Working`
+- `SessionSidebar.tsx` now exposes clearer background-session activity labels instead of relying only on card tint and dot color.
+
+#### User-facing improvements landed
+- the header now answers a practical question the old UI did not answer clearly:
+  > what is this session doing right now?
+- the sidebar now makes background activity more explicit with readable badges such as:
+  - `Current`
+  - `New activity`
+  - `Working`
+
+#### Why this matters
+This is the first slice where ClawFace starts exposing session runtime as a product concept instead of only exposing low-level thread symptoms.
+
+That matters because an OpenClaw-native desktop frontend should help the user understand active work at a glance, not only after reading through streaming text and tool entries.
+
+#### What this ticket intentionally does *not* solve yet
+- it does not yet introduce a normalized `toolStore` or broader runtime-store boundary
+- it does not yet distinguish richer tool-result classes beyond the current thread/tool presentation
+- it does not yet fully solve tool failure/result clarity, especially for dense or noisy tool-heavy threads
+
+That is fine.
+This slice was about creating the first clear shell/session visibility layer before deepening tool-result semantics.
+
+#### Validation status
+This ticket is validated complete.
+
+Validation outcome:
+- `make typecheck` passes
+- `make build` should still be treated as authoritative on the active macOS development machine per `docs/DEVELOPMENT_CONSTRAINTS.md`
+
+#### Recommended next step
+Proceed to **Slice 3.2 — Tool output and failure clarity**.
+
+## Ticket 3.2.1 — Audit current tool result and failure presentation
+### Goal
+Identify where current tool results and failures are understandable, where they are still too raw, and which rendering improvements should land first.
+
+### Why
+ClawFace now exposes runtime/session activity more clearly, but tool-heavy threads can still be noisy or ambiguous once tools finish, fail, or produce partial output.
+
+The next step is to improve the user's answer to:
+> what happened, did it work, and what should I pay attention to?
+
+### Scope
+- current tool result rendering
+- current failure/error rendering
+- distinction between in-progress tool activity and final tool result
+- identifying where raw payloads still leak into renderer-oriented presentation
+
+### Tasks
+- review `ToolActivityPanel` result/failure presentation
+- inspect representative tool result states in `ChatView` / thread rendering
+- identify where result summaries are clear vs noisy
+- identify where failures are visible vs buried
+- recommend the first implementation slice for tool result/failure clarity
+
+### Deliverable
+A short audit and decomposition note for Slice 3.2.
+
+### Done when
+- we know the highest-leverage clarity problems in current tool result rendering
+- we know the first concrete implementation slice for tool output/failure clarity
+
+### Implementation notes
+
+### Audit findings (2026-04-09)
+
+#### Current tool-result state already present in the app
+The app already has a coherent first-pass notion of tool activity, but not yet a trustworthy notion of tool outcome.
+
+Observed current modeling:
+- `ToolItem` currently stores:
+  - `id`
+  - `name`
+  - `status: "start" | "update" | "result"`
+  - `args`
+  - `output`
+  - `startedAt`
+  - `updatedAt`
+- tool updates are merged over time via `mergeToolItems(...)`
+- `normalizeToolStatus(...)` intentionally collapses many raw upstream states into the coarse buckets above
+
+This means the UI can already answer:
+- did a tool appear?
+- is it still in-flight vs no longer in-flight?
+- what raw args/output do we currently have?
+
+But it still cannot answer reliably:
+- did the tool succeed?
+- did it fail?
+- what is the most important result?
+- is the visible failure about the tool, the run lifecycle, or both?
+
+#### Current user-visible tool-result surfaces
+
+##### 1. Thread-embedded tool panels
+`ToolActivityPanel.tsx` renders tool activity grouped into the thread.
+
+Current strengths:
+- tool activity is visible inside the conversation instead of being hidden
+- the user can expand a tool entry to inspect args/output
+- the user can distinguish running vs non-running at a glance
+
+##### 2. Collapsed summary lines
+Collapsed tool cards currently show:
+- a status dot
+- a text label such as `Running`, `Completed`, or `Needs attention`
+- a one-line summary derived from either:
+  - output preview, or
+  - args preview
+
+This is directionally useful, but still fragile.
+
+##### 3. Expanded raw payload view
+Expanded tool cards expose:
+- `Args`
+- `Output`
+- a small status chip
+- start time
+
+This is useful for debugging, but it is still renderer-facing exposure of mostly raw normalized payload rather than a product-oriented explanation of outcome.
+
+#### What is currently working well enough
+
+##### 1. Presence and chronology of tool activity
+The current thread rendering does a decent job of showing that tool activity happened and roughly where it belongs in the conversation.
+
+That is already much better than burying all tool work behind final assistant prose.
+
+##### 2. Coarse running vs finished distinction
+The current panel distinguishes:
+- in-flight tool activity
+- completed/finalized tool activity
+
+That distinction is important and should be preserved.
+
+##### 3. Expand-for-debug behavior
+For local debugging and early product development, expandable raw args/output is still useful.
+This should not be thrown away.
+
+#### Highest-leverage clarity gaps
+
+##### 1. Failure detection is currently heuristic, not modeled
+This is the biggest issue.
+
+`ToolActivityPanel.tsx` currently infers failure by regex-matching the rendered output text for words such as:
+- `error`
+- `failed`
+- `exception`
+- `denied`
+- `not found`
+- `timeout`
+
+That creates both false positives and false negatives.
+
+Examples of failure modes:
+- a successful tool output that quotes an error string may look failed
+- a failed tool result without those exact words may look completed
+- a run-level error may appear as a separate system message while the tool card still looks successful or merely complete
+
+This means the current `Needs attention` label is not yet dependable enough to be treated as strong product language.
+
+##### 2. `result` currently conflates success and failure
+At the data-model level, the app currently knows only:
+- `start`
+- `update`
+- `result`
+
+That means both of these collapse into the same terminal bucket:
+- successful completion
+- failed completion
+
+The renderer is then forced to guess outcome from output text.
+
+That is backwards.
+Outcome should be modeled first, then rendered.
+
+##### 3. Tool failures and run/lifecycle failures are not clearly joined
+`app.tsx` can surface lifecycle errors via system messages like `Error: ...`, but that error state is not strongly attached to the relevant tool entry.
+
+So the user may get:
+- a tool card in one place
+- an error message in another place
+- no clear explanation of whether the tool itself failed, the assistant run failed after the tool, or the run was interrupted for another reason
+
+##### 4. Summary text is too raw and not reliably outcome-oriented
+Collapsed tool summaries currently prefer the first available preview from raw output or args.
+
+That means the user often gets:
+- noisy JSON-ish previews
+- partial raw output with weak semantic value
+- no stable distinction between:
+  - what the tool was doing
+  - what it produced
+  - whether it succeeded
+  - what matters now
+
+##### 5. `update` is visually treated as generic running state
+This is acceptable for now, but worth noting.
+
+The current UI effectively treats:
+- `start`
+- `update`
+
+as one broad `Running` bucket.
+
+That is fine for an early slice, but it means the UI still does not distinguish:
+- starting
+- actively producing partial output
+- waiting on completion
+
+That is a secondary concern, not the first thing to fix.
+
+#### Ownership boundaries suggested by the audit
+
+The next slice should not jump straight to a giant store rewrite.
+
+The first improvement should happen at the seam between:
+- normalization in `app.tsx`
+- rendering in `ToolActivityPanel.tsx`
+
+Recommended ownership direction:
+- `app.tsx` / normalization layer should produce a more trustworthy normalized tool outcome
+- renderer components should consume that normalized outcome instead of inferring failure from display text
+
+This follows the same principle that helped in 3.1.x:
+move product meaning closer to state ownership, not into ad hoc renderer heuristics.
+
+#### Recommended first implementation slice
+
+### Recommended slice: explicit tool outcome and clearer result/failure summaries
+
+##### Goal
+Make tool results and failures legible without requiring the user to parse raw output blobs or infer failure from stray words.
+
+##### Scope
+- extend normalized tool state so terminal tool outcomes are more explicit
+- stop relying primarily on output-text regexes for failure presentation
+- improve collapsed tool summaries so they describe outcome more clearly
+- keep expanded raw args/output for debugging, but make the default collapsed state more product-oriented
+
+##### Recommended first-pass behavior
+- distinguish at least:
+  - `running`
+  - `succeeded`
+  - `failed`
+- prefer explicit event/state/error metadata when available
+- only fall back to output-text heuristics when upstream data truly gives no better signal
+- render clearer collapsed labels such as:
+  - `Running`
+  - `Succeeded`
+  - `Failed`
+- surface concise failure copy in the collapsed state when available
+
+##### Why this should come first
+- it attacks the highest-risk confusion point directly
+- it improves trust in the UI's language around tools
+- it reduces renderer guesswork without demanding a full thread UX redesign
+- it creates a better foundation for later Slice 3.3 polish work
+
+##### What should wait until later
+- deep tool-card visual redesign
+- advanced grouping of multiple tool calls into higher-level task summaries
+- fully separate treatment of progress updates vs partial results vs final results across all providers
+
+Those may matter later, but the first job is to make success/failure meaning trustworthy.
+
+## Ticket 3.2.2 — Introduce explicit tool outcome and clearer result/failure summaries
+### Goal
+Make tool results and failures legible from normalized state instead of renderer heuristics.
+
+### Scope
+- extend normalized tool state with explicit outcome semantics
+- prefer structured error metadata over display-text guessing
+- improve collapsed tool summaries so they communicate result vs failure more clearly
+- preserve expanded raw args/output for debugging
+
+### Deliverable
+A more trustworthy first-pass tool-result model and clearer collapsed tool activity cards.
+
+### Done when
+- tool items distinguish `running`, `succeeded`, and `failed`
+- renderer components consume normalized tool outcome instead of inferring failure from output text alone
+- collapsed tool cards show clearer result/failure labels and summaries
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-09)
+
+This ticket is now complete.
+
+#### What changed
+- `ToolItem` now carries explicit `outcome` state:
+  - `running`
+  - `succeeded`
+  - `failed`
+- normalized tool updates now also preserve structured `errorMessage` data when available
+- tool normalization in `app.tsx` now prefers explicit status/error metadata first
+- output-text heuristics are retained only as a fallback when terminal tool output has no better structured success/failure signal
+- `ToolActivityPanel.tsx` now renders collapsed tool cards from normalized outcome semantics rather than local regex guessing
+
+#### User-facing improvements landed
+- collapsed cards now use clearer labels:
+  - `Running`
+  - `Succeeded`
+  - `Failed`
+- failed tools now prefer structured error copy in the collapsed summary when available
+- expanded failed tools now surface an explicit `Error` section when structured error metadata exists
+- raw `Args` and `Output` remain available for debugging
+
+#### Why this is the right first 3.2 slice
+This lands the most important semantic improvement without prematurely redesigning the full tool thread UI.
+
+The product now has a better answer to:
+- did this tool work?
+- if not, what failed?
+
+That is a better base for future thread polish than adding more styling on top of ambiguous state.
+
+#### Validation status
+- `make typecheck` passes
+- `make build` should still be treated as authoritative on the active macOS development machine per `docs/DEVELOPMENT_CONSTRAINTS.md`
+
+#### Recommended next step
+Move deeper into Slice 3.2 by reviewing whether run-level lifecycle errors should be visually attached more directly to related tool entries, or whether the next highest-leverage move is general tool-heavy thread scanability work in Slice 3.3.
+
+## Ticket 3.2.3 — Attach lifecycle errors more clearly to related tool activity
+### Goal
+Reduce ambiguity between tool-level failures and run/lifecycle failures by attaching structured lifecycle errors to the most relevant in-flight tool entry when possible.
+
+### Scope
+- carry enough normalized tool metadata to associate tool activity with a run
+- attach run/lifecycle error messages to related in-flight tool items when the linkage is clear
+- preserve existing system error messages for cases that are broader than a single tool failure
+
+### Deliverable
+Tool activity cards that more often surface the relevant failure directly, instead of forcing the user to correlate a separate system error message by hand.
+
+### Done when
+- tool items can retain run linkage during normalization
+- relevant lifecycle errors mark the matching in-flight tool as failed when possible
+- background-session failures remain visible in sidebar/session state
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-09)
+
+This ticket is now complete.
+
+#### What changed
+- normalized `ToolItem` state now retains optional `runId`
+- tool extraction paths now preserve `runId` across live agent/chat tool updates when it is available from the event stream
+- lifecycle/run errors now attempt to attach structured error text to the most recent matching in-flight tool for the same run
+- active-session failures still surface as system messages, but the relevant tool entry now also becomes a failed tool when the association is clear
+- non-active session failures now also mark sidebar/session activity unread when the failure is new background activity
+
+#### Why this matters
+Before this change, ClawFace could show:
+- a running tool entry
+- then a separate `Error: ...` system message
+
+without clearly tying those two pieces together.
+
+Now, when the run linkage is clear, the tool card itself becomes a better source of truth for what failed.
+
+#### Implementation boundary
+This deliberately links only to the most recent matching in-flight tool for the same run.
+
+That keeps the behavior conservative:
+- attach when the association is clear
+- avoid aggressively rewriting old completed tool cards when the failure may belong elsewhere in the run
+
+#### Validation status
+- `make typecheck` passes
+- `make build` should still be treated as authoritative on the active macOS development machine per `docs/DEVELOPMENT_CONSTRAINTS.md`
+
+#### Recommended next step
+Proceed into **Slice 3.3 — Tool-aware thread UX polish**, starting with scanability in tool-heavy threads.
+
+## Ticket 3.3.1 — Reduce repeated tool-panel chrome in tool-heavy threads
+### Goal
+Improve thread scanability by calming the presentation of common single-tool thread groups.
+
+### Why
+After 3.2.x, tool outcome semantics are clearer, but tool-heavy threads can still feel visually busier than they need to.
+
+The most obvious clutter point is repeated single-tool groups rendering as:
+- an outer tool panel shell
+- a `Tool Activity (1)` style header
+- an inner card
+
+That creates unnecessary dashboard-like chrome for the most common case.
+
+### Scope
+- reduce repeated header chrome for single-tool groups
+- make common single-tool groups feel more like inline work steps than nested dashboard cards
+- preserve stronger framing for multi-tool groups
+
+### Deliverable
+A calmer first-pass presentation for tool-heavy threads, especially when many single-tool groups are interleaved with messages.
+
+### Done when
+- single-tool groups avoid redundant section chrome
+- multi-tool groups still retain enough framing to stay understandable
+- tool-heavy threads are easier to scan at a glance
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-09)
+
+This ticket is now complete.
+
+#### What changed
+- single-tool thread groups now render in a compact mode
+- compact single-tool groups no longer render the repeated `Tool Activity (1)` header chrome
+- multi-tool groups still retain a dedicated panel header
+- tool entries now carry clearer visual left-rail state by outcome (`running`, `succeeded`, `failed`)
+- compact tool groups now read more like inline execution steps instead of stacked mini-dashboard cards
+
+#### Why this matters
+This is intentionally modest, but it improves the common case.
+
+In real threads, many tool groups are singletons.
+Flattening those groups reduces noise without hiding useful information.
+
+#### Validation status
+- `make typecheck` passes
+- `make build` should still be treated as authoritative on the active macOS development machine per `docs/DEVELOPMENT_CONSTRAINTS.md`
+
+#### Recommended next step
+Continue Slice 3.3 by reviewing whether consecutive tool groups and assistant follow-up text should be grouped more explicitly, or whether tool-entry density/spacing now needs a second pass after live usage.
+
+## Ticket 3.3.2 — Group tool activity and immediate assistant follow-up more explicitly
+### Goal
+Make the handoff from tool activity to assistant follow-up feel like one coherent thread step instead of adjacent unrelated blocks.
+
+### Why
+Even after flattening single-tool chrome, tool-heavy threads can still read as:
+- tool panel
+- gap
+- assistant reply
+
+when the reply is clearly the direct follow-up to that tool activity.
+
+That forces more visual parsing than necessary.
+
+### Scope
+- identify assistant replies that directly follow tool activity in the rendered thread
+- add a lightweight visual grouping treatment between tool panels and immediate assistant follow-up
+- preserve the existing transcript order and avoid a large thread data-model rewrite
+
+### Deliverable
+A clearer first-pass grouping treatment for tool activity and the assistant reply that immediately follows it.
+
+### Done when
+- assistant replies that immediately follow tool activity read as part of the same thread step
+- the implementation stays lightweight and transcript-order preserving
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-10)
+
+This ticket is now complete.
+
+#### What changed
+- `ChatThread.tsx` now marks tool-panel rows that are immediately followed by assistant output
+- assistant message rows now receive a lightweight `tool follow-up` state when they directly follow tool activity
+- streaming and thinking assistant states also participate in the same grouping treatment when they are the immediate continuation after tool work
+- the thread keeps the same underlying ordering, but the rendered presentation now makes the handoff clearer
+
+#### User-facing improvements landed
+- tool activity followed by assistant output now reads more like one execution step
+- the visual gap between tool work and assistant follow-up is reduced
+- assistant follow-up bubbles now get a subtle grouped treatment instead of looking fully detached from the tool activity above
+
+#### Why this is the right 3.3 follow-up
+This improves scanability without introducing a risky transcript rewrite or trying to over-summarize tool/message boundaries.
+
+It is a presentation-level grouping pass, which is exactly the right ambition for an early 3.3 slice.
+
+#### Validation status
+- `make typecheck` passes
+- `make build` should still be treated as authoritative on the active macOS development machine per `docs/DEVELOPMENT_CONSTRAINTS.md`
+
+#### Recommended next step
+If live usage still feels dense, the next 3.3 pass should focus on spacing and hierarchy inside multi-tool groups, not on broader state-model changes.
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:

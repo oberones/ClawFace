@@ -64,6 +64,12 @@ export function renderThreadStateCard(state: Exclude<ThreadState, { kind: "ready
 }
 
 export function ChatThread(props: ChatThreadProps) {
+  const firstMessageFollowsTools = props.toolBeforeFirst.length > 0 && props.messages[0]?.role === "assistant";
+  const trailingToolCount = props.messages.length > 0
+    ? (props.toolByMessageId.get(props.messages[props.messages.length - 1]!.id)?.length ?? 0)
+    : props.toolBeforeFirst.length;
+  const streamOrThinkingFollowsTools = trailingToolCount > 0;
+
   return (
     <div
       key={`main-${props.sessionKey ?? "none"}`}
@@ -80,31 +86,53 @@ export function ChatThread(props: ChatThreadProps) {
 
       {props.threadState.kind !== "ready" && props.messages.length === 0 && renderThreadStateCard(props.threadState)}
 
-      {props.showToolActivity && props.onRenderToolPanel(props.toolBeforeFirst, "tool-before-first")}
+      {props.showToolActivity && props.toolBeforeFirst.length > 0 && (
+        <div
+          className={`tool-panel-row${firstMessageFollowsTools || (!props.messages.length && (Boolean(props.streamText) || props.thinking)) ? " is-followed-by-assistant" : ""}`}
+        >
+          {props.onRenderToolPanel(props.toolBeforeFirst, "tool-before-first")}
+        </div>
+      )}
 
-      {props.messages.map((msg) => (
-        <React.Fragment key={msg.id}>
-          <MessageRow
-            message={msg}
-            showTimestamp={props.showMessageTimestamp}
-            timestampFontSize={props.timestampFontSize}
-            drawerPop={props.poppingMessageIdSet.has(msg.id)}
-            sessionFlyIn={props.sessionFlyInMessageIdSet.has(msg.id)}
-            onOpenImage={props.onOpenImage}
-            onResolveRemoteImage={props.onResolveRemoteImage}
-          />
-          {props.showToolActivity &&
-            props.onRenderToolPanel(props.toolByMessageId.get(msg.id) ?? [], `tool-after-${msg.id}`)}
-        </React.Fragment>
-      ))}
+      {props.messages.map((msg, index) => {
+        const previousMessage = index > 0 ? props.messages[index - 1] : null;
+        const previousToolCount = previousMessage ? (props.toolByMessageId.get(previousMessage.id)?.length ?? 0) : props.toolBeforeFirst.length;
+        const followsTools = msg.role === "assistant" && previousToolCount > 0;
+        const toolItemsAfter = props.toolByMessageId.get(msg.id) ?? [];
+        const nextMessage = index < props.messages.length - 1 ? props.messages[index + 1] : null;
+        const toolPanelFollowedByAssistant = toolItemsAfter.length > 0 && (
+          nextMessage?.role === "assistant" ||
+          (!nextMessage && (Boolean(props.streamText) || props.thinking))
+        );
+
+        return (
+          <React.Fragment key={msg.id}>
+            <MessageRow
+              message={msg}
+              showTimestamp={props.showMessageTimestamp}
+              timestampFontSize={props.timestampFontSize}
+              drawerPop={props.poppingMessageIdSet.has(msg.id)}
+              sessionFlyIn={props.sessionFlyInMessageIdSet.has(msg.id)}
+              followupType={followsTools ? "tool" : undefined}
+              onOpenImage={props.onOpenImage}
+              onResolveRemoteImage={props.onResolveRemoteImage}
+            />
+            {props.showToolActivity && toolItemsAfter.length > 0 && (
+              <div className={`tool-panel-row${toolPanelFollowedByAssistant ? " is-followed-by-assistant" : ""}`}>
+                {props.onRenderToolPanel(toolItemsAfter, `tool-after-${msg.id}`)}
+              </div>
+            )}
+          </React.Fragment>
+        );
+      })}
 
       {props.streamText && (
         <div
-          className={`message-row assistant ${props.streamPopActive ? "drawer-pop" : ""} ${props.sessionFlyInStream ? "session-fly-in" : ""}`}
+          className={`message-row assistant ${streamOrThinkingFollowsTools ? "is-tool-followup" : ""} ${props.streamPopActive ? "drawer-pop" : ""} ${props.sessionFlyInStream ? "session-fly-in" : ""}`}
           data-stream-row="1"
           style={props.streamMotionStyle}
         >
-          <article className="message-bubble assistant stream-bubble">
+          <article className={`message-bubble assistant ${streamOrThinkingFollowsTools ? "is-tool-followup" : ""} stream-bubble`}>
             <CopyButton text={props.streamText || ""} />
             <div className="message-role">Assistant</div>
             <div
@@ -117,8 +145,8 @@ export function ChatThread(props: ChatThreadProps) {
       )}
 
       {!props.streamText && props.thinking && (
-        <div className="message-row assistant">
-          <article className="message-bubble assistant thinking-indicator">
+        <div className={`message-row assistant ${streamOrThinkingFollowsTools ? "is-tool-followup" : ""}`}>
+          <article className={`message-bubble assistant ${streamOrThinkingFollowsTools ? "is-tool-followup" : ""} thinking-indicator`}>
             <span className="thinking-label">Thinking</span>
             <span className="thinking-dots" aria-hidden="true">
               <span className="dot" />
