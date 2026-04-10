@@ -109,6 +109,18 @@ This version should be treated as the explicit starting point before deeper impl
 - This release is primarily a **project-baseline declaration** and planning checkpoint
 - Future releases should track actual implementation progress against Milestone 1 and later roadmap phases
 
+## v0.4.0 (2026-04-09)
+
+### Feat
+
+- multi tool panels derive group level summary
+- improve tool activity and output
+
+### Fix
+
+- address PR feedback
+- address PR feedback
+
 ## v0.3.0 (2026-04-09)
 
 ### Feat

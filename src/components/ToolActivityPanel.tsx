@@ -92,11 +92,12 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
   }
 
   const isSingleToolPanel = props.tools.length === 1;
+  const isDenseMultiToolPanel = props.tools.length >= 3;
   const groupSummary = isSingleToolPanel ? null : summarizeToolGroup(props.tools);
 
   return (
     <section
-      className={`tool-panel ${isSingleToolPanel ? "is-single" : `is-multi is-${groupSummary?.tone}-group`} ${props.panelFlyIn ? "session-fly-in" : ""}`}
+      className={`tool-panel ${isSingleToolPanel ? "is-single" : `is-multi is-${groupSummary?.tone}-group${isDenseMultiToolPanel ? " is-dense" : ""}`} ${props.panelFlyIn ? "session-fly-in" : ""}`}
       data-tool-panel-key={props.panelKey}
       style={props.panelMotionStyle}
     >
@@ -123,6 +124,7 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
         {props.tools.map((tool) => {
           const expanded = props.snapshotMode ? false : (props.expandedById[tool.id] ?? false);
           const summaryInfo = summarizeTool(tool);
+          const showCollapsedSummary = !expanded && Boolean(summaryInfo.summary) && (!isDenseMultiToolPanel || summaryInfo.phase !== "succeeded");
           const drawerPop = !props.snapshotMode && props.poppingToolIdSet.has(tool.id);
           const sessionFlyIn = !props.snapshotMode && props.sessionFlyInToolIdSet.has(tool.id);
           const motionStyle = props.buildMotionVars(tool.id);
@@ -153,7 +155,7 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
                     {summaryInfo.statusLabel}
                   </span>
                 </span>
-                {!expanded && summaryInfo.summary && (
+                {showCollapsedSummary && (
                   <span className="tool-summary" style={{ fontSize: props.toolMinorFontSize }}>
                     {summaryInfo.summaryLabel ? `${summaryInfo.summaryLabel}: ` : ""}{summaryInfo.summary}
                   </span>
