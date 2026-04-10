@@ -52,8 +52,11 @@ Goal:
 
 Questions:
 - is current-session status obvious but calm?
+yes
 - does the header feel informative without stealing attention?
+yes
 - do inactive tool-heavy threads still read cleanly?
+yes
 
 ### 2. Session loading and switching
 Goal:
@@ -61,8 +64,11 @@ Goal:
 
 Questions:
 - is `Loading session` vs `Switching session` easy to distinguish?
+yes
 - does the shell make it obvious which session is active now?
+yes
 - do sidebar unread/working states remain believable while switching?
+yes
 
 ### 3. Background session activity
 Goal:
@@ -70,8 +76,11 @@ Goal:
 
 Questions:
 - are `Current`, `Working`, and `New activity` easy to understand at a glance?
+yes
 - does unread activity win over working when both are true in a way that feels correct?
+yes
 - does the sidebar feel too busy when multiple sessions are active?
+no
 
 ### 4. Simple single-tool success
 Goal:
@@ -79,8 +88,11 @@ Goal:
 
 Questions:
 - does the flattened single-tool presentation feel like a natural thread step?
+yes
 - is the tool-to-assistant handoff visually clear?
+yes
 - does the row give enough information without expansion?
+yes
 
 ### 5. Single-tool failure
 Goal:
@@ -88,8 +100,11 @@ Goal:
 
 Questions:
 - does the failed tool read as failed before expansion?
+yes
 - is the error copy understandable?
+yes
 - does the relationship between tool failure and any system error message feel redundant, complementary, or confusing?
+yes
 
 ### 6. Multi-tool success burst
 Goal:
@@ -97,8 +112,11 @@ Goal:
 
 Questions:
 - does the multi-tool header summarize the group well enough?
+yes
 - do completed rows feel appropriately quieter?
+yes
 - is there still too much repeated summary text?
+no
 
 ### 7. Multi-tool mixed outcome burst
 Goal:
@@ -106,8 +124,11 @@ Goal:
 
 Questions:
 - do failed/running rows stand out first?
+yes
 - is the group-level tone accurate and helpful?
+yes
 - do succeeded rows still provide enough context after compaction?
+yes
 
 ### 8. Tool activity followed by streaming assistant reply
 Goal:
@@ -115,8 +136,11 @@ Goal:
 
 Questions:
 - does the assistant follow-up feel attached to the tool work above it?
+yes
 - does the grouping treatment help or feel decorative?
+yes
 - does streaming after tools still read cleanly while text is changing?
+yes
 
 ### 9. Lifecycle/run error attached to tool work
 Goal:
@@ -124,8 +148,11 @@ Goal:
 
 Questions:
 - when a run fails after or during tool activity, does the relevant tool card now tell the truth?
+yes
 - is the tool card enough on its own, or is the separate system error still doing most of the work?
+yes
 - does anything feel incorrectly attributed to the wrong tool?
+no
 
 ## What to capture
 
