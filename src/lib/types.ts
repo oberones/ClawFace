@@ -120,8 +120,11 @@ export type ToolItem = {
   id: string;
   name: string;
   status: "start" | "update" | "result";
+  outcome: "running" | "succeeded" | "failed";
+  runId?: string;
   args?: unknown;
   output?: string;
+  errorMessage?: string;
   startedAt: number;
   updatedAt: number;
 };

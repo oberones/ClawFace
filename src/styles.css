@@ -793,6 +793,22 @@ body::before {
   animation: fade-up calc(260ms * var(--claw-animation-duration-scale)) ease;
 }
 
+.tool-panel-row {
+  position: relative;
+}
+
+.tool-panel-row.is-followed-by-assistant::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  bottom: -12px;
+  width: 2px;
+  height: 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--claw-accent) 20%, var(--claw-border));
+  pointer-events: none;
+}
+
 .message-row.user {
   justify-content: flex-end;
 }
@@ -822,6 +838,18 @@ body::before {
 .message-bubble.assistant {
   background: var(--claw-assistant-bubble);
   border-color: color-mix(in srgb, var(--claw-border) 78%, white);
+}
+
+.message-row.assistant.is-tool-followup {
+  margin-top: -10px;
+}
+
+.message-bubble.assistant.is-tool-followup {
+  border-top-left-radius: calc(var(--claw-chat-bubble-radius) - 8px);
+  box-shadow:
+    0 12px 24px rgba(34, 54, 84, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    inset 3px 0 0 color-mix(in srgb, var(--claw-accent) 18%, transparent);
 }
 
 .message-bubble.system {
@@ -1276,6 +1304,12 @@ body::before {
   overflow: hidden;
 }
 
+.tool-panel.is-single {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
 .tool-panel-header {
   display: flex;
   justify-content: space-between;
@@ -1297,6 +1331,10 @@ body::before {
   min-width: 0;
 }
 
+.tool-panel.is-single .tool-grid {
+  gap: 0;
+}
+
 .tool-entry {
   max-width: 100%;
   min-width: 0;
@@ -1306,6 +1344,25 @@ body::before {
   border-radius: 13px;
   background: #fff;
   padding: 9px;
+}
+
+.tool-panel.is-single .tool-entry {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(250, 252, 255, 0.86);
+}
+
+.tool-entry.is-running {
+  border-left: 3px solid #f59e0b;
+}
+
+.tool-entry.is-succeeded {
+  border-left: 3px solid #16a34a;
+}
+
+.tool-entry.is-failed {
+  border-left: 3px solid #ef4444;
+  background: #fff7f7;
 }
 
 .tool-entry-toggle {
@@ -1401,6 +1458,12 @@ body::before {
   word-break: break-word;
   overflow: auto;
   color: #2a3f55;
+}
+
+.tool-pre-error {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
 }
 
 .stream-bubble {

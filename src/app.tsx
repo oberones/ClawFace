@@ -1391,8 +1391,11 @@ type ToolUpdate = {
   id: string;
   name?: string;
   status?: ToolItem["status"];
+  outcome?: ToolItem["outcome"];
+  runId?: string;
   args?: unknown;
   output?: string;
+  errorMessage?: string;
   startedAt?: number;
   updatedAt?: number;
 };
@@ -1946,29 +1949,172 @@ function filterConfiguredModels(
 }
 
 function normalizeToolStatus(raw: string | null | undefined): ToolItem["status"] {
-  const value = raw?.toLowerCase() ?? "";
-  if (
-    value.includes("result") ||
-    value.includes("done") ||
-    value.includes("end") ||
-    value.includes("error") ||
-    value.includes("fail") ||
-    value.includes("ok") ||
-    value.includes("success") ||
-    value.includes("finish") ||
-    value.includes("complete")
-  ) {
+  if (hasAnyStateToken(raw, [
+    "result",
+    "done",
+    "end",
+    "ended",
+    "error",
+    "fail",
+    "failed",
+    "failure",
+    "ok",
+    "success",
+    "succeeded",
+    "successful",
+    "finish",
+    "finished",
+    "complete",
+    "completed",
+  ])) {
     return "result";
   }
-  if (
-    value.includes("start") ||
-    value.includes("begin") ||
-    value.includes("call") ||
-    value.includes("invoke")
-  ) {
+  if (hasAnyStateToken(raw, ["start", "started", "begin", "began", "call", "called", "invoke", "invoked"])) {
     return "start";
   }
   return "update";
+}
+
+function normalizeToolOutcome(raw: string | null | undefined): ToolItem["outcome"] | null {
+  if (!raw?.trim()) {
+    return null;
+  }
+  if (hasAnyStateToken(raw, [
+    "error",
+    "errors",
+    "fail",
+    "failed",
+    "failure",
+    "denied",
+    "timeout",
+    "blocked",
+    "abort",
+    "aborted",
+    "cancelled",
+    "canceled",
+  ])) {
+    return "failed";
+  }
+  if (hasAnyStateToken(raw, [
+    "result",
+    "done",
+    "end",
+    "ended",
+    "ok",
+    "success",
+    "succeeded",
+    "successful",
+    "finish",
+    "finished",
+    "complete",
+    "completed",
+  ])) {
+    return "succeeded";
+  }
+  if (hasAnyStateToken(raw, [
+    "start",
+    "started",
+    "begin",
+    "began",
+    "call",
+    "called",
+    "invoke",
+    "invoked",
+    "update",
+    "updated",
+    "delta",
+    "progress",
+    "running",
+    "pending",
+  ])) {
+    return "running";
+  }
+  return null;
+}
+
+function tokenizeStateMarkers(raw: string | null | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function hasAnyStateToken(raw: string | null | undefined, candidates: string[]): boolean {
+  const tokens = tokenizeStateMarkers(raw);
+  if (tokens.length === 0) {
+    return false;
+  }
+  const tokenSet = new Set(tokens);
+  return candidates.some((candidate) => tokenSet.has(candidate));
+}
+
+function looksLikeToolFailureText(value: string | null | undefined): boolean {
+  const normalized = value?.toLowerCase() ?? "";
+  return /\b(error|failed|exception|denied|not found|timeout)\b/.test(normalized);
+}
+
+function extractToolErrorMessage(source: Record<string, unknown>): string | null {
+  const direct =
+    getString(source, ["errorMessage", "error_message", "failureMessage", "failure_message", "reason"]) ??
+    (typeof source.error === "string" && source.error.trim() ? source.error : null);
+  if (direct) {
+    return direct;
+  }
+  const nestedPaths = [
+    ["error"],
+    ["result", "error"],
+    ["payload", "error"],
+    ["data", "error"],
+    ["response", "error"],
+  ];
+  for (const path of nestedPaths) {
+    const nested = getNested(source, path);
+    if (typeof nested === "string" && nested.trim()) {
+      return nested;
+    }
+    if (isRecord(nested)) {
+      const nestedMessage = getString(nested, ["message", "error", "reason", "detail", "type"]);
+      if (nestedMessage) {
+        return nestedMessage;
+      }
+    }
+  }
+  return null;
+}
+
+function resolveToolOutcome(params: {
+  candidate: Record<string, unknown>;
+  rawState?: string | null;
+  coarseStatus: ToolItem["status"];
+  output?: string;
+}): Pick<ToolUpdate, "outcome" | "errorMessage"> {
+  const { candidate, rawState, coarseStatus, output } = params;
+  const explicitErrorMessage = extractToolErrorMessage(candidate);
+  const explicitFailure =
+    getBoolean(candidate, ["isError", "is_error", "failed", "isFailed", "hasError"]) === true;
+  const explicitSuccess =
+    getBoolean(candidate, ["ok", "success", "succeeded", "isSuccess", "isSuccessful"]) === true;
+  const normalizedOutcome = normalizeToolOutcome(rawState);
+  if (explicitErrorMessage || explicitFailure || normalizedOutcome === "failed") {
+    return {
+      outcome: "failed",
+      errorMessage: explicitErrorMessage ?? undefined,
+    };
+  }
+  if (explicitSuccess || normalizedOutcome === "succeeded") {
+    return { outcome: "succeeded" };
+  }
+  if (coarseStatus === "result") {
+    if (looksLikeToolFailureText(output)) {
+      return { outcome: "failed" };
+    }
+    return { outcome: "succeeded" };
+  }
+  return { outcome: "running" };
 }
 
 function pickToolCallId(source: Record<string, unknown>): string | null {
@@ -2014,12 +2160,16 @@ function mergeToolItems(prev: ToolItem[], updates: ToolUpdate[]): ToolItem[] {
     const existing = map.get(update.id);
     const status = update.status ?? existing?.status ?? "update";
     const normalizedName = stripToolLabel(update.name ?? existing?.name ?? "tool") || "tool";
+    const outcome = update.outcome ?? existing?.outcome ?? (status === "result" ? "succeeded" : "running");
     const next: ToolItem = {
       id: update.id,
       name: normalizedName,
       status,
+      outcome,
+      runId: update.runId ?? existing?.runId,
       args: update.args ?? existing?.args,
       output: update.output ?? existing?.output,
+      errorMessage: update.errorMessage ?? existing?.errorMessage,
       startedAt: update.startedAt ?? existing?.startedAt ?? Date.now(),
       updatedAt: update.updatedAt ?? Date.now(),
     };
@@ -2108,20 +2258,28 @@ function dedupeToolUpdates(updates: ToolUpdate[]): ToolUpdate[] {
     map.set(update.id, {
       ...prev,
       ...update,
+      runId: update.runId ?? prev?.runId,
       args: update.args ?? prev?.args,
       output: update.output ?? prev?.output,
       status: update.status ?? prev?.status ?? "update",
+      outcome: update.outcome ?? prev?.outcome ?? ((update.status ?? prev?.status ?? "update") === "result" ? "succeeded" : "running"),
+      errorMessage: update.errorMessage ?? prev?.errorMessage,
     });
   }
   return [...map.values()];
 }
 
-function extractToolUpdatesFromAgent(payload: unknown): ToolUpdate[] {
+function extractToolUpdatesFromAgent(payload: unknown, fallbackRunId?: string | null): ToolUpdate[] {
   if (!isRecord(payload)) {
     return [];
   }
   const ts = typeof payload.ts === "number" ? payload.ts : Date.now();
   const root = isRecord(payload.data) ? payload.data : payload;
+  const payloadRunId =
+    getString(payload, ["runId", "run_id"]) ??
+    (isRecord(payload.data) ? getString(payload.data, ["runId", "run_id"]) : null) ??
+    fallbackRunId ??
+    undefined;
   const rootStream =
     getString(payload, ["stream", "channel", "topic"]) ??
     (isRecord(payload.data) ? getString(payload.data, ["stream", "channel", "topic"]) : null);
@@ -2156,12 +2314,23 @@ function extractToolUpdatesFromAgent(payload: unknown): ToolUpdate[] {
     const status = normalizeToolStatus(
       getString(candidate, ["phase", "status", "state", "event", "type"]),
     );
+    const coarseStatus = outputValue !== undefined && status === "start" ? "update" : status;
+    const normalizedOutput = outputValue !== undefined ? formatToolOutput(outputValue) : undefined;
+    const outcome = resolveToolOutcome({
+      candidate,
+      rawState: getString(candidate, ["phase", "status", "state", "event", "type"]),
+      coarseStatus,
+      output: normalizedOutput,
+    });
     updates.push({
       id,
       name: name ?? "tool",
-      status: outputValue !== undefined && status === "start" ? "update" : status,
+      status: coarseStatus,
+      outcome: outcome.outcome,
+      runId: payloadRunId,
       args,
-      output: outputValue !== undefined ? formatToolOutput(outputValue) : undefined,
+      output: normalizedOutput,
+      errorMessage: outcome.errorMessage,
       startedAt: ts,
       updatedAt: Date.now(),
     });
@@ -2169,7 +2338,7 @@ function extractToolUpdatesFromAgent(payload: unknown): ToolUpdate[] {
   return dedupeToolUpdates(updates);
 }
 
-function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: number): ToolUpdate[] {
+function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: number, fallbackRunId?: string | null): ToolUpdate[] {
   if (!isRecord(message)) {
     return [];
   }
@@ -2177,6 +2346,7 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
     typeof message.timestamp === "number" && Number.isFinite(message.timestamp)
       ? message.timestamp
       : fallbackTimestamp ?? Date.now();
+  const runId = getString(message, ["runId", "run_id"]) ?? fallbackRunId ?? undefined;
   const updates: ToolUpdate[] = [];
   const content = message.content;
   if (Array.isArray(content)) {
@@ -2192,6 +2362,8 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
           id,
           name: getString(part, ["name", "toolName", "tool_name", "tool"]) ?? "tool",
           status: "start",
+          outcome: "running",
+          runId,
           args: part.input ?? part.args ?? part.arguments,
           startedAt: ts,
           updatedAt: ts,
@@ -2204,11 +2376,21 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
         type === "function_result"
       ) {
         const id = pickToolCallId(part) ?? `tool:content:${ts}:${i}`;
+        const output = formatToolOutput(part.content ?? part.result ?? part.output);
+        const outcome = resolveToolOutcome({
+          candidate: part,
+          rawState: getString(part, ["phase", "status", "state", "event", "type"]),
+          coarseStatus: "result",
+          output,
+        });
         updates.push({
           id,
           name: getString(part, ["name", "toolName", "tool_name", "tool"]) ?? "tool",
           status: "result",
-          output: formatToolOutput(part.content ?? part.result ?? part.output),
+          outcome: outcome.outcome,
+          runId,
+          output,
+          errorMessage: outcome.errorMessage,
           startedAt: ts,
           updatedAt: ts,
         });
@@ -2229,6 +2411,8 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
         id,
         name,
         status: "start",
+        outcome: "running",
+        runId,
         args: rawCall.arguments ?? fn.arguments,
         startedAt: ts,
         updatedAt: ts,
@@ -2238,11 +2422,21 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
   const role = getString(message, ["role"])?.toLowerCase() ?? "";
   if (role === "tool" || role === "toolresult" || role === "tool_result" || role === "function") {
     const id = pickToolCallId(message) ?? `tool:role:${ts}`;
+    const output = extractText(message) ?? formatToolOutput(message.result ?? message.output);
+    const outcome = resolveToolOutcome({
+      candidate: message,
+      rawState: getString(message, ["phase", "status", "state", "event", "type"]),
+      coarseStatus: "result",
+      output,
+    });
     updates.push({
       id,
       name: getString(message, ["name", "toolName", "tool_name", "tool"]) ?? "tool",
       status: "result",
-      output: extractText(message) ?? formatToolOutput(message.result ?? message.output),
+      outcome: outcome.outcome,
+      runId,
+      output,
+      errorMessage: outcome.errorMessage,
       startedAt: ts,
       updatedAt: ts,
     });
@@ -2259,11 +2453,46 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
       id,
       name: getString(message, ["name", "toolName", "tool_name", "tool"]) ?? "tool",
       status: "update",
+      outcome: "running",
+      runId,
       output: extractText(message) ?? undefined,
       startedAt: ts,
       updatedAt: ts,
     },
   ];
+}
+
+function attachLifecycleErrorToToolItems(
+  items: ToolItem[],
+  params: { runId?: string | null; errorMessage?: string | null },
+): ToolItem[] {
+  const runId = params.runId?.trim();
+  const errorMessage = params.errorMessage?.trim();
+  if (!runId || !errorMessage || items.length === 0) {
+    return items;
+  }
+  let targetIndex = -1;
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    const item = items[i];
+    if (!item || item.runId !== runId || item.outcome !== "running") {
+      continue;
+    }
+    targetIndex = i;
+    break;
+  }
+  if (targetIndex < 0) {
+    return items;
+  }
+  const target = items[targetIndex]!;
+  const next = [...items];
+  next[targetIndex] = {
+    ...target,
+    status: "result",
+    outcome: "failed",
+    errorMessage,
+    updatedAt: Date.now(),
+  };
+  return next;
 }
 
 type NormalizedChatEvent = {
@@ -2373,17 +2602,16 @@ function sessionKeysMatch(a: string | null | undefined, b: string | null | undef
 }
 
 function normalizeLifecyclePhase(raw: string | null | undefined): "start" | "end" | "error" | null {
-  const value = raw?.trim().toLowerCase() ?? "";
-  if (!value) {
+  if (!raw?.trim()) {
     return null;
   }
-  if (value.includes("error") || value.includes("fail")) {
+  if (hasAnyStateToken(raw, ["error", "fail", "failed", "failure"])) {
     return "error";
   }
-  if (value.includes("end") || value.includes("done") || value.includes("finish") || value.includes("complete")) {
+  if (hasAnyStateToken(raw, ["end", "ended", "done", "finish", "finished", "complete", "completed"])) {
     return "end";
   }
-  if (value.includes("start") || value.includes("begin")) {
+  if (hasAnyStateToken(raw, ["start", "started", "begin", "began"])) {
     return "start";
   }
   return null;
@@ -4028,7 +4256,25 @@ export default function App() {
     refreshSessionsWithFollowUp(client);
   };
 
+  const attachLifecycleErrorToActiveTools = useCallback((params: { runId?: string | null; errorMessage?: string | null }) => {
+    if (!params.runId || !params.errorMessage) {
+      return;
+    }
+    setToolItems((prev) => attachLifecycleErrorToToolItems(prev, params));
+  }, []);
+
+  const attachLifecycleErrorToCachedTools = useCallback((sessionKey: string, params: { runId?: string | null; errorMessage?: string | null }) => {
+    if (!sessionKey || !params.runId || !params.errorMessage) {
+      return;
+    }
+    updateCacheField(sessionKey, (cached) => ({
+      ...cached,
+      toolItems: attachLifecycleErrorToToolItems(cached.toolItems, params),
+    }));
+  }, [updateCacheField]);
+
   const scheduleAgentFinalizeFallback = (params: {
+    sessionKey?: string | null;
     runId: string | null | undefined;
     phase: "end" | "error";
     errorMessage?: string | null;
@@ -4081,6 +4327,13 @@ export default function App() {
       const activeSessionKey = selectedSessionRef.current;
       if (activeSessionKey) {
         updateSessionActivity(activeSessionKey, { working: false, unread: false });
+      }
+      if (params.errorMessage) {
+        if (params.sessionKey && activeSessionKey && sessionKeysMatch(params.sessionKey, activeSessionKey)) {
+          attachLifecycleErrorToActiveTools({ runId, errorMessage: params.errorMessage });
+        } else if (params.sessionKey) {
+          attachLifecycleErrorToCachedTools(params.sessionKey, { runId, errorMessage: params.errorMessage });
+        }
       }
       if (params.errorMessage) {
         pushSystemMessage(`Error: ${params.errorMessage}`);
@@ -5448,7 +5701,7 @@ export default function App() {
       if (!activeSessionKey || !(activeRun && parsed.runId && parsed.runId === activeRun)) {
         const targetKey = parsed.sessionKey!;
         if (parsed.state === "delta") {
-          const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message);
+          const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
           if (deltaToolUpdates.length > 0) {
             updateCacheField(targetKey, (cached) => ({
               ...cached,
@@ -5472,7 +5725,7 @@ export default function App() {
 
         if (parsed.state === "final") {
           clearAgentFinalizeTimer(parsed.runId);
-          const toolUpdates = extractToolUpdatesFromMessage(parsed.message);
+          const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
           if (toolUpdates.length > 0) {
             updateCacheField(targetKey, (cached) => ({
               ...cached,
@@ -5513,7 +5766,15 @@ export default function App() {
         if (parsed.state === "aborted" || parsed.state === "error") {
           clearAgentFinalizeTimer(parsed.runId);
           clearCachedStreamingState(targetKey);
-          updateSessionActivity(targetKey, { working: false });
+          if (parsed.state === "error") {
+            attachLifecycleErrorToCachedTools(targetKey, {
+              runId: parsed.runId,
+              errorMessage: parsed.errorMessage,
+            });
+            updateSessionActivity(targetKey, { working: false, unread: true });
+          } else {
+            updateSessionActivity(targetKey, { working: false });
+          }
           return;
         }
         return;
@@ -5527,7 +5788,7 @@ export default function App() {
         chatRunRef.current = parsed.runId;
         setChatRunId(parsed.runId);
       }
-      const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message);
+      const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
       if (deltaToolUpdates.length > 0) {
         setToolItems((prev) => mergeToolItems(prev, deltaToolUpdates));
         if (activeSessionKey) {
@@ -5566,7 +5827,7 @@ export default function App() {
         void reloadActiveSessionHistory();
         return;
       }
-      const toolUpdates = extractToolUpdatesFromMessage(parsed.message);
+      const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
       if (toolUpdates.length > 0) {
         setToolItems((prev) => mergeToolItems(prev, toolUpdates));
       }
@@ -5614,6 +5875,10 @@ export default function App() {
     if (parsed.state === "error") {
       clearAgentFinalizeTimer(parsed.runId);
       clearActiveStreamingState();
+      attachLifecycleErrorToActiveTools({
+        runId: parsed.runId,
+        errorMessage: parsed.errorMessage,
+      });
       if (activeSessionKey) {
         updateSessionActivity(activeSessionKey, { working: false, unread: false });
       }
@@ -5641,7 +5906,7 @@ export default function App() {
       const activeRun = chatRunRef.current;
       if (!activeSessionKey || !(activeRun && runId && runId === activeRun)) {
         const targetKey = sessionKey!;
-        const updates = extractToolUpdatesFromAgent(payload);
+        const updates = extractToolUpdatesFromAgent(payload, runId);
         if (updates.length > 0) {
           updateCacheField(targetKey, (cached) => ({
             ...cached,
@@ -5679,13 +5944,23 @@ export default function App() {
           );
           if (phase === "end" || phase === "error") {
             clearAgentFinalizeTimer(runId);
-            updateSessionActivity(targetKey, { working: false });
+            if (phase === "error") {
+              attachLifecycleErrorToCachedTools(targetKey, {
+                runId,
+                errorMessage:
+                  getString(payload.data, ["errorMessage", "error", "reason"]) ??
+                  getString(payload, ["errorMessage", "error"]),
+              });
+              updateSessionActivity(targetKey, { working: false, unread: true });
+            } else {
+              updateSessionActivity(targetKey, { working: false });
+            }
           }
         }
         return;
       }
     }
-    const updates = extractToolUpdatesFromAgent(payload);
+    const updates = extractToolUpdatesFromAgent(payload, runId);
     if (updates.length > 0) {
       setToolItems((prev) => mergeToolItems(prev, updates));
       if (activeSessionKey) {
@@ -5720,15 +5995,20 @@ export default function App() {
         getString(payload.data, ["phase", "status", "state", "event", "type"]),
       );
       if (phase === "end" || phase === "error") {
+        const lifecycleErrorMessage =
+          getString(payload.data, ["errorMessage", "error", "reason"]) ??
+          getString(payload, ["errorMessage", "error"]);
+        if (phase === "error") {
+          attachLifecycleErrorToActiveTools({ runId, errorMessage: lifecycleErrorMessage });
+        }
         if (activeSessionKey) {
           updateSessionActivity(activeSessionKey, { working: false, unread: false });
         }
         scheduleAgentFinalizeFallback({
+          sessionKey: activeSessionKey,
           runId,
           phase,
-          errorMessage:
-            getString(payload.data, ["errorMessage", "error", "reason"]) ??
-            getString(payload, ["errorMessage", "error"]),
+          errorMessage: lifecycleErrorMessage,
         });
       }
     }
