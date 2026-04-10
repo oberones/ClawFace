@@ -2785,7 +2785,7 @@ move product meaning closer to state ownership, not into ad hoc renderer heurist
 
 #### Recommended first implementation slice
 
-### Ticket 3.2.2 — Introduce explicit tool outcome and clearer result/failure summaries
+### Recommended slice: explicit tool outcome and clearer result/failure summaries
 
 ##### Goal
 Make tool results and failures legible without requiring the user to parse raw output blobs or infer failure from stray words.

@@ -5,5 +5,5 @@
 * support for iphone and android apps
 * support for mac, windows, and linux
 * images should show in chat if they don't already
-* dedicated section frow browsing generated media
+* dedicated section for browsing generated media
 

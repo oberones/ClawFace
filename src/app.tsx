@@ -1949,70 +1949,107 @@ function filterConfiguredModels(
 }
 
 function normalizeToolStatus(raw: string | null | undefined): ToolItem["status"] {
-  const value = raw?.toLowerCase() ?? "";
-  if (
-    value.includes("result") ||
-    value.includes("done") ||
-    value.includes("end") ||
-    value.includes("error") ||
-    value.includes("fail") ||
-    value.includes("ok") ||
-    value.includes("success") ||
-    value.includes("finish") ||
-    value.includes("complete")
-  ) {
+  if (hasAnyStateToken(raw, [
+    "result",
+    "done",
+    "end",
+    "ended",
+    "error",
+    "fail",
+    "failed",
+    "failure",
+    "ok",
+    "success",
+    "succeeded",
+    "successful",
+    "finish",
+    "finished",
+    "complete",
+    "completed",
+  ])) {
     return "result";
   }
-  if (
-    value.includes("start") ||
-    value.includes("begin") ||
-    value.includes("call") ||
-    value.includes("invoke")
-  ) {
+  if (hasAnyStateToken(raw, ["start", "started", "begin", "began", "call", "called", "invoke", "invoked"])) {
     return "start";
   }
   return "update";
 }
 
 function normalizeToolOutcome(raw: string | null | undefined): ToolItem["outcome"] | null {
-  const value = raw?.toLowerCase() ?? "";
-  if (!value) {
+  if (!raw?.trim()) {
     return null;
   }
-  if (
-    value.includes("error") ||
-    value.includes("fail") ||
-    value.includes("denied") ||
-    value.includes("timeout") ||
-    value.includes("blocked") ||
-    value.includes("abort")
-  ) {
+  if (hasAnyStateToken(raw, [
+    "error",
+    "errors",
+    "fail",
+    "failed",
+    "failure",
+    "denied",
+    "timeout",
+    "blocked",
+    "abort",
+    "aborted",
+    "cancelled",
+    "canceled",
+  ])) {
     return "failed";
   }
-  if (
-    value.includes("result") ||
-    value.includes("done") ||
-    value.includes("end") ||
-    value.includes("ok") ||
-    value.includes("success") ||
-    value.includes("finish") ||
-    value.includes("complete")
-  ) {
+  if (hasAnyStateToken(raw, [
+    "result",
+    "done",
+    "end",
+    "ended",
+    "ok",
+    "success",
+    "succeeded",
+    "successful",
+    "finish",
+    "finished",
+    "complete",
+    "completed",
+  ])) {
     return "succeeded";
   }
-  if (
-    value.includes("start") ||
-    value.includes("begin") ||
-    value.includes("call") ||
-    value.includes("invoke") ||
-    value.includes("update") ||
-    value.includes("delta") ||
-    value.includes("progress") ||
-    value.includes("running")
-  ) {
+  if (hasAnyStateToken(raw, [
+    "start",
+    "started",
+    "begin",
+    "began",
+    "call",
+    "called",
+    "invoke",
+    "invoked",
+    "update",
+    "updated",
+    "delta",
+    "progress",
+    "running",
+    "pending",
+  ])) {
     return "running";
   }
   return null;
+}
+
+function tokenizeStateMarkers(raw: string | null | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function hasAnyStateToken(raw: string | null | undefined, candidates: string[]): boolean {
+  const tokens = tokenizeStateMarkers(raw);
+  if (tokens.length === 0) {
+    return false;
+  }
+  const tokenSet = new Set(tokens);
+  return candidates.some((candidate) => tokenSet.has(candidate));
 }
 
 function looksLikeToolFailureText(value: string | null | undefined): boolean {
@@ -2565,17 +2602,16 @@ function sessionKeysMatch(a: string | null | undefined, b: string | null | undef
 }
 
 function normalizeLifecyclePhase(raw: string | null | undefined): "start" | "end" | "error" | null {
-  const value = raw?.trim().toLowerCase() ?? "";
-  if (!value) {
+  if (!raw?.trim()) {
     return null;
   }
-  if (value.includes("error") || value.includes("fail")) {
+  if (hasAnyStateToken(raw, ["error", "fail", "failed", "failure"])) {
     return "error";
   }
-  if (value.includes("end") || value.includes("done") || value.includes("finish") || value.includes("complete")) {
+  if (hasAnyStateToken(raw, ["end", "ended", "done", "finish", "finished", "complete", "completed"])) {
     return "end";
   }
-  if (value.includes("start") || value.includes("begin")) {
+  if (hasAnyStateToken(raw, ["start", "started", "begin", "began"])) {
     return "start";
   }
   return null;
