@@ -3096,6 +3096,63 @@ It is a hierarchy pass, not a behavioral rewrite.
 #### Recommended next step
 If we keep going in 3.3, the next pass should come from real usage review, probably around whether collapsed summaries themselves are still too verbose in dense tool bursts.
 
+## Ticket 3.3.4 — Quiet completed summaries during dense tool bursts
+### Goal
+Reduce visual overload in dense multi-tool groups by making already-completed rows less verbose when the group is large.
+
+### Why
+After the earlier 3.3 work, dense multi-tool bursts can still feel noisy because every collapsed row competes for equal attention.
+
+In practice, the user usually needs the most emphasis on:
+- running work
+- failed work
+- anything that still needs attention
+
+Completed rows should remain visible, but they do not need the same summary weight in a dense burst.
+
+### Scope
+- identify dense multi-tool groups
+- keep failures and running rows richly summarized
+- make succeeded rows more compact in dense multi-tool groups
+- preserve expand-for-debug behavior and chronology
+
+### Deliverable
+A calmer dense-burst presentation where the most actionable tool rows stand out first.
+
+### Done when
+- dense multi-tool groups feel less verbose
+- succeeded rows become more compact without disappearing
+- failed/running rows remain easy to scan
+- `make typecheck` and `make build` pass for the slice
+
+### Implementation notes (2026-04-10)
+
+This ticket is now complete.
+
+#### What changed
+- multi-tool groups with higher row counts now enter a denser presentation mode
+- in dense multi-tool groups, collapsed summaries remain visible for:
+  - running rows
+  - failed rows
+- succeeded rows become more compact in dense groups, reducing repeated low-value summary text
+- dense multi-tool groups also get slightly tighter row spacing and lighter succeeded-row emphasis
+
+#### User-facing improvements landed
+- dense tool bursts now direct attention more clearly toward what is still active or broken
+- completed rows remain visible and expandable, but no longer dominate the scan path with repetitive summary copy
+
+#### Why this is the right next 3.3 slice
+This improves burst readability without changing chronology, hiding data, or introducing riskier grouping semantics.
+
+It is a prioritization pass, not a state-model rewrite.
+
+#### Validation status
+- `make typecheck` passes
+- `make build` should still be treated as authoritative on the active macOS development machine per `docs/DEVELOPMENT_CONSTRAINTS.md`
+
+#### Recommended next step
+At this point the next useful 3.3 work should come from hands-on usage review rather than guessing another polish slice in the abstract.
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:

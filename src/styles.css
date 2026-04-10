@@ -1395,6 +1395,10 @@ body::before {
   gap: 7px;
 }
 
+.tool-panel.is-multi.is-dense .tool-grid {
+  gap: 6px;
+}
+
 .tool-entry {
   max-width: 100%;
   min-width: 0;
@@ -1416,6 +1420,18 @@ body::before {
   padding: 8px;
   border-radius: 12px;
   box-shadow: 0 4px 10px rgba(34, 54, 84, 0.03);
+}
+
+.tool-panel.is-multi.is-dense .tool-entry {
+  padding: 7px 8px;
+}
+
+.tool-panel.is-multi.is-dense .tool-entry.is-succeeded .tool-status-text {
+  color: color-mix(in srgb, var(--claw-text-muted) 88%, #718198);
+}
+
+.tool-panel.is-multi.is-dense .tool-entry.is-succeeded .tool-title {
+  font-weight: 620;
 }
 
 .tool-entry.is-running {
