@@ -16,7 +16,6 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { name: "approve", description: "Approve or deny exec requests", usage: "/approve <id> allow|deny" },
   { name: "allowlist", description: "Manage allowlist entries", usage: "/allowlist [list|add|remove] ..." },
   { name: "config", description: "Show or update config", usage: "/config show|get|set|unset ..." },
-  { name: "debug", description: "Set runtime debug overrides", usage: "/debug show|set|unset|reset ..." },
   { name: "tts", description: "Control text-to-speech", usage: "/tts on|off|status|provider|limit|summary|audio" },
   { name: "models", description: "List available models" },
   { name: "compact", description: "Compact current session" },

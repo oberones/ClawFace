@@ -1,3 +1,10 @@
+* show size of workspace and media folders
+* show media folder in same way as workspace
+* custom prompts per session (optional)
+* full test coverage
+* particle animation using https://github.com/VincentGarreau/particles.js/
+* add proper /debug handler
+* git integration like codex
 * cooler interface for dreaming mode
 * waifu avatar like grok
 * ability to generate music and play it back through the app

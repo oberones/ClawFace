@@ -18,6 +18,7 @@ export type ThreadState =
 
 export type ChatThreadProps = {
   sessionKey: string | null;
+  threadRef?: React.Ref<HTMLDivElement>;
   chatImpulseActive: boolean;
   sessionTransitionPhase: "idle" | "out" | "preparing" | "in";
   hiddenMessageCount: number;
@@ -32,6 +33,7 @@ export type ChatThreadProps = {
   streamText: string | null;
   streamMarkdownHtml: string;
   thinking: boolean;
+  imageGenerationPending?: boolean;
   streamPopActive: boolean;
   sessionFlyInStream: boolean;
   streamMotionStyle?: React.CSSProperties;
@@ -72,6 +74,7 @@ export function ChatThread(props: ChatThreadProps) {
 
   return (
     <div
+      ref={props.threadRef}
       key={`main-${props.sessionKey ?? "none"}`}
       className={`chat-thread chat-thread-main ${props.chatImpulseActive ? "is-impulsing" : ""} ${(props.sessionTransitionPhase === "out" || props.sessionTransitionPhase === "preparing") ? "is-hidden-for-switch-out" : ""}`}
       style={{ maxWidth: "var(--claw-content-width)", gap: "var(--claw-message-gap)" }}
@@ -116,6 +119,7 @@ export function ChatThread(props: ChatThreadProps) {
               followupType={followsTools ? "tool" : undefined}
               onOpenImage={props.onOpenImage}
               onResolveRemoteImage={props.onResolveRemoteImage}
+              imageGenerationPending={props.imageGenerationPending}
             />
             {props.showToolActivity && toolItemsAfter.length > 0 && (
               <div className={`tool-panel-row${toolPanelFollowedByAssistant ? " is-followed-by-assistant" : ""}`}>

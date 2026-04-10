@@ -12,7 +12,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:unit": "node --test tests/*.test.mjs",
     "desktop:build:web": "vite build",
+    "desktop:dev": "node scripts/desktop-dev.mjs",
     "desktop:pack": "npm run desktop:build:web && electron-builder --dir",
     "desktop:dist:mac": "npm run desktop:build:web && electron-builder --mac dmg zip --publish never",
     "preview": "vite preview",
