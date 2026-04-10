@@ -3514,6 +3514,17 @@ function toolMessageMayContainImage(raw: unknown): boolean {
       return true;
     }
   }
+  const extractedText = extractText(raw);
+  if (extractedText) {
+    const sample = extractedText.slice(0, 2048).toLowerCase();
+    if (
+      sample.includes("data:image/") ||
+      sample.includes("media:") ||
+      /\.(png|jpe?g|webp|gif|bmp|svg)\b/i.test(sample)
+    ) {
+      return true;
+    }
+  }
   return false;
 }
 
@@ -3603,10 +3614,10 @@ function toChatMessage(raw: unknown, fallbackTimestamp?: number): ChatMessage | 
   if (toolMessage && !toolMessageMayContainImage(raw)) {
     return null;
   }
-  const rawText = toolMessage ? "" : (extractText(raw) ?? "");
+  const rawText = extractText(raw) ?? "";
   let text = rawText;
   let mediaAttachments: Attachment[] = [];
-  if (!toolMessage && rawText && MEDIA_PREFIX_RE.test(rawText)) {
+  if (rawText && MEDIA_PREFIX_RE.test(rawText)) {
     const mediaResult = extractMediaAttachmentsFromText(rawText);
     text = mediaResult.cleanedText;
     mediaAttachments = mediaResult.attachments;
