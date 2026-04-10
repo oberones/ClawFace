@@ -2276,10 +2276,23 @@ body::before {
   letter-spacing: 0.01em;
 }
 
+.field-hint {
+  color: color-mix(in srgb, var(--claw-text-soft) 88%, white);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .field-inline {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.path-mapping-textarea {
+  min-height: 132px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  line-height: 1.5;
 }
 
 .dual-inputs {
@@ -3473,6 +3486,46 @@ body::before {
   color: var(--claw-text-soft);
   font-size: 12px;
   text-align: center;
+}
+
+.attachment-image-fallback-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.attachment-image-debug-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  padding-top: 4px;
+}
+
+.attachment-image-debug-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+.attachment-image-debug-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--claw-text-muted);
+}
+
+.attachment-image-debug-value {
+  font-family: var(--claw-font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--claw-text);
+  word-break: break-all;
 }
 
 .image-lightbox-backdrop {

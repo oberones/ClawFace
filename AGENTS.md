@@ -85,10 +85,26 @@ Important root files:
 - `AGENTS.md` — this bootstrap guide
 - `requirements.md` — historical or supplemental project requirements
 - `package.json` — scripts and dependencies
+- `Makefile` — common local validation/build commands
 - `vite.config.ts` — Vite config
 - `vite-fs-plugin.ts` — Vite-side file system plugin
 - `tailwind.config.ts` / `postcss.config.cjs` — styling/build config
 - `tsconfig.json` — TypeScript config
+
+## Tests
+
+Focused regression tests now live under:
+
+```text
+tests/
+```
+
+Current coverage is intentionally narrow and aimed at the image/media regressions that have been easy to reintroduce:
+- path-prefix mappings for shared-volume/container installs
+- generated-image source resolution into `~/.openclaw/media`
+- image-path candidate selection when both pretty filenames and concrete UUID media paths are present
+
+The lightweight test harness lives in `tests/helpers/load-ts-module.mjs` and is currently driven by `make test-unit` / `npm run test:unit`.
 
 ## Renderer app
 
@@ -188,6 +204,8 @@ Milestone 1 is centered on:
 - The gateway's control-ui client id is `openclaw-control-ui`. Do not use legacy ids like `control-ui` or `clawui` in `connect.client.id`.
 - For packaged Electron builds loaded from `file://`, the gateway origin checker normalizes the browser origin to `null`, not `file://`. If gateway origin allowlisting is required, `gateway.controlUi.allowedOrigins` must include `"null"` for that packaged-app path.
 - During desktop connectivity debugging, `make typecheck` is a reliable in-repo validation pass from the Linux container, but `make build` should be treated as authoritative on the real macOS dev machine because Rollup optional native packages can differ by host OS/arch.
+- Generated-image rendering is currently most fragile around `src/lib/message-image-source.ts`, `src/lib/path-prefix-mappings.ts`, and `src/lib/media-path-utils.ts`; if you touch image/path resolution, assume regressions are easy and validate them directly.
+- `make test-unit` exists specifically to catch the helper-level media/path regressions that previously caused “image only appears after reload” and wrong-path bugs. It is not a substitute for `make typecheck` and `make build`.
 
 ---
 
@@ -204,6 +222,8 @@ Milestone 1 is centered on:
 - for this repo, the default completion gate should be:
   - `make typecheck`
   - `make build`
+- when changing media rendering, path-prefix mapping, or image source resolution, also run:
+  - `make test-unit`
 - use `make verify` when the change set is large enough to justify the stronger pass
 
 ## Do not do this

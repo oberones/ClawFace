@@ -124,6 +124,7 @@ export type ToolItem = {
   runId?: string;
   args?: unknown;
   output?: string;
+  mediaPaths?: string[];
   errorMessage?: string;
   startedAt: number;
   updatedAt: number;
@@ -135,6 +136,7 @@ export type Attachment = {
   size: number;
   type: string;
   dataUrl: string;
+  sourcePath?: string;
   isImage: boolean;
 };
 
@@ -144,6 +146,7 @@ export type ChatMessage = {
   text: string;
   timestamp: number;
   attachments?: Attachment[];
+  runId?: string;
   raw?: unknown;
 };
 

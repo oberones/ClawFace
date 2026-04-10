@@ -8,6 +8,7 @@ import { clawFsPlugin } from "./vite-fs-plugin.ts";
 
 const devPort = Number(process.env.PORT) || 5178;
 const WORKSPACE_DIR = path.join(os.homedir(), ".openclaw", "workspace");
+const MEDIA_DIR = path.join(os.homedir(), ".openclaw", "media");
 const ALLOWED_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg"]);
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
@@ -27,10 +28,45 @@ function isPosixAbsolute(value: string): boolean {
   return value.startsWith("/");
 }
 
+function mapOpenClawPathToLocalRoot(raw: string, localRoot: string, dirName: "workspace" | "media"): string | null {
+  const normalized = raw.trim().replace(/\\/g, "/");
+  if (!normalized) {
+    return null;
+  }
+  const lower = normalized.toLowerCase();
+  const absoluteMarker = `/.openclaw/${dirName}/`;
+  const absoluteRootMarker = `/.openclaw/${dirName}`;
+  const dotRelativeMarker = `.openclaw/${dirName}/`;
+  const bareRelativeMarker = `openclaw/${dirName}/`;
+  if (lower === absoluteRootMarker || lower === dotRelativeMarker.slice(0, -1) || lower === bareRelativeMarker.slice(0, -1)) {
+    return localRoot;
+  }
+  const absoluteIndex = lower.indexOf(absoluteMarker);
+  if (absoluteIndex >= 0) {
+    const suffix = normalized.slice(absoluteIndex + absoluteMarker.length);
+    return suffix ? path.join(localRoot, suffix) : localRoot;
+  }
+  if (lower.startsWith(dotRelativeMarker)) {
+    return path.join(localRoot, normalized.slice(dotRelativeMarker.length));
+  }
+  if (lower.startsWith(bareRelativeMarker)) {
+    return path.join(localRoot, normalized.slice(bareRelativeMarker.length));
+  }
+  return null;
+}
+
 function normalizeIncomingPath(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) {
     return "";
+  }
+  const mappedMediaPath = mapOpenClawPathToLocalRoot(trimmed, MEDIA_DIR, "media");
+  if (mappedMediaPath) {
+    return path.normalize(mappedMediaPath);
+  }
+  const mappedWorkspacePath = mapOpenClawPathToLocalRoot(trimmed, WORKSPACE_DIR, "workspace");
+  if (mappedWorkspacePath) {
+    return path.normalize(mappedWorkspacePath);
   }
   if (
     trimmed.includes("/") ||
@@ -49,12 +85,8 @@ function isAllowedLocalPath(candidate: string): boolean {
   if (!normalized) {
     return false;
   }
-  const workspaceRoot = path.resolve(WORKSPACE_DIR) + path.sep;
-  const tmpRoot = path.resolve("/tmp") + path.sep;
-  if (normalized.startsWith(workspaceRoot) || normalized.startsWith(tmpRoot)) {
-    return true;
-  }
-  return false;
+  const allowedRoots = [WORKSPACE_DIR, MEDIA_DIR, "/tmp"].map((root) => path.resolve(root));
+  return allowedRoots.some((root) => normalized === root || normalized.startsWith(`${root}${path.sep}`));
 }
 
 function localImageProxyPlugin() {
