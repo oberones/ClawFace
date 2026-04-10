@@ -1,23 +1,55 @@
 import React from "react";
 import type { ToolItem } from "../lib/types.ts";
 
+function formatArgsPreview(args: unknown): string {
+  if (args == null) {
+    return "";
+  }
+  try {
+    return JSON.stringify(args).replace(/\s+/g, " ").trim().slice(0, 120);
+  } catch {
+    return String(args).replace(/\s+/g, " ").trim().slice(0, 120);
+  }
+}
+
+function formatArgsExpanded(args: unknown): string {
+  if (args == null) {
+    return "(no args)";
+  }
+  try {
+    return JSON.stringify(args, null, 2);
+  } catch {
+    return String(args);
+  }
+}
+
 function summarizeTool(tool: ToolItem) {
   const outputPreview = (tool.output ?? "").replace(/\s+/g, " ").trim();
-  const argsPreview = tool.args == null
-    ? ""
-    : JSON.stringify(tool.args).replace(/\s+/g, " ").trim().slice(0, 120);
-  const normalizedOutput = outputPreview.toLowerCase();
-  const looksFailed = /\b(error|failed|exception|denied|not found|timeout)\b/.test(normalizedOutput);
-  const phase = tool.status === "result" ? (looksFailed ? "failed" : "completed") : "running";
-  const statusLabel = phase === "failed" ? "Needs attention" : phase === "completed" ? "Completed" : "Running";
-  const summarySource = outputPreview || argsPreview;
-  const summary = summarySource.slice(0, 120);
-  const summaryLabel = outputPreview ? (looksFailed ? "Issue" : "Output") : argsPreview ? "Args" : null;
+  const argsPreview = formatArgsPreview(tool.args);
+  const errorPreview = (tool.errorMessage ?? "").replace(/\s+/g, " ").trim();
+  const phase = tool.outcome;
+  const statusLabel = phase === "failed" ? "Failed" : phase === "succeeded" ? "Succeeded" : "Running";
+  const summary =
+    phase === "failed"
+      ? (errorPreview || outputPreview || "Failed without a structured error message")
+      : phase === "succeeded"
+        ? (outputPreview || "No output returned")
+        : (outputPreview || argsPreview);
+  const summaryLabel =
+    phase === "failed"
+      ? "Error"
+      : phase === "succeeded"
+        ? "Result"
+        : outputPreview
+          ? "Update"
+          : argsPreview
+            ? "Args"
+            : null;
 
   return {
     phase,
     statusLabel,
-    summary,
+    summary: summary.slice(0, 120),
     summaryLabel,
   };
 }
@@ -42,17 +74,21 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
     return null;
   }
 
+  const isSingleToolPanel = props.tools.length === 1;
+
   return (
     <section
-      className={`tool-panel ${props.panelFlyIn ? "session-fly-in" : ""}`}
+      className={`tool-panel ${isSingleToolPanel ? "is-single" : "is-multi"} ${props.panelFlyIn ? "session-fly-in" : ""}`}
       data-tool-panel-key={props.panelKey}
       style={props.panelMotionStyle}
     >
-      <div className="tool-panel-header">
-        <div className="tool-panel-title" style={{ fontSize: props.toolMinorFontSize }}>
-          Tool Activity ({props.tools.length})
+      {!isSingleToolPanel && (
+        <div className="tool-panel-header">
+          <div className="tool-panel-title" style={{ fontSize: props.toolMinorFontSize }}>
+            Tools ({props.tools.length})
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="tool-grid">
         {props.tools.map((tool) => {
@@ -61,11 +97,12 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
           const drawerPop = !props.snapshotMode && props.poppingToolIdSet.has(tool.id);
           const sessionFlyIn = !props.snapshotMode && props.sessionFlyInToolIdSet.has(tool.id);
           const motionStyle = props.buildMotionVars(tool.id);
+          const phaseClass = summaryInfo.phase === "succeeded" ? "done" : summaryInfo.phase === "failed" ? "failed" : "running";
 
           return (
             <article
               key={tool.id}
-              className={`tool-entry ${expanded ? "is-expanded" : ""} ${drawerPop ? "drawer-pop" : ""} ${sessionFlyIn ? "session-fly-in" : ""}`}
+              className={`tool-entry is-${summaryInfo.phase} ${expanded ? "is-expanded" : ""} ${drawerPop ? "drawer-pop" : ""} ${sessionFlyIn ? "session-fly-in" : ""}`}
               data-tool-id={tool.id}
               style={{ ...motionStyle, fontSize: props.toolFontSize }}
             >
@@ -81,9 +118,7 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
                 aria-expanded={expanded}
               >
                 <span className="tool-title-wrap">
-                  <span
-                    className={`tool-status-dot ${summaryInfo.phase === "completed" ? "done" : summaryInfo.phase === "failed" ? "failed" : "running"}`}
-                  />
+                  <span className={`tool-status-dot ${phaseClass}`} />
                   <span className="tool-title">{tool.name}</span>
                   <span className="tool-status-text" style={{ fontSize: props.toolMinorFontSize }}>
                     {summaryInfo.statusLabel}
@@ -99,9 +134,7 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
               {expanded && (
                 <div className="tool-expanded">
                   <div className="tool-expanded-meta" style={{ fontSize: props.toolMinorFontSize }}>
-                    <span
-                      className={`tool-status-chip ${summaryInfo.phase === "completed" ? "done" : summaryInfo.phase === "failed" ? "failed" : "running"}`}
-                    >
+                    <span className={`tool-status-chip ${phaseClass}`}>
                       {summaryInfo.statusLabel}
                     </span>
                     {tool.startedAt > 0 && (
@@ -110,11 +143,19 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
                       </span>
                     )}
                   </div>
+                  {tool.outcome === "failed" && tool.errorMessage?.trim().length ? (
+                    <div>
+                      <div className="tool-expanded-title" style={{ fontSize: props.toolMinorFontSize }}>
+                        Error
+                      </div>
+                      <pre className="tool-pre tool-pre-error">{tool.errorMessage}</pre>
+                    </div>
+                  ) : null}
                   <div>
                     <div className="tool-expanded-title" style={{ fontSize: props.toolMinorFontSize }}>
                       Args
                     </div>
-                    <pre className="tool-pre">{tool.args == null ? "(no args)" : JSON.stringify(tool.args, null, 2)}</pre>
+                    <pre className="tool-pre">{formatArgsExpanded(tool.args)}</pre>
                   </div>
                   <div>
                     <div className="tool-expanded-title" style={{ fontSize: props.toolMinorFontSize }}>

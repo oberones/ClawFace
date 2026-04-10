@@ -146,6 +146,7 @@ export type MessageRowProps = {
   timestampFontSize: number;
   drawerPop?: boolean;
   sessionFlyIn?: boolean;
+  followupType?: "tool";
   onOpenImage: (attachment: Attachment) => void;
   onResolveRemoteImage?: (filePath: string) => Promise<string | null>;
 };
@@ -156,7 +157,8 @@ export const MessageRow = React.memo(
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
     const roleLabel = isSystem ? "System" : isUser ? "You" : "Assistant";
-    const rowMotionClass = `${props.drawerPop ? "drawer-pop" : ""} ${props.sessionFlyIn ? "session-fly-in" : ""}`.trim();
+    const followupClass = props.followupType === "tool" && !isUser && !isSystem ? "is-tool-followup" : "";
+    const rowMotionClass = `${props.drawerPop ? "drawer-pop" : ""} ${props.sessionFlyIn ? "session-fly-in" : ""} ${followupClass}`.trim();
     const motionStyle = useMemo(() => buildMotionVars(message.id), [message.id]);
     const markdownHtml = useMemo(
       () => (message.text ? renderMarkdown(message.text) : ""),
@@ -198,7 +200,7 @@ export const MessageRow = React.memo(
         data-message-id={message.id}
         style={motionStyle}
       >
-        <article className={`message-bubble ${isUser ? "user" : "assistant"}`}>
+        <article className={`message-bubble ${isUser ? "user" : "assistant"} ${followupClass}`.trim()}>
           <CopyButton text={message.text} />
           <div className="message-role">{roleLabel}</div>
           {markdownHtml && (
@@ -243,7 +245,7 @@ export const MessageRow = React.memo(
     prev.timestampFontSize === next.timestampFontSize &&
     prev.drawerPop === next.drawerPop &&
     prev.sessionFlyIn === next.sessionFlyIn &&
+    prev.followupType === next.followupType &&
     prev.onOpenImage === next.onOpenImage &&
     prev.onResolveRemoteImage === next.onResolveRemoteImage,
 );
-
