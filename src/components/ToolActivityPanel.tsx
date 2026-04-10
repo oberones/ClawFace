@@ -92,11 +92,11 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
   }
 
   const isSingleToolPanel = props.tools.length === 1;
-  const groupSummary = summarizeToolGroup(props.tools);
+  const groupSummary = isSingleToolPanel ? null : summarizeToolGroup(props.tools);
 
   return (
     <section
-      className={`tool-panel ${isSingleToolPanel ? "is-single" : "is-multi"} is-${groupSummary.tone}-group ${props.panelFlyIn ? "session-fly-in" : ""}`}
+      className={`tool-panel ${isSingleToolPanel ? "is-single" : `is-multi is-${groupSummary?.tone}-group`} ${props.panelFlyIn ? "session-fly-in" : ""}`}
       data-tool-panel-key={props.panelKey}
       style={props.panelMotionStyle}
     >
@@ -106,13 +106,13 @@ export function ToolActivityPanel(props: ToolActivityPanelProps) {
             Tools ({props.tools.length})
           </div>
           <div className="tool-panel-stats" style={{ fontSize: props.toolMinorFontSize }}>
-            {groupSummary.running > 0 && (
+            {groupSummary && groupSummary.running > 0 && (
               <span className="tool-panel-stat is-running">{groupSummary.running} running</span>
             )}
-            {groupSummary.failed > 0 && (
+            {groupSummary && groupSummary.failed > 0 && (
               <span className="tool-panel-stat is-failed">{groupSummary.failed} failed</span>
             )}
-            {groupSummary.succeeded > 0 && (
+            {groupSummary && groupSummary.succeeded > 0 && (
               <span className="tool-panel-stat is-succeeded">{groupSummary.succeeded} done</span>
             )}
           </div>
