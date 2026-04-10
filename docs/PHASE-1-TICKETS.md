@@ -3153,6 +3153,59 @@ It is a prioritization pass, not a state-model rewrite.
 #### Recommended next step
 At this point the next useful 3.3 work should come from hands-on usage review rather than guessing another polish slice in the abstract.
 
+## Ticket 3.3.5 — Run a live usage review on the authoritative macOS environment
+### Goal
+Validate recent runtime/session/tool UX work from actual usage, then choose the next slice from observed problems instead of abstract speculation.
+
+### Why
+The recent 3.1.x, 3.2.x, and 3.3.x work materially improved semantics and presentation, but the next useful polish decision should now come from real usage.
+
+Static code review is no longer enough to answer questions like:
+- which remaining rough edge is actually most noticeable?
+- where does the UI still feel noisy in practice?
+- which surfaces are improved on paper but still weak in live interaction?
+
+### Scope
+- perform a live review on the authoritative macOS development machine
+- exercise real session-switching, background-session, and tool-heavy flows
+- capture concrete findings with screenshots or clips
+- turn findings into the next explicit ticket rather than free-floating notes
+
+### Deliverable
+A concrete live-usage review packet and checklist for the authoritative environment.
+
+### Done when
+- the review scenarios are documented
+- the authoritative environment constraints are explicit
+- the next ticket can be chosen from actual usage findings
+
+### Implementation notes (2026-04-10)
+
+This ticket is now prepared and ready for execution on the authoritative macOS machine.
+
+#### What changed
+- added `docs/LIVE-USAGE-REVIEW.md`
+- documented the review goals, scenarios, evidence to capture, and likely decision points
+- recorded the current container limitation honestly:
+  - Linux-host Vite review remains blocked by the known missing Rollup optional package issue on this host
+  - this reinforces that macOS remains the correct environment for the real live review pass
+
+#### Why this is the right next move
+At this point, continuing to invent polish tickets from static inspection would be weaker than reviewing the actual product behavior.
+
+The goal now is to convert:
+- "I think this might still be noisy"
+
+into:
+- "in scenario X, the user loses the signal because Y"
+
+#### Validation status
+Documentation-only slice.
+No code-path validation required beyond keeping the repo notes aligned with the current environment constraints.
+
+#### Review artifact
+See: `docs/LIVE-USAGE-REVIEW.md`
+
 # Definition of Phase 1 done
 
 Phase 1 is done when:
