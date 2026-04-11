@@ -1,11 +1,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { app, BrowserWindow, shell, ipcMain, protocol } = require("electron");
+const { app, BrowserWindow, shell, ipcMain, nativeImage, protocol } = require("electron");
 
 const WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 820;
 const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 const CLAW_FS_SCHEME = "claw-fs";
+const APP_ICON_FILE = "clawface-logo.png";
 const IMAGE_CACHE_LIMIT = 5;
 const BLANK_CHECK_DELAY_MS = 1400;
 const MAX_BLANK_RECOVERY_ATTEMPTS = 2;
@@ -35,6 +36,7 @@ let gatewayUsesRemoteHost = false;
 let clawFsServerUrl = "";
 let mainWindow = null;
 let isQuitting = false;
+let cachedAppIcon = undefined;
 
 function imageMimeTypeFromPath(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -77,6 +79,33 @@ function getWorkspaceRoot(homeDir) {
 
 function getMediaRoot(homeDir) {
   return path.join(homeDir, ".openclaw", "media");
+}
+
+function resolveAppIconPath() {
+  const candidates = [
+    path.join(__dirname, "..", "dist", APP_ICON_FILE),
+    path.join(__dirname, "..", "public", APP_ICON_FILE),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function getAppIcon() {
+  if (cachedAppIcon !== undefined) {
+    return cachedAppIcon;
+  }
+  const iconPath = resolveAppIconPath();
+  if (!iconPath) {
+    cachedAppIcon = null;
+    return cachedAppIcon;
+  }
+  const image = nativeImage.createFromPath(iconPath);
+  cachedAppIcon = image.isEmpty() ? null : image;
+  return cachedAppIcon;
 }
 
 function mapOpenClawPathToLocalHome(rawPath, homeDir, dirName) {
@@ -1153,12 +1182,14 @@ function createMainWindow() {
     return mainWindow;
   }
 
+  const appIcon = getAppIcon();
   const nextWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
     minWidth: 1000,
     minHeight: 640,
     autoHideMenuBar: true,
+    icon: appIcon || undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -1277,6 +1308,10 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  const appIcon = getAppIcon();
+  if (process.platform === "darwin" && appIcon && app.dock) {
+    app.dock.setIcon(appIcon);
+  }
   protocol.handle(DESKTOP_LOCAL_IMAGE_SCHEME, handleDesktopLocalImageRequest);
   protocol.handle(CLAW_FS_SCHEME, handleClawFsRequest);
   createMainWindow();

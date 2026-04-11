@@ -3279,9 +3279,9 @@ A concrete live-usage review packet and checklist for the authoritative environm
 - the authoritative environment constraints are explicit
 - the next ticket can be chosen from actual usage findings
 
-### Implementation notes (2026-04-10)
+### Implementation notes (2026-04-11)
 
-This ticket is now prepared and ready for execution on the authoritative macOS machine.
+This ticket now has a concrete review packet in the repo and is ready for hands-on execution on the authoritative macOS machine.
 
 #### What changed
 - added `docs/LIVE-USAGE-REVIEW.md`
@@ -3305,6 +3305,10 @@ No code-path validation required beyond keeping the repo notes aligned with the 
 
 #### Review artifact
 See: `docs/LIVE-USAGE-REVIEW.md`
+
+#### Current execution note
+The review packet is now present in the repo, but the actual live review still needs to be performed through the real desktop UI session.
+That part should produce the concrete findings that determine the next post-3.3 ticket.
 
 # Definition of Phase 1 done
 

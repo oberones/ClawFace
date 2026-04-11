@@ -1,3 +1,4 @@
+* custom backgrounds/textures for chat
 * show size of workspace and media folders
 * show media folder in same way as workspace
 * custom prompts per session (optional)
