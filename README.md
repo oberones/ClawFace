@@ -117,6 +117,86 @@ Current stack includes:
 
 This remains a reasonable baseline for the product.
 
+## Install
+
+ClawFace currently works best as a desktop app pointed at an OpenClaw gateway you already have running.
+
+### macOS
+
+1. Install **Node.js `22.22.0`** and **npm `10.9.4`**.
+2. Clone this repo.
+3. Install dependencies:
+
+```bash
+npm ci
+```
+
+4. Start the desktop app in development mode:
+
+```bash
+npm run desktop:dev
+```
+
+5. If you want a packaged macOS build, create one with:
+
+```bash
+npm run desktop:dist:mac
+```
+
+That writes the app bundle and macOS artifacts to `desktop-dist/`.
+
+### Windows
+
+1. Install **Node.js `22.22.0`** and **npm `10.9.4`**.
+2. Clone this repo in PowerShell or Command Prompt.
+3. Install dependencies:
+
+```bash
+npm ci
+```
+
+4. Start the desktop app:
+
+```bash
+npm run desktop:dev
+```
+
+5. If you want an unpacked desktop build for your current machine, run:
+
+```bash
+npm run desktop:pack
+```
+
+Notes:
+- The repo is currently exercised most heavily on macOS.
+- Windows support is expected to work from source, but packaged Windows installer flows are not yet the primary validated path in this repo.
+
+### Linux
+
+1. Install **Node.js `22.22.0`** and **npm `10.9.4`**.
+2. Clone this repo.
+3. Install dependencies:
+
+```bash
+npm ci
+```
+
+4. Start the desktop app:
+
+```bash
+npm run desktop:dev
+```
+
+5. If you want an unpacked desktop build for your current machine, run:
+
+```bash
+npm run desktop:pack
+```
+
+Notes:
+- Linux support is currently best treated as a source-run workflow.
+- If Electron reports missing system libraries on your distro, install the usual desktop GUI dependencies required by Electron and retry.
+
 ## Common development commands
 
 A `Makefile` is available for common local tasks.
