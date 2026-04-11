@@ -3,7 +3,7 @@ SHELL := /bin/sh
 NPM := npm
 TSCP := ./node_modules/.bin/tsc --noEmit
 
-.PHONY: help install dev build preview typecheck check-runtime check-rollup-linux check-env verify desktop-build-web desktop-pack desktop-dist-mac hooks-install clean
+.PHONY: help install dev build preview typecheck test-unit check-runtime check-rollup-linux check-env verify desktop-build-web desktop-dev desktop-pack desktop-dist-mac hooks-install clean
 
 help:
 	@echo "ClawFace Make targets:"
@@ -12,11 +12,13 @@ help:
 	@echo "  make build              Build the web app"
 	@echo "  make preview            Preview the built app"
 	@echo "  make typecheck          Run TypeScript type checking"
+	@echo "  make test-unit          Run focused Node-based regression tests"
 	@echo "  make check-runtime      Run runtime checks"
 	@echo "  make check-rollup-linux Check Linux rollup package resolution"
 	@echo "  make check-env          Run environment validation"
 	@echo "  make verify             Run the CI-style verification command"
 	@echo "  make desktop-build-web  Build renderer assets for desktop packaging"
+	@echo "  make desktop-dev        Start Vite + Electron for desktop development"
 	@echo "  make desktop-pack       Build unpacked Electron app"
 	@echo "  make desktop-dist-mac   Build macOS distributables"
 	@echo "  make hooks-install      Install repo git hooks"
@@ -37,6 +39,9 @@ preview:
 typecheck:
 	$(TSCP)
 
+test-unit:
+	$(NPM) run test:unit
+
 check-runtime:
 	$(NPM) run check:runtime
 
@@ -51,6 +56,9 @@ verify:
 
 desktop-build-web:
 	$(NPM) run desktop:build:web
+
+desktop-dev:
+	$(NPM) run desktop:dev
 
 desktop-pack:
 	$(NPM) run desktop:pack

@@ -1,3 +1,5 @@
+import { applyPathPrefixMappings } from "./path-prefix-mappings.ts";
+
 export const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 
 function filePathFromFileUrl(value: string): string | null {
@@ -55,6 +57,9 @@ function looksLikeAbsoluteImagePath(value: string): boolean {
     return false;
   }
   if (
+    trimmed.startsWith(".openclaw/media/") ||
+    trimmed.startsWith("openclaw/media/") ||
+    trimmed.includes("/.openclaw/media/") ||
     trimmed.startsWith(".openclaw/workspace/") ||
     trimmed.startsWith("openclaw/workspace/") ||
     trimmed.includes("/.openclaw/workspace/")
@@ -67,6 +72,18 @@ function looksLikeAbsoluteImagePath(value: string): boolean {
   return /^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.startsWith("/") || trimmed.startsWith("~/");
 }
 
+function resolveMediaRelativeLocalPath(value: string): string | null {
+  const trimmed = value.trim().replace(/^\.\/+/, "").replace(/^\/+/, "");
+  if (!trimmed || !looksLikeImagePath(trimmed)) {
+    return null;
+  }
+  const homeDir = window.desktopInfo?.homeDir?.trim();
+  if (!homeDir) {
+    return null;
+  }
+  return `${homeDir}/.openclaw/media/${trimmed}`;
+}
+
 function resolveWorkspaceRelativeLocalPath(value: string): string | null {
   const trimmed = value.trim().replace(/^\.\/+/, "").replace(/^\/+/, "");
   if (!trimmed || !looksLikeImagePath(trimmed)) {
@@ -77,6 +94,21 @@ function resolveWorkspaceRelativeLocalPath(value: string): string | null {
     return null;
   }
   return `${workspaceDir}/${trimmed}`;
+}
+
+function mapMediaAliasToLocalPath(value: string): string | null {
+  const trimmed = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
+  const homeDir = window.desktopInfo?.homeDir?.trim();
+  if (!trimmed || !homeDir) {
+    return null;
+  }
+  if (trimmed.startsWith(".openclaw/media/")) {
+    return `${homeDir}/${trimmed}`;
+  }
+  if (trimmed.startsWith("openclaw/media/")) {
+    return `${homeDir}/.${trimmed}`;
+  }
+  return null;
 }
 
 function mapWorkspaceAliasToLocalPath(value: string): string | null {
@@ -109,6 +141,8 @@ function isLikelyPathOrUrl(value: string): boolean {
     /^[A-Za-z]:[\\/]/.test(trimmed) ||
     trimmed.startsWith("/") ||
     trimmed.startsWith("~/") ||
+    trimmed.startsWith(".openclaw/media/") ||
+    trimmed.startsWith("openclaw/media/") ||
     trimmed.startsWith(".openclaw/workspace/") ||
     trimmed.startsWith("openclaw/workspace/")
   ) {
@@ -227,6 +261,11 @@ export function extractImageSourceCandidates(value: string): string[] {
     }
     seen.add(next);
     candidates.push(next);
+    const mapped = applyPathPrefixMappings(next);
+    if (mapped && mapped !== next && !seen.has(mapped)) {
+      seen.add(mapped);
+      candidates.push(mapped);
+    }
   };
 
   push(initial);
@@ -236,9 +275,19 @@ export function extractImageSourceCandidates(value: string): string[] {
     push(decodedBase64);
   }
 
+  const mappedMedia = mapMediaAliasToLocalPath(initial);
+  if (mappedMedia) {
+    push(mappedMedia);
+  }
+
   const mappedWorkspace = mapWorkspaceAliasToLocalPath(initial);
   if (mappedWorkspace) {
     push(mappedWorkspace);
+  }
+
+  const resolvedMediaRelative = resolveMediaRelativeLocalPath(initial);
+  if (resolvedMediaRelative) {
+    push(resolvedMediaRelative);
   }
 
   const resolvedWorkspaceRelative = resolveWorkspaceRelativeLocalPath(initial);
@@ -275,34 +324,60 @@ export function filePathFromImageSource(value: string): string | null {
       continue;
     }
     if (candidate.toLowerCase().startsWith(`${DESKTOP_LOCAL_IMAGE_SCHEME}:`)) {
+      try {
+        const parsed = new URL(candidate);
+        if (parsed.protocol === `${DESKTOP_LOCAL_IMAGE_SCHEME}:`) {
+          const queryPath = parsed.searchParams.get("path");
+          if (queryPath) {
+            return applyPathPrefixMappings(decodeURIComponent(queryPath));
+          }
+          let pathname = decodeURIComponent(parsed.pathname || "");
+          if (/^\/[A-Za-z]:\//.test(pathname)) {
+            pathname = pathname.slice(1);
+          }
+          if (pathname) {
+            return applyPathPrefixMappings(pathname);
+          }
+        }
+      } catch {
+        // Fall back to legacy compact scheme parsing below.
+      }
       const encoded = candidate.slice(DESKTOP_LOCAL_IMAGE_SCHEME.length + 1);
       try {
-        return decodeURIComponent(encoded);
+        return applyPathPrefixMappings(decodeURIComponent(encoded));
       } catch {
-        return encoded;
+        return applyPathPrefixMappings(encoded);
       }
     }
     const fileUrlPath = filePathFromFileUrl(candidate);
     if (fileUrlPath) {
-      return fileUrlPath;
+      return applyPathPrefixMappings(fileUrlPath);
+    }
+    const mediaAliasMapped = mapMediaAliasToLocalPath(candidate);
+    if (mediaAliasMapped) {
+      return applyPathPrefixMappings(mediaAliasMapped);
     }
     const aliasMapped = mapWorkspaceAliasToLocalPath(candidate);
     if (aliasMapped) {
-      return aliasMapped;
+      return applyPathPrefixMappings(aliasMapped);
     }
     if (looksLikeAbsoluteImagePath(candidate)) {
-      return candidate;
+      return applyPathPrefixMappings(candidate);
+    }
+    const resolvedMediaRelative = resolveMediaRelativeLocalPath(candidate);
+    if (resolvedMediaRelative) {
+      return applyPathPrefixMappings(resolvedMediaRelative);
     }
     const resolvedWorkspaceRelative = resolveWorkspaceRelativeLocalPath(candidate);
     if (resolvedWorkspaceRelative) {
-      return resolvedWorkspaceRelative;
+      return applyPathPrefixMappings(resolvedWorkspaceRelative);
     }
   }
   return null;
 }
 
 export function buildDesktopLocalImageUrl(filePath: string): string {
-  return `${DESKTOP_LOCAL_IMAGE_SCHEME}:${encodeURIComponent(filePath)}`;
+  return `${DESKTOP_LOCAL_IMAGE_SCHEME}://open?path=${encodeURIComponent(filePath)}`;
 }
 
 export function isDesktopRuntime(): boolean {
@@ -312,13 +387,42 @@ export function isDesktopRuntime(): boolean {
   return window.location.protocol === "file:";
 }
 
-export function toDesktopRenderableSrc(value: string): string {
-  if (!isDesktopRuntime()) {
-    return value;
+function canUseWebLocalImageProxy(): boolean {
+  const protocol = window.location.protocol;
+  return protocol === "http:" || protocol === "https:";
+}
+
+function buildWebLocalImageProxyUrl(filePath: string): string {
+  if (!canUseWebLocalImageProxy()) {
+    return "";
   }
+  return `${window.location.origin}/__claw/local-image?path=${encodeURIComponent(filePath)}`;
+}
+
+function toFileUrl(value: string): string | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+  if (/^[A-Za-z]:\//.test(normalized)) {
+    return `file:///${encodeURI(normalized)}`;
+  }
+  if (normalized.startsWith("//")) {
+    return `file:${encodeURI(normalized)}`;
+  }
+  if (normalized.startsWith("/")) {
+    return `file://${encodeURI(normalized)}`;
+  }
+  return null;
+}
+
+export function toRuntimeRenderableSrc(value: string): string {
   const path = filePathFromImageSource(value);
   if (!path) {
     return value;
+  }
+  if (!isDesktopRuntime()) {
+    return buildWebLocalImageProxyUrl(path) || toFileUrl(path) || value;
   }
   return buildDesktopLocalImageUrl(path);
 }

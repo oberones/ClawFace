@@ -98,6 +98,26 @@ function pickString(source: Record<string, unknown>, keys: string[]): string | n
   return null;
 }
 
+function collectDirectStrings(source: Record<string, unknown>, keys: string[]): string[] {
+  const values: string[] = [];
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      values.push(value.trim());
+      continue;
+    }
+    if (!Array.isArray(value)) {
+      continue;
+    }
+    for (const entry of value) {
+      if (typeof entry === "string" && entry.trim()) {
+        values.push(entry.trim());
+      }
+    }
+  }
+  return values;
+}
+
 function normalizeImageMimeType(value: string | null | undefined): string | null {
   const normalized = value?.trim().toLowerCase() ?? "";
   if (!normalized) {
@@ -284,6 +304,31 @@ export function extractImages(message: unknown): Array<{ data: string; mimeType:
       if (imageUrl && looksLikeImageUrl(imageUrl)) {
         pushImage(imageUrl, mime);
       }
+    }
+
+    const directImageCandidates = collectDirectStrings(current, [
+      "mediaUrl",
+      "mediaurl",
+      "mediaUrls",
+      "mediaurls",
+      "media",
+      "path",
+      "paths",
+      "file",
+      "filePath",
+      "file_path",
+      "uri",
+      "src",
+      "href",
+    ]);
+    for (const candidate of directImageCandidates) {
+      if (!looksLikeImageUrl(candidate)) {
+        continue;
+      }
+      if (!hasImageHint && !inferMimeTypeFromUrl(candidate)) {
+        continue;
+      }
+      pushImage(candidate, mime);
     }
 
     const url = pickString(current, ["url", "uri", "src", "href"]);

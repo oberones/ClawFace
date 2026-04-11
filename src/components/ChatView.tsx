@@ -115,6 +115,7 @@ export default function ChatView(props: ChatViewProps) {
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const thinkingMenuRef = useRef<HTMLDivElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mainThreadRef = useRef<HTMLDivElement | null>(null);
   const prevSessionKeyRef = useRef<string | null>(props.sessionKey);
   const prevSessionKeyForLayoutRef = useRef<string | null>(props.sessionKey);
 
@@ -168,6 +169,22 @@ export default function ChatView(props: ChatViewProps) {
     () => [...props.toolItems].sort((a, b) => a.startedAt - b.startedAt),
     [props.toolItems],
   );
+  const messageTailKey = useMemo(() => {
+    const lastMessage = props.messages[props.messages.length - 1];
+    if (!lastMessage) {
+      return null;
+    }
+    const attachmentKey = (lastMessage.attachments ?? [])
+      .map((attachment) => `${attachment.type}:${attachment.dataUrl.length}`)
+      .join("|");
+    return [
+      lastMessage.id,
+      lastMessage.role,
+      String(lastMessage.timestamp),
+      String(lastMessage.text.length),
+      attachmentKey,
+    ].join(":");
+  }, [props.messages]);
   const {
     scrollRef,
     visibleMessageCount,
@@ -176,6 +193,7 @@ export default function ChatView(props: ChatViewProps) {
     resetAutoScrollState,
   } = useAutoScroll({
     messageCount: props.messages.length,
+    messageTailKey,
     lastMessageRole: props.messages[Math.max(0, props.messages.length - 1)]?.role ?? null,
     orderedTools,
     streamText: props.streamText,
@@ -619,6 +637,37 @@ export default function ChatView(props: ChatViewProps) {
     triggerVisibleSessionFlyIn,
   ]);
 
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    const thread = mainThreadRef.current;
+    if (!container || !thread || !autoScrollEnabled || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    let rafId: number | null = null;
+    const scrollToBottom = () => {
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        if (!scrollRef.current || !autoScrollEnabled) {
+          return;
+        }
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      });
+    };
+    const observer = new ResizeObserver(() => {
+      scrollToBottom();
+    });
+    observer.observe(thread);
+    return () => {
+      observer.disconnect();
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [autoScrollEnabled, props.sessionKey, scrollRef]);
+
 
   useEffect(() => {
     if (sessionTransitionPhase !== "idle") {
@@ -750,7 +799,7 @@ export default function ChatView(props: ChatViewProps) {
     if (!imageLightbox) {
       return;
     }
-    const filePath = filePathFromImageSource(imageLightbox.dataUrl);
+    const filePath = filePathFromImageSource(imageLightbox.sourcePath ?? imageLightbox.dataUrl);
     if (isDesktopRuntime() && filePath) {
       const nextDesktopSrc = buildDesktopLocalImageUrl(filePath);
       if (nextDesktopSrc !== imageLightbox.dataUrl) {
@@ -808,7 +857,7 @@ export default function ChatView(props: ChatViewProps) {
     if (!isDesktopRuntime()) {
       return;
     }
-    const filePath = filePathFromImageSource(imageLightbox.dataUrl);
+    const filePath = filePathFromImageSource(imageLightbox.sourcePath ?? imageLightbox.dataUrl);
     if (filePath) {
       const nextDesktopSrc = buildDesktopLocalImageUrl(filePath);
       if (nextDesktopSrc !== imageLightbox.dataUrl) {
@@ -1017,6 +1066,8 @@ export default function ChatView(props: ChatViewProps) {
     () => new Map(outgoingThreadSnapshot?.toolByMessageEntries ?? []),
     [outgoingThreadSnapshot],
   );
+  const imageGenerationPending =
+    props.thinking || Boolean(props.streamText) || props.canAbort || props.toolItems.some((item) => item.status !== "result");
 
   const connectionStatus = props.connectionStatus ?? (props.connected ? "connected" : "disconnected");
   const isSessionSwitching = props.sessionTransitionState === "switching";
@@ -1262,6 +1313,7 @@ export default function ChatView(props: ChatViewProps) {
                     drawerPop={false}
                     onOpenImage={setImageLightbox}
                     onResolveRemoteImage={props.onResolveRemoteImage}
+                    imageGenerationPending={false}
                   />
                   {props.uiSettings.showToolActivity &&
                     renderToolPanel(outgoingToolTimelineByMessage.get(msg.id) ?? [], `snapshot-tool-after-${msg.id}`, {
@@ -1300,6 +1352,7 @@ export default function ChatView(props: ChatViewProps) {
 
         <ChatThread
           sessionKey={props.sessionKey}
+          threadRef={mainThreadRef}
           chatImpulseActive={chatImpulseActive}
           sessionTransitionPhase={sessionTransitionPhase}
           hiddenMessageCount={hiddenMessageCount}
@@ -1314,6 +1367,7 @@ export default function ChatView(props: ChatViewProps) {
           streamText={props.streamText}
           streamMarkdownHtml={streamMarkdownHtml}
           thinking={props.thinking}
+          imageGenerationPending={imageGenerationPending}
           streamPopActive={streamPopActive}
           sessionFlyInStream={sessionFlyInStream}
           streamMotionStyle={streamMotionStyle}

@@ -1,5 +1,6 @@
 import React from "react";
 import { DEFAULT_UI_SETTINGS, type UiSettings } from "../lib/ui-settings.ts";
+import { parsePathPrefixMappingsText } from "../lib/path-prefix-mappings.ts";
 
 type ShortcutCombo = {
   meta: boolean;
@@ -22,6 +23,8 @@ type SettingsModalProps = {
   onPasswordChange: (value: string) => void;
   fsServerUrl: string;
   onFsServerUrlChange: (value: string) => void;
+  pathPrefixMappingsText: string;
+  onPathPrefixMappingsTextChange: (value: string) => void;
   uiSettings: UiSettings;
   onUiSettingsChange: (next: UiSettings) => void;
   uiSettingsSchemes: Array<{ id: string; name: string; updatedAt: number }>;
@@ -133,6 +136,10 @@ const FONT_OPTIONS = [
 
 const BUILTIN_UI_SETTINGS_SCHEME_ID = "default";
 const MAX_REPLY_DONE_CUSTOM_AUDIO_BYTES = 420 * 1024;
+const COMMON_OPENCLAW_DOCKER_MAPPINGS = [
+  "/home/node/.openclaw/media => ~/.openclaw/media",
+  "/home/node/.openclaw/workspace => ~/.openclaw/workspace",
+].join("\n");
 
 const TYPOGRAPHY_LAYOUT_DEFAULTS: Partial<UiSettings> = {
   fontFamily: DEFAULT_UI_SETTINGS.fontFamily,
@@ -319,6 +326,10 @@ function ColorField(props: ColorFieldProps) {
 export default function SettingsModal(props: SettingsModalProps) {
   const [schemeNameDraft, setSchemeNameDraft] = React.useState("");
   const [customSoundError, setCustomSoundError] = React.useState<string | null>(null);
+  const parsedPathPrefixMappings = React.useMemo(
+    () => parsePathPrefixMappingsText(props.pathPrefixMappingsText),
+    [props.pathPrefixMappingsText],
+  );
 
   React.useEffect(() => {
     if (!props.open) {
@@ -958,6 +969,46 @@ export default function SettingsModal(props: SettingsModalProps) {
                     placeholder="http://192.168.1.100:3000"
                   />
                   <span className="field-hint">Base URL of the dev server for remote file access (leave empty for local)</span>
+                </label>
+              </div>
+            </section>
+
+            <section className="setting-card">
+              <div className="setting-head">
+                <h3 className="setting-title">Path Prefix Mappings</h3>
+                <button
+                  type="button"
+                  onClick={() => props.onPathPrefixMappingsTextChange(COMMON_OPENCLAW_DOCKER_MAPPINGS)}
+                  className="ui-btn ui-btn-light section-reset-btn"
+                >
+                  Use Docker Example
+                </button>
+              </div>
+              <div className="setting-fields">
+                <label className="field-block">
+                  <span className="field-label">
+                    Map backend/container path prefixes to local filesystem prefixes.
+                  </span>
+                  <textarea
+                    value={props.pathPrefixMappingsText}
+                    onChange={(e) => props.onPathPrefixMappingsTextChange(e.target.value)}
+                    className="ui-input path-mapping-textarea"
+                    rows={6}
+                    spellCheck={false}
+                    placeholder={COMMON_OPENCLAW_DOCKER_MAPPINGS}
+                  />
+                  <span className="field-hint">
+                    One mapping per line using <code>source =&gt; target</code>. Blank lines and <code>#</code> comments are ignored.
+                  </span>
+                  <span className="field-hint">
+                    Active mappings: {parsedPathPrefixMappings.mappings.length}
+                    {parsedPathPrefixMappings.invalidLines.length > 0
+                      ? ` · Invalid lines ignored: ${parsedPathPrefixMappings.invalidLines.length}`
+                      : ""}
+                  </span>
+                  <span className="field-hint">
+                    Example: <code>/home/node/.openclaw/media =&gt; ~/.openclaw/media</code>
+                  </span>
                 </label>
               </div>
             </section>

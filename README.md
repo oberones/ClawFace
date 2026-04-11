@@ -129,10 +129,21 @@ make install
 make dev
 make build
 make typecheck
+make test-unit
 make verify
 ```
 
-The Makefile wraps the commands that are actually present in the repo today, plus a small number of sensible extras like `typecheck` and `clean`.
+The Makefile wraps the commands that are actually present in the repo today, plus a small number of sensible extras like `typecheck`, `test-unit`, and `clean`.
+
+`make test-unit` runs the focused Node-based regression checks that currently cover:
+- path prefix mapping for shared-volume/container installs
+- generated-image source resolution into `~/.openclaw/media`
+- renderer image source selection when both pretty filenames and concrete UUID media paths are present
+
+For media-related work, the practical validation stack is:
+- `make test-unit` for helper-level regressions
+- `make typecheck` for renderer/app safety
+- `make build` for the final production bundling check
 
 ## Runtime expectations
 
@@ -142,6 +153,26 @@ If you see `EBADENGINE` warnings on Node 20, that is expected with the current r
 Some parts of the current Electron/tooling dependency chain now also require Node 22+.
 
 Use the pinned runtime described in [`docs/DEVELOPMENT_CONSTRAINTS.md`](./docs/DEVELOPMENT_CONSTRAINTS.md) before treating install or validation failures as application-code regressions.
+
+## Media path mapping
+
+ClawFace can render OpenClaw-generated images and other local media in a few different deployment shapes, but the path resolution strategy depends on where OpenClaw is running.
+
+- **OpenClaw on the host machine**: media paths usually resolve directly.
+- **OpenClaw in a local container with shared volumes**: use **Settings -> Path Prefix Mappings** to map container paths to host paths.
+- **OpenClaw on a remote machine**: path mappings alone are not enough unless the remote media directory is also exposed locally; use a file/media server or a gateway-served media endpoint for that setup.
+
+The most common Docker mapping looks like:
+
+```text
+/home/node/.openclaw/media => ~/.openclaw/media
+/home/node/.openclaw/workspace => ~/.openclaw/workspace
+```
+
+Notes:
+- Path mappings are applied when ClawFace needs to turn backend filesystem paths into local renderable image sources.
+- This makes shared-volume container installs much more practical without hardcoding Docker-specific paths into the app.
+- For community-facing portability, local path mapping should be treated as a compatibility layer; truly remote installs still benefit from gateway-served media access.
 
 ## Development status and expectations
 

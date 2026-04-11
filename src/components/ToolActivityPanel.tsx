@@ -25,6 +25,7 @@ function formatArgsExpanded(args: unknown): string {
 
 function summarizeTool(tool: ToolItem) {
   const outputPreview = (tool.output ?? "").replace(/\s+/g, " ").trim();
+  const mediaPreview = tool.mediaPaths && tool.mediaPaths.length > 0 ? `${tool.mediaPaths.length} media attachment${tool.mediaPaths.length === 1 ? "" : "s"}` : "";
   const argsPreview = formatArgsPreview(tool.args);
   const errorPreview = (tool.errorMessage ?? "").replace(/\s+/g, " ").trim();
   const phase = tool.outcome;
@@ -33,14 +34,14 @@ function summarizeTool(tool: ToolItem) {
     phase === "failed"
       ? (errorPreview || outputPreview || "Failed without a structured error message")
       : phase === "succeeded"
-        ? (outputPreview || "No output returned")
-        : (outputPreview || argsPreview);
+        ? (outputPreview || mediaPreview || "No output returned")
+        : (outputPreview || mediaPreview || argsPreview);
   const summaryLabel =
     phase === "failed"
       ? "Error"
       : phase === "succeeded"
         ? "Result"
-        : outputPreview
+        : outputPreview || mediaPreview
           ? "Update"
           : argsPreview
             ? "Args"
