@@ -109,6 +109,12 @@ This version should be treated as the explicit starting point before deeper impl
 - This release is primarily a **project-baseline declaration** and planning checkpoint
 - Future releases should track actual implementation progress against Milestone 1 and later roadmap phases
 
+## v0.4.2 (2026-04-11)
+
+### Fix
+
+- update npm packages to latest
+
 ## v0.4.1 (2026-04-11)
 
 ### Fix
