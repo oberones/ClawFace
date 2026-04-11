@@ -1320,6 +1320,14 @@ Validation outcome:
 - `make typecheck` passes
 - `make build` passes on the active macOS development machine
 
+#### Later follow-up (2026-04-11)
+Subsequent generated-image stabilization work kept this ticket's boundary intact while extracting one more narrow scroll seam:
+- delayed-attachment bottom pinning now goes through `src/lib/scroll-anchoring.ts`
+- the resize-to-bottom scheduling path has focused unit coverage via `tests/scroll-anchoring.test.mjs`
+
+This follow-up did **not** move core steady-state auto-scroll ownership back out of `useAutoScroll`.
+It only isolated the resize-driven bottom-pin behavior that became important once image attachments could appear after initial message render.
+
 #### Recommended next step
 Proceed to `1.2.5` — clean up streaming message update flow — now that the thread surface has a cleaner scroll-state boundary.
 
@@ -2218,8 +2226,92 @@ Validation outcome:
 - `make typecheck` passes
 - `make build` passes on the active macOS development machine
 
+#### Later follow-up (2026-04-11)
+The generated-image follow-through after this ticket materially expanded the media/rendering side of the attachment boundary without changing the fact that this ticket itself is complete.
+
+##### Generated-image rendering stabilization landed
+- local/shared-volume generated image paths now resolve more intentionally, including configurable path-prefix mappings for container-to-host setups
+- generated image attachments preserve the original backend/source path more reliably instead of collapsing too early to pretty filenames
+- live image attachments and post-reload history now go through more consistent source normalization
+
+##### Live render + recovery behavior was tightened
+- assistant image attachments are now reconciled by `runId` instead of behaving like unrelated duplicate rows
+- delayed history hydration remains available when a live final event is text-only or otherwise incomplete
+- generated images now render in chat without requiring a manual reload in the common local and shared-volume-container cases
+
+##### Validation coverage is now much stronger
+Focused regression coverage now exists for:
+- path-prefix mappings
+- image source resolution
+- media path normalization
+- final assistant commit/hydration decisions
+- live active-final delayed-hydration behavior
+- delayed-attachment scroll anchoring
+
+The media-focused validation pass for this work is now:
+- `make test-unit`
+- `make typecheck`
+- `make build`
+
+##### Known remaining boundary
+Truly remote setups without shared media still ultimately want a gateway-served media/artifact read path.
+The current path-mapping approach is aimed at host-local and shared-volume container workflows.
+
 #### Recommended next step
-Proceed to `2.2` — paste image / clipboard workflow — now that attachment ingestion, state ownership, and preview/rendering boundaries are all materially cleaner.
+Proceed to `2.2` — paste image / clipboard workflow — for the next product-facing attachment slice.
+Queue `2.3.1` as the portability follow-up for truly remote OpenClaw installs.
+
+## Ticket 2.3.1 — Add gateway-served remote media/artifact resolution
+### Goal
+Make generated images and other media outputs render correctly when OpenClaw is running remotely and its filesystem is not shared with the local desktop.
+
+### Scope
+- gateway-served media/artifact reads for generated images and media attachments
+- frontend fallback from local path mapping / local file reads to gateway-served resolution
+- preserving existing host-local and shared-volume container behavior
+
+### Tasks
+- audit the current remote image resolution seams in `src/app.tsx`, `src/lib/message-image-source.ts`, and `electron/main.cjs`
+- define the preferred remote media contract for ClawFace to consume:
+  - structured `media.read` / artifact-read style response, or
+  - a stable gateway-served media endpoint
+- route image attachment resolution through that contract when local path resolution is unavailable or fails
+- ensure generated-image attachments preserve enough source identity to resolve via gateway-served reads
+- keep path-prefix mappings as a compatibility layer for shared-volume installs rather than the only media strategy
+- add focused validation coverage for the remote-resolution decision path
+
+### Deliverable
+A portable media-resolution path that works for truly remote OpenClaw installs instead of assuming local/shared filesystem access.
+
+### Done when
+- generated images render for remote OpenClaw installs without shared local volumes
+- ClawFace does not depend on backend filesystem path mapping as the only viable media-rendering strategy
+- local host and shared-volume container installs continue to work
+- `make test-unit`, `make typecheck`, and `make build` pass for the slice
+
+### Implementation notes
+Queued.
+
+#### Why this ticket exists
+The recent generated-image fixes solved the common local and shared-volume-container cases, but they intentionally stopped short of defining a portable remote media contract.
+
+That leaves one remaining deployment gap:
+- OpenClaw on another machine
+- generated media stored remotely
+- no shared host filesystem path for ClawFace to open directly
+
+#### Existing seams this should build on
+The app already has useful partial hooks that this ticket should formalize rather than replace:
+- `src/app.tsx` already tries remote-style media/file read methods such as `media.read`
+- the desktop image path already attempts remote gateway reads before local file reads in `electron/main.cjs`
+- `message-image-source.ts` already acts as the renderer-side normalization layer for attachment image sources
+
+#### First-pass product preference
+Prefer a gateway-served media/artifact contract over adding more hardcoded backend-path assumptions into the renderer.
+
+Path-prefix mappings should remain:
+- a strong compatibility layer for host-local and shared-volume container installs
+- not the only story for community-facing portability
 
 ## Ticket 2.2 — Paste image / clipboard workflow
 ### Goal
@@ -2351,6 +2443,14 @@ This ticket is validated complete.
 Validation outcome:
 - `make typecheck` passes
 - `make build` passes on the active macOS development machine
+
+#### Later follow-up (2026-04-11)
+Subsequent generated-image cleanup refined how media outputs relate to this tool surface:
+- temporary inline generated-image previewing inside `ToolActivityPanel` was removed once chat-side image attachments were working reliably
+- generated images now read as message attachments first, while tool activity remains focused on runtime visibility and result context
+
+That keeps this ticket aligned with its original goal:
+tool activity should be first-class and legible, but it does not need to duplicate the primary media-rendering surface once chat attachments are trustworthy.
 
 #### Recommended next step
 Proceed to a runtime/session visibility slice so ClawFace continues evolving from a polished chat client into a more distinctly OpenClaw-native desktop frontend.
