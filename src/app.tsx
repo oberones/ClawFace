@@ -45,7 +45,10 @@ import {
   runMayStillProduceMedia,
   toolMayProduceMedia,
 } from "./lib/media-hydration.ts";
-import { shouldCommitFinalAssistantMessage } from "./lib/final-assistant-message.ts";
+import {
+  resolveActiveFinalAssistantEvent,
+  resolveFinalAssistantMessage,
+} from "./lib/final-assistant-message.ts";
 import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
@@ -5131,27 +5134,19 @@ export default function App() {
           updateActiveSessionRunActivity({ working: false, unread: false });
           return;
         }
-        const hasRenderableText = Boolean(finalAssistantMessage.text.trim());
-        const hasRenderableAttachment = Boolean(finalAssistantMessage.attachments?.length);
-        const hydrationDecision = decideFinalizedRunHydration({
-          hasFinalAssistantMessage: true,
-          hasRenderableAttachment,
+        const finalAssistantResolution = resolveFinalAssistantMessage({
+          message: finalAssistantMessage,
           hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(runId),
-          hasCommittedMessage: true,
           expectsMedia: runHasExpectedMediaForRun(runId),
+          shouldSkipText: finalAssistantMessage.text.trim()
+            ? shouldSkipAssistantFinal(runId, finalAssistantMessage.text)
+            : true,
         });
-        const shouldSkipText = hasRenderableText
-          ? shouldSkipAssistantFinal(runId, finalAssistantMessage.text)
-          : true;
-        if (shouldCommitFinalAssistantMessage({
-          hasRenderableText,
-          hasRenderableAttachment,
-          shouldSkipText,
-        })) {
+        if (finalAssistantResolution.shouldCommitMessage) {
           setMessages((prev) => upsertAssistantMessageForRun(prev, runId, finalAssistantMessage));
           notifyReplyCompleted();
         }
-        applyFinalizedRunHydrationDecision(runId, hydrationDecision);
+        applyFinalizedRunHydrationDecision(runId, finalAssistantResolution.hydrationDecision);
         clearActiveRunTransientState(runId);
         refreshSessionListsSoon();
         updateActiveSessionRunActivity({ working: false, unread: false });
@@ -6696,28 +6691,18 @@ export default function App() {
       streamedText,
       parsed.runId,
     );
-    if (msg) {
-      const hasRenderableText = Boolean(msg.text.trim());
-      const hasRenderableAttachment = Boolean(msg.attachments?.length);
-      const hydrationDecision = decideFinalizedRunHydration({
-        hasFinalAssistantMessage: true,
-        hasRenderableAttachment,
-        hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(parsed.runId),
-        hasCommittedMessage: true,
-        expectsMedia: runHasExpectedMediaForRun(parsed.runId, { toolUpdates }),
-      });
-      const shouldSkipText = hasRenderableText
-        ? shouldSkipAssistantFinal(parsed.runId, msg.text)
-        : true;
-      if (shouldCommitFinalAssistantMessage({
-        hasRenderableText,
-        hasRenderableAttachment,
-        shouldSkipText,
-      })) {
+    const activeFinalAssistantResolution = resolveActiveFinalAssistantEvent({
+      message: msg,
+      hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(parsed.runId),
+      expectsMedia: runHasExpectedMediaForRun(parsed.runId, { toolUpdates }),
+      shouldSkipText: msg?.text.trim() ? shouldSkipAssistantFinal(parsed.runId, msg.text) : true,
+    });
+    if (activeFinalAssistantResolution.kind === "final-assistant-message") {
+      if (activeFinalAssistantResolution.shouldCommitMessage) {
         setMessages((prev) => upsertAssistantMessageForRun(prev, parsed.runId, msg));
         notifyReplyCompleted();
       }
-      applyFinalizedRunHydrationDecision(parsed.runId, hydrationDecision);
+      applyFinalizedRunHydrationDecision(parsed.runId, activeFinalAssistantResolution.hydrationDecision);
     } else {
       scheduleActiveHistoryHydration(parsed.runId);
     }

@@ -75,3 +75,86 @@ test("shouldCommitFinalAssistantMessage commits text-only finals when the text i
     true,
   );
 });
+
+test("resolveFinalAssistantMessage schedules hydration for text-only finals when media is still expected", () => {
+  const { resolveFinalAssistantMessage } = loadFinalAssistantMessageModule();
+
+  assert.deepEqual(
+    resolveFinalAssistantMessage({
+      message: {
+        text: "Here you go",
+        attachments: [],
+      },
+      hasCommittedAttachment: false,
+      expectsMedia: true,
+      shouldSkipText: false,
+    }),
+    {
+      hasRenderableText: true,
+      hasRenderableAttachment: false,
+      shouldCommitMessage: true,
+      hydrationDecision: "schedule",
+    },
+  );
+});
+
+test("resolveFinalAssistantMessage clears hydration and still commits attachment-bearing finals even when the text itself would be skipped", () => {
+  const { resolveFinalAssistantMessage } = loadFinalAssistantMessageModule();
+
+  assert.deepEqual(
+    resolveFinalAssistantMessage({
+      message: {
+        text: "duplicate text",
+        attachments: [{ kind: "image", source: "monkey.png" }],
+      },
+      hasCommittedAttachment: false,
+      expectsMedia: true,
+      shouldSkipText: true,
+    }),
+    {
+      hasRenderableText: true,
+      hasRenderableAttachment: true,
+      shouldCommitMessage: true,
+      hydrationDecision: "clear",
+    },
+  );
+});
+
+test("resolveActiveFinalAssistantEvent schedules delayed hydration when the live final has no assistant message yet", () => {
+  const { resolveActiveFinalAssistantEvent } = loadFinalAssistantMessageModule();
+
+  assert.deepEqual(
+    resolveActiveFinalAssistantEvent({
+      message: null,
+      hasCommittedAttachment: false,
+      expectsMedia: true,
+      shouldSkipText: true,
+    }),
+    {
+      kind: "schedule-history-hydration",
+    },
+  );
+});
+
+test("resolveActiveFinalAssistantEvent commits attachment-bearing finals instead of scheduling delayed hydration", () => {
+  const { resolveActiveFinalAssistantEvent } = loadFinalAssistantMessageModule();
+
+  assert.deepEqual(
+    resolveActiveFinalAssistantEvent({
+      message: {
+        text: "duplicate text",
+        attachments: [{ id: "1", name: "monkey.png", size: 1, type: "image/png", dataUrl: "", isImage: true }],
+      },
+      hasCommittedAttachment: false,
+      expectsMedia: true,
+      shouldSkipText: true,
+    }),
+    {
+      kind: "final-assistant-message",
+      hasRenderableText: true,
+      hasRenderableAttachment: true,
+      shouldCommitMessage: true,
+      hydrationDecision: "clear",
+    },
+  );
+});
