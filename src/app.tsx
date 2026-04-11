@@ -46,6 +46,12 @@ import {
   toolMayProduceMedia,
 } from "./lib/media-hydration.ts";
 import {
+  buildGatewayRemoteMediaUrlCandidates,
+  buildRemoteMediaReadParamVariants,
+  extractRenderableImageSourceFromUnknown,
+  pickRemoteMediaReadMethods,
+} from "./lib/remote-media-resolution.ts";
+import {
   resolveActiveFinalAssistantEvent,
   resolveFinalAssistantMessage,
 } from "./lib/final-assistant-message.ts";
@@ -129,16 +135,6 @@ const ATTACHMENT_FINGERPRINT_TAIL = 64;
 const WORKSPACE_MARKER = "/.openclaw/workspace";
 const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 const REMOTE_IMAGE_CACHE_LIMIT = 5;
-const DEFAULT_REMOTE_IMAGE_READ_METHODS = [
-  "workspace.read",
-  "workspace.file.read",
-  "files.read",
-  "file.read",
-  "fs.read",
-  "image.read",
-  "images.read",
-  "media.read",
-];
 const runtimePathHints: { homeDir: string; workspaceDir: string } = {
   homeDir: "",
   workspaceDir: "",
@@ -3153,226 +3149,6 @@ function inferImageMimeTypeFromPath(value: string): string | null {
   return null;
 }
 
-function looksLikeBase64Payload(value: string): boolean {
-  const compact = value.replace(/\s+/g, "");
-  if (compact.length < 24 || compact.length % 4 === 1) {
-    return false;
-  }
-  return /^[A-Za-z0-9+/]+=*$/.test(compact);
-}
-
-function toImageDataUrl(base64Payload: string, sourcePathHint: string, mimeHint?: string | null): string | null {
-  const compact = base64Payload.replace(/\s+/g, "").trim();
-  if (!looksLikeBase64Payload(compact)) {
-    return null;
-  }
-  const mimeType = mimeHint ?? inferImageMimeTypeFromPath(sourcePathHint) ?? "image/png";
-  return `data:${mimeType};base64,${compact}`;
-}
-
-function extractImageDataUrlFromUnknown(
-  value: unknown,
-  sourcePathHint: string,
-  mimeHint?: string | null,
-): string | null {
-  const queue: Array<{ value: unknown; depth: number; mimeHint?: string | null }> = [
-    { value, depth: 0, mimeHint },
-  ];
-  const seen = new Set<unknown>();
-  let traversed = 0;
-  const MAX_NODES = 220;
-  const MAX_DEPTH = 6;
-
-  while (queue.length > 0 && traversed < MAX_NODES) {
-    const current = queue.shift();
-    if (!current) {
-      continue;
-    }
-    traversed += 1;
-    const node = current.value;
-    if (node === null || node === undefined || seen.has(node)) {
-      continue;
-    }
-    seen.add(node);
-
-    if (typeof node === "string") {
-      const trimmed = node.trim();
-      if (!trimmed) {
-        continue;
-      }
-      if (/^data:image\//i.test(trimmed)) {
-        return trimmed;
-      }
-      if (/^(https?:|blob:)/i.test(trimmed)) {
-        return trimmed;
-      }
-      const dataUrl = toImageDataUrl(trimmed, sourcePathHint, current.mimeHint);
-      if (dataUrl) {
-        return dataUrl;
-      }
-      continue;
-    }
-
-    if (Array.isArray(node)) {
-      if (current.depth < MAX_DEPTH) {
-        for (const item of node) {
-          queue.push({ value: item, depth: current.depth + 1, mimeHint: current.mimeHint });
-        }
-      }
-      continue;
-    }
-
-    if (!isRecord(node)) {
-      continue;
-    }
-
-    const inferredMime =
-      getString(node, ["mimeType", "mime_type", "media_type", "contentType", "content_type"]) ??
-      current.mimeHint ??
-      null;
-    const directUrl = getString(node, ["dataUrl", "data_url", "url", "uri", "href", "image_url", "imageUrl"]);
-    if (directUrl) {
-      if (/^data:image\//i.test(directUrl) || /^(https?:|blob:)/i.test(directUrl)) {
-        return directUrl;
-      }
-      const fromRaw = toImageDataUrl(directUrl, sourcePathHint, inferredMime);
-      if (fromRaw) {
-        return fromRaw;
-      }
-    }
-
-    const directBase64 = getString(node, [
-      "base64",
-      "b64",
-      "b64_json",
-      "data",
-      "content",
-      "bytes",
-      "image",
-      "image_base64",
-    ]);
-    if (directBase64) {
-      const asDataUrl = toImageDataUrl(directBase64, sourcePathHint, inferredMime);
-      if (asDataUrl) {
-        return asDataUrl;
-      }
-    }
-
-    if (current.depth >= MAX_DEPTH) {
-      continue;
-    }
-    for (const nested of Object.values(node)) {
-      if (isRecord(nested) || Array.isArray(nested) || typeof nested === "string") {
-        queue.push({ value: nested, depth: current.depth + 1, mimeHint: inferredMime });
-      }
-    }
-  }
-
-  return null;
-}
-
-function pickRemoteImageReadMethods(methods: Set<string>): string[] {
-  const values = [...methods].filter((entry) => typeof entry === "string" && entry.trim());
-  if (values.length === 0) {
-    return [...DEFAULT_REMOTE_IMAGE_READ_METHODS];
-  }
-  const scored = values
-    .map((method) => {
-      const lower = method.trim().toLowerCase();
-      let score = 0;
-      if (lower.includes("read")) {
-        score += 3;
-      }
-      if (lower.includes("file") || lower.includes("fs")) {
-        score += 3;
-      }
-      if (lower.includes("workspace") || lower.includes("media") || lower.includes("image")) {
-        score += 2;
-      }
-      if (lower.includes("chat")) {
-        score -= 2;
-      }
-      return { method, score };
-    })
-    .filter((item) => item.score >= 2)
-    .sort((a, b) => b.score - a.score);
-
-  const methodsByScore = scored.map((item) => item.method);
-  const relatedMethods = values.filter((method) => {
-    const lower = method.toLowerCase();
-    return (
-      lower.includes("read") ||
-      lower.includes("file") ||
-      lower.includes("fs") ||
-      lower.includes("image") ||
-      lower.includes("media") ||
-      lower.includes("workspace")
-    );
-  });
-  const merged = [...methodsByScore, ...relatedMethods, ...DEFAULT_REMOTE_IMAGE_READ_METHODS].filter(
-    (method, index, arr) => arr.indexOf(method) === index,
-  );
-  if (merged.length === 0) {
-    return [...DEFAULT_REMOTE_IMAGE_READ_METHODS];
-  }
-  return merged;
-}
-
-function toGatewayHttpBaseCandidates(rawGatewayUrl: string): string[] {
-  const trimmed = normalizeGatewayUrl(rawGatewayUrl).trim();
-  if (!trimmed) {
-    return [];
-  }
-  const seen = new Set<string>();
-  const candidates: string[] = [];
-  const push = (value: string) => {
-    const next = value.trim().replace(/\/+$/g, "");
-    if (!next || seen.has(next)) {
-      return;
-    }
-    seen.add(next);
-    candidates.push(next);
-  };
-  const collectFromUrl = (value: URL) => {
-    const protocol =
-      value.protocol === "wss:"
-        ? "https:"
-        : value.protocol === "ws:"
-          ? "http:"
-          : value.protocol;
-    if (protocol !== "http:" && protocol !== "https:") {
-      return;
-    }
-    const originBase = `${protocol}//${value.host}`;
-    push(originBase);
-    const segments = value.pathname.split("/").filter(Boolean);
-    if (segments.length === 0) {
-      return;
-    }
-    for (let i = segments.length; i >= 1; i -= 1) {
-      push(`${originBase}/${segments.slice(0, i).join("/")}`);
-    }
-  };
-
-  try {
-    collectFromUrl(new URL(trimmed));
-  } catch {
-    try {
-      collectFromUrl(new URL(`ws://${trimmed}`));
-    } catch {
-      return [];
-    }
-  }
-  return candidates;
-}
-
-function buildGatewayLocalImageProxyCandidates(rawGatewayUrl: string, filePath: string): string[] {
-  const encodedPath = encodeURIComponent(filePath);
-  return toGatewayHttpBaseCandidates(rawGatewayUrl)
-    .map((base) => `${base}/__claw/local-image?path=${encodedPath}`)
-    .filter((value, index, arr) => arr.indexOf(value) === index);
-}
-
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -3399,7 +3175,7 @@ async function extractImageDataUrlFromHttpResponse(
   if (contentType.includes("json")) {
     try {
       const payload = await response.json();
-      return extractImageDataUrlFromUnknown(payload, sourcePathHint);
+      return extractRenderableImageSourceFromUnknown(payload, sourcePathHint);
     } catch {
       return null;
     }
@@ -3411,9 +3187,9 @@ async function extractImageDataUrlFromHttpResponse(
     }
     try {
       const parsed = JSON.parse(payload);
-      return extractImageDataUrlFromUnknown(parsed, sourcePathHint);
+      return extractRenderableImageSourceFromUnknown(parsed, sourcePathHint);
     } catch {
-      return extractImageDataUrlFromUnknown(payload, sourcePathHint);
+      return extractRenderableImageSourceFromUnknown(payload, sourcePathHint);
     }
   }
   const blob = await response.blob();
@@ -3431,7 +3207,7 @@ async function resolveRemoteImageViaHttpProxy(
   gatewayUrl: string,
   filePath: string,
 ): Promise<string | null> {
-  const candidates = buildGatewayLocalImageProxyCandidates(gatewayUrl, filePath);
+  const candidates = buildGatewayRemoteMediaUrlCandidates(gatewayUrl, filePath);
   const desktopFetchImageUrl = window.desktopInfo?.fetchImageUrl;
   for (const candidate of candidates) {
     if (typeof desktopFetchImageUrl === "function") {
@@ -4551,23 +4327,12 @@ export default function App() {
     if (!client || !connected) {
       return null;
     }
-    const methods = pickRemoteImageReadMethods(gatewayMethodsRef.current);
+    const methods = pickRemoteMediaReadMethods(gatewayMethodsRef.current);
     if (methods.length === 0) {
       return null;
     }
 
-    const paramVariants: Record<string, unknown>[] = [
-      { path: normalizedPath },
-      { filePath: normalizedPath },
-      { file_path: normalizedPath },
-      { source: normalizedPath },
-      { uri: normalizedPath },
-      { path: normalizedPath, encoding: "base64" },
-      { filePath: normalizedPath, encoding: "base64" },
-      { path: normalizedPath, format: "base64" },
-      { filePath: normalizedPath, format: "base64" },
-      { path: normalizedPath, responseType: "base64" },
-    ];
+    const paramVariants = buildRemoteMediaReadParamVariants(normalizedPath);
 
     const seenParamKeys = new Set<string>();
     for (const method of methods) {
@@ -4579,7 +4344,7 @@ export default function App() {
         seenParamKeys.add(dedupeKey);
         try {
           const payload = await client.request(method, params);
-          const dataUrl = extractImageDataUrlFromUnknown(payload, normalizedPath);
+          const dataUrl = extractRenderableImageSourceFromUnknown(payload, normalizedPath);
           if (!dataUrl) {
             continue;
           }

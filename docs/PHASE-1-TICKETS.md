@@ -2290,7 +2290,20 @@ A portable media-resolution path that works for truly remote OpenClaw installs i
 - `make test-unit`, `make typecheck`, and `make build` pass for the slice
 
 ### Implementation notes
-Queued.
+In progress.
+
+ClawFace now has a dedicated remote-media resolution layer that:
+- preserves remote source identity instead of requiring every image source to parse as a local desktop path first
+- broadens the consumable RPC contract to path-like and artifact-like read shapes
+- broadens the consumable HTTP contract beyond the legacy `__claw/local-image` path
+- adds focused regression coverage for remote method selection, payload extraction, reference preservation, and gateway endpoint candidate building
+
+That means the frontend is now ready to consume:
+- a future OpenClaw `media.read` / `artifact.read` style gateway method, or
+- a future gateway-served media/artifact HTTP endpoint returning image bytes, base64/data URLs, or redirect-style image URLs
+
+What is still missing for full completion is the authoritative backend contract itself.
+The OpenClaw source currently does not expose a first-class remote media/artifact read gateway method in the server-method set, so end-to-end remote image rendering without shared volumes still depends on backend follow-through.
 
 #### Why this ticket exists
 The recent generated-image fixes solved the common local and shared-volume-container cases, but they intentionally stopped short of defining a portable remote media contract.
