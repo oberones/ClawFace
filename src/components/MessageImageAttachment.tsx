@@ -12,6 +12,7 @@ import {
   summarizeSourceForError,
   toRuntimeRenderableSrc,
 } from "../lib/message-image-source.ts";
+import { buildRemoteMediaReferenceCandidates } from "../lib/remote-media-resolution.ts";
 
 type MessageImageAttachmentProps = {
   attachment: Attachment;
@@ -162,6 +163,31 @@ export function MessageImageAttachment(props: MessageImageAttachmentProps) {
         break;
       }
     }
+    const remoteReferenceCandidates = buildRemoteMediaReferenceCandidates({
+      sourcePath: props.attachment.sourcePath ?? sourceValue,
+      sourceCandidates,
+      localFilePath: filePath,
+    });
+    const tryResolveRemote = async (): Promise<Attachment | null> => {
+      if (!props.resolveRemoteImage) {
+        return null;
+      }
+      for (const remoteReferenceCandidate of remoteReferenceCandidates) {
+        const remoteDataUrl = await props.resolveRemoteImage(remoteReferenceCandidate);
+        const nextDataUrl = typeof remoteDataUrl === "string" ? remoteDataUrl.trim() : "";
+        if (!nextDataUrl) {
+          continue;
+        }
+        setResolvedSrc(nextDataUrl);
+        setFailedToLoad(false);
+        setLoadError(null);
+        return {
+          ...props.attachment,
+          dataUrl: nextDataUrl,
+        };
+      }
+      return null;
+    };
     if (!filePath) {
       if (sourceKind === "data-url") {
         for (const candidate of sourceCandidates) {
@@ -179,6 +205,10 @@ export function MessageImageAttachment(props: MessageImageAttachmentProps) {
         setFailedToLoad(true);
         setLoadError(`img-decode-failed:${sourceKind}:${summarizeSourceForError(sourceValue)}`);
         return null;
+      }
+      const remotelyResolved = await tryResolveRemote();
+      if (remotelyResolved) {
+        return remotelyResolved;
       }
       let remoteUrl: string | null = null;
       for (const candidate of sourceCandidates) {
@@ -214,28 +244,6 @@ export function MessageImageAttachment(props: MessageImageAttachmentProps) {
       setLoadError(`path-parse-failed:${sourceKind}:${summarizeSourceForError(sourceValue)}`);
       return null;
     }
-    const tryResolveRemote = async (): Promise<Attachment | null> => {
-      if (!props.resolveRemoteImage) {
-        return null;
-      }
-      const originalSourcePath = props.attachment.sourcePath?.trim() ?? "";
-      const remotePathCandidate = originalSourcePath || filePath;
-      if (!remotePathCandidate) {
-        return null;
-      }
-      const remoteDataUrl = await props.resolveRemoteImage(remotePathCandidate);
-      const nextDataUrl = typeof remoteDataUrl === "string" ? remoteDataUrl.trim() : "";
-      if (!nextDataUrl) {
-        return null;
-      }
-      setResolvedSrc(nextDataUrl);
-      setFailedToLoad(false);
-      setLoadError(null);
-      return {
-        ...props.attachment,
-        dataUrl: nextDataUrl,
-      };
-    };
 
     let localError: string | null = null;
     const readImageFile = desktopReadImageFile;

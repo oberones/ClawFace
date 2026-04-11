@@ -81,6 +81,7 @@ const DRAWER_KICK_MS = 440;
 const POP_MARK_MS = 640;
 const FLY_IN_STAGGER_MS = 38;
 const MAX_FLY_IN_ELEMENTS = 10;
+const CHAT_BRAND_LOGO_SRC = `${import.meta.env.BASE_URL}clawface-logo.png`;
 
 type ThreadSnapshot = {
   sessionKey: string | null;
@@ -1199,9 +1200,12 @@ export default function ChatView(props: ChatViewProps) {
       <header className={`chat-header ${modelMenuOpen || thinkingMenuOpen ? "menu-layer-active" : ""}`}>
         <div className="chat-header-main">
           <div className="chat-header-identity">
-            <div>
-              <div className="chat-brand-title">ClawFace</div>
-              <div className="chat-brand-subtitle">OpenClaw control surface · v{__APP_VERSION__}</div>
+            <div className="chat-brand-lockup">
+              <img className="chat-brand-mark" src={CHAT_BRAND_LOGO_SRC} alt="ClawFace logo" />
+              <div className="chat-brand-copy">
+                <div className="chat-brand-title">ClawFace</div>
+                <div className="chat-brand-subtitle">OpenClaw control surface · v{__APP_VERSION__}</div>
+              </div>
             </div>
             <div
               className={`session-runtime-pill${currentSessionRuntime.tone === "active" ? " is-active" : currentSessionRuntime.tone === "warning" ? " is-warning" : ""}`}
