@@ -1,11 +1,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { app, BrowserWindow, shell, ipcMain, protocol } = require("electron");
+const { app, BrowserWindow, shell, ipcMain, nativeImage, protocol } = require("electron");
 
 const WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 820;
 const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 const CLAW_FS_SCHEME = "claw-fs";
+const APP_ICON_FILE = "clawface-logo.png";
 const IMAGE_CACHE_LIMIT = 5;
 const BLANK_CHECK_DELAY_MS = 1400;
 const MAX_BLANK_RECOVERY_ATTEMPTS = 2;
@@ -29,12 +30,15 @@ const IMAGE_MIME_BY_EXT = {
   ".bmp": "image/bmp",
   ".svg": "image/svg+xml",
 };
+const REMOTE_GATEWAY_FETCH_TIMEOUT_MS = 2000;
+const MAX_REMOTE_GATEWAY_URLS = 18;
 const imageDataCache = new Map();
 let gatewayHttpBaseCandidates = [];
 let gatewayUsesRemoteHost = false;
 let clawFsServerUrl = "";
 let mainWindow = null;
 let isQuitting = false;
+let cachedAppIcon = undefined;
 
 function imageMimeTypeFromPath(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -43,6 +47,29 @@ function imageMimeTypeFromPath(filePath) {
 
 function isLikelyImageFileName(value) {
   return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(value || "");
+}
+
+function classifyRemoteMediaReference(value) {
+  const trimmed = stripPathDecorators(value);
+  if (!trimmed) {
+    return "opaque";
+  }
+  if (/^artifact:/i.test(trimmed)) {
+    return "artifact";
+  }
+  if (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("~/") ||
+    /^[A-Za-z]:[\\/]/.test(trimmed) ||
+    trimmed.startsWith(".openclaw/") ||
+    trimmed.startsWith("openclaw/") ||
+    trimmed.includes("/.openclaw/") ||
+    trimmed.includes("\\.openclaw\\") ||
+    isLikelyImageFileName(trimmed)
+  ) {
+    return "path";
+  }
+  return "opaque";
 }
 
 function normalizePathSeparators(value) {
@@ -77,6 +104,33 @@ function getWorkspaceRoot(homeDir) {
 
 function getMediaRoot(homeDir) {
   return path.join(homeDir, ".openclaw", "media");
+}
+
+function resolveAppIconPath() {
+  const candidates = [
+    path.join(__dirname, "..", "dist", APP_ICON_FILE),
+    path.join(__dirname, "..", "public", APP_ICON_FILE),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function getAppIcon() {
+  if (cachedAppIcon !== undefined) {
+    return cachedAppIcon;
+  }
+  const iconPath = resolveAppIconPath();
+  if (!iconPath) {
+    cachedAppIcon = null;
+    return cachedAppIcon;
+  }
+  const image = nativeImage.createFromPath(iconPath);
+  cachedAppIcon = image.isEmpty() ? null : image;
+  return cachedAppIcon;
 }
 
 function mapOpenClawPathToLocalHome(rawPath, homeDir, dirName) {
@@ -379,11 +433,11 @@ function toGatewayHttpBaseCandidates(rawGatewayUrl) {
       return;
     }
     const originBase = `${protocol}//${value.host}`;
-    push(originBase);
     const segments = value.pathname.split("/").filter(Boolean);
     for (let i = segments.length; i >= 1; i -= 1) {
       push(`${originBase}/${segments.slice(0, i).join("/")}`);
     }
+    push(originBase);
   };
   try {
     collectFromUrl(new URL(trimmed));
@@ -423,40 +477,349 @@ function isRemoteGatewayCandidates(candidates) {
 // Vite dev server port for local image proxy (run `npm run dev` on the Gateway machine)
 const VITE_DEV_SERVER_PORT = process.env.CLAWUI_IMAGE_PROXY_PORT || "3000";
 
-async function tryFetchImageFromUrl(targetUrl) {
+function buildAllowedRemoteFetchOrigins(seedUrl, includeGatewayOrigins = true) {
+  const allowed = new Set();
+  const pushOrigin = (rawUrl) => {
+    try {
+      const origin = new URL(rawUrl).origin;
+      if (origin && origin !== "null") {
+        allowed.add(origin);
+      }
+    } catch {
+      // ignore invalid origin candidates
+    }
+  };
+  pushOrigin(seedUrl);
+  if (includeGatewayOrigins) {
+    for (const baseUrl of gatewayHttpBaseCandidates) {
+      pushOrigin(baseUrl);
+    }
+  }
+  return allowed;
+}
+
+function isAllowedFollowUpUrl(rawUrl, allowedOrigins) {
   try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false;
+    }
+    if (!(allowedOrigins instanceof Set) || allowedOrigins.size === 0) {
+      return true;
+    }
+    return allowedOrigins.has(parsed.origin);
+  } catch {
+    return false;
+  }
+}
+
+function buildRemoteGatewayUrlCandidates(reference) {
+  const normalizedReference = stripPathDecorators(reference);
+  if (!normalizedReference) {
+    return [];
+  }
+  const referenceKind = classifyRemoteMediaReference(normalizedReference);
+  const endpointCandidates =
+    referenceKind === "artifact"
+      ? [
+          ["/__claw/artifacts/read", "artifact"],
+          ["/__claw/artifacts/read", "artifactUri"],
+          ["/__claw/media/read", "artifact"],
+          ["/__claw/media/read", "source"],
+          ["/artifacts/read", "artifact"],
+          ["/media/read", "artifact"],
+        ]
+      : referenceKind === "path"
+        ? [
+            ["/__claw/local-image", "path"],
+            ["/__claw/media/read", "path"],
+            ["/__claw/media/read", "filePath"],
+            ["/media/read", "path"],
+            ["/media/read", "filePath"],
+          ]
+        : [
+            ["/__claw/media/read", "source"],
+            ["/__claw/media/read", "uri"],
+            ["/__claw/artifacts/read", "artifact"],
+            ["/media/read", "source"],
+            ["/artifacts/read", "artifact"],
+          ];
+  const seen = new Set();
+  const candidates = [];
+  const push = (value) => {
+    const next = String(value || "").trim();
+    if (!next || seen.has(next) || candidates.length >= MAX_REMOTE_GATEWAY_URLS) {
+      return;
+    }
+    seen.add(next);
+    candidates.push(next);
+  };
+  const encodedReference = encodeURIComponent(normalizedReference);
+  for (const baseUrl of gatewayHttpBaseCandidates) {
+    for (const [pathname, queryKey] of endpointCandidates) {
+      push(`${baseUrl}${pathname}?${queryKey}=${encodedReference}`);
+      if (candidates.length >= MAX_REMOTE_GATEWAY_URLS) {
+        break;
+      }
+    }
+    if (candidates.length >= MAX_REMOTE_GATEWAY_URLS) {
+      break;
+    }
+  }
+  return candidates;
+}
+
+function looksLikeBase64Payload(value) {
+  const compact = String(value || "").replace(/\s+/g, "");
+  if (compact.length < 24 || compact.length % 4 === 1) {
+    return false;
+  }
+  return /^[A-Za-z0-9+/]+=*$/.test(compact);
+}
+
+function toImageDataUrl(base64Payload, sourcePathHint, mimeHint) {
+  const compact = String(base64Payload || "").replace(/\s+/g, "").trim();
+  if (!looksLikeBase64Payload(compact)) {
+    return null;
+  }
+  const mimeType = mimeHint || imageMimeTypeFromPath(sourcePathHint) || "image/png";
+  return `data:${mimeType};base64,${compact}`;
+}
+
+function extractRenderableImageSourceFromUnknown(value, sourcePathHint, mimeHint) {
+  const queue = [{ value, depth: 0, mimeHint }];
+  const seen = new Set();
+  let traversed = 0;
+  const maxNodes = 220;
+  const maxDepth = 6;
+
+  while (queue.length > 0 && traversed < maxNodes) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    traversed += 1;
+    const node = current.value;
+    if (node === null || node === undefined || seen.has(node)) {
+      continue;
+    }
+    seen.add(node);
+
+    if (typeof node === "string") {
+      const trimmed = node.trim();
+      if (!trimmed) {
+        continue;
+      }
+      if (/^data:image\//i.test(trimmed) || /^(https?:|blob:)/i.test(trimmed)) {
+        return trimmed;
+      }
+      const dataUrl = toImageDataUrl(trimmed, sourcePathHint, current.mimeHint);
+      if (dataUrl) {
+        return dataUrl;
+      }
+      continue;
+    }
+
+    if (Array.isArray(node)) {
+      if (current.depth < maxDepth) {
+        for (const item of node) {
+          queue.push({ value: item, depth: current.depth + 1, mimeHint: current.mimeHint });
+        }
+      }
+      continue;
+    }
+
+    if (!node || typeof node !== "object") {
+      continue;
+    }
+
+    const inferredMime =
+      ["mimeType", "mime_type", "media_type", "contentType", "content_type"]
+        .map((key) => node[key])
+        .find((entry) => typeof entry === "string" && entry.trim()) ||
+      current.mimeHint ||
+      null;
+    const directUrl =
+      [
+        "dataUrl",
+        "data_url",
+        "url",
+        "uri",
+        "href",
+        "image_url",
+        "imageUrl",
+        "mediaUrl",
+        "media_url",
+      ]
+        .map((key) => node[key])
+        .find((entry) => typeof entry === "string" && entry.trim()) || null;
+    if (directUrl) {
+      if (/^data:image\//i.test(directUrl) || /^(https?:|blob:)/i.test(directUrl)) {
+        return directUrl;
+      }
+      const fromRaw = toImageDataUrl(directUrl, sourcePathHint, inferredMime);
+      if (fromRaw) {
+        return fromRaw;
+      }
+    }
+
+    const directBase64 =
+      ["base64", "b64", "b64_json", "data", "content", "bytes", "image", "image_base64"]
+        .map((key) => node[key])
+        .find((entry) => typeof entry === "string" && entry.trim()) || null;
+    if (directBase64) {
+      const asDataUrl = toImageDataUrl(directBase64, sourcePathHint, inferredMime);
+      if (asDataUrl) {
+        return asDataUrl;
+      }
+    }
+
+    if (current.depth >= maxDepth) {
+      continue;
+    }
+    for (const nested of Object.values(node)) {
+      if ((nested && typeof nested === "object") || Array.isArray(nested) || typeof nested === "string") {
+        queue.push({ value: nested, depth: current.depth + 1, mimeHint: inferredMime });
+      }
+    }
+  }
+
+  return null;
+}
+
+function decodeDataImageUrl(dataUrl) {
+  const match = /^data:(image\/[a-z0-9.+-]+)(?:;[a-z0-9.+-]+=[^;,]+)*;base64,([\s\S]+)$/i.exec(
+    String(dataUrl || "").trim(),
+  );
+  if (!match) {
+    return { ok: false, error: "invalid-data-url" };
+  }
+  try {
+    const mimeType = match[1].toLowerCase();
+    const payload = match[2].replace(/\s+/g, "");
+    const data = Buffer.from(payload, "base64");
+    if (data.length === 0) {
+      return { ok: false, error: "empty-body" };
+    }
+    return {
+      ok: true,
+      mimeType,
+      size: data.length,
+      data,
+    };
+  } catch {
+    return { ok: false, error: "invalid-data-url" };
+  }
+}
+
+async function resolveFetchedImageSource(source, sourcePathHint, depth, options) {
+  const trimmed = String(source || "").trim();
+  if (!trimmed) {
+    return { ok: false, error: "empty-body" };
+  }
+  if (/^data:image\//i.test(trimmed)) {
+    return decodeDataImageUrl(trimmed);
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    if (!isAllowedFollowUpUrl(trimmed, options?.allowedOrigins)) {
+      return { ok: false, error: "disallowed-follow-up-origin" };
+    }
+    return tryFetchImageFromUrl(trimmed, sourcePathHint, depth + 1, options);
+  }
+  return { ok: false, error: "wrong-content-type:unusable-response" };
+}
+
+async function tryFetchImageFromUrl(targetUrl, sourcePathHint = "", depth = 0, options = {}) {
+  if (depth > 2) {
+    return { ok: false, error: "redirect-depth-exceeded" };
+  }
+  const timeoutMs =
+    typeof options.timeoutMs === "number" && options.timeoutMs > 0
+      ? options.timeoutMs
+      : 0;
+  let timeoutId = null;
+  const controller = timeoutMs > 0 ? new AbortController() : null;
+  try {
+    if (controller) {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+    }
     const response = await fetch(targetUrl, {
       method: "GET",
       cache: "no-store",
+      signal: controller?.signal,
     });
     if (!response.ok) {
       return { ok: false, error: `http-${response.status}` };
+    }
+    const contentType = (response.headers.get("content-type") || "")
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+    if (contentType.includes("json")) {
+      try {
+        const payload = await response.json();
+        const extracted = extractRenderableImageSourceFromUnknown(payload, sourcePathHint);
+        if (!extracted) {
+          return { ok: false, error: "wrong-content-type:json" };
+        }
+        return resolveFetchedImageSource(extracted, sourcePathHint, depth, options);
+      } catch {
+        return { ok: false, error: "invalid-json" };
+      }
+    }
+    if (contentType.startsWith("text/")) {
+      const payload = await response.text();
+      if (!payload.trim()) {
+        return { ok: false, error: "empty-body" };
+      }
+      try {
+        const parsed = JSON.parse(payload);
+        const extracted = extractRenderableImageSourceFromUnknown(parsed, sourcePathHint);
+        if (!extracted) {
+          return { ok: false, error: `wrong-content-type:${contentType || "unknown"}` };
+        }
+        return resolveFetchedImageSource(extracted, sourcePathHint, depth, options);
+      } catch {
+        const extracted = extractRenderableImageSourceFromUnknown(payload, sourcePathHint);
+        if (!extracted) {
+          return { ok: false, error: `wrong-content-type:${contentType || "unknown"}` };
+        }
+        return resolveFetchedImageSource(extracted, sourcePathHint, depth, options);
+      }
     }
     const arrayBuffer = await response.arrayBuffer();
     const data = Buffer.from(arrayBuffer);
     if (data.length === 0) {
       return { ok: false, error: "empty-body" };
     }
-    const contentType = (response.headers.get("content-type") || "")
-      .split(";")[0]
-      .trim()
-      .toLowerCase();
-    // Only accept image/* content types; skip HTML/JSON/text responses
-    if (!contentType.startsWith("image/")) {
+    const mimeType =
+      (contentType.startsWith("image/") && contentType) ||
+      imageMimeTypeFromPath(sourcePathHint) ||
+      imageMimeTypeFromPath(new URL(targetUrl).pathname);
+    if (!mimeType) {
       return { ok: false, error: `wrong-content-type:${contentType || "unknown"}` };
     }
     return {
       ok: true,
-      mimeType: contentType,
+      mimeType,
       size: data.length,
       data,
     };
   } catch (error) {
+    if (error && typeof error === "object" && error.name === "AbortError") {
+      return { ok: false, error: "timeout" };
+    }
     const code =
       error && typeof error === "object" && "code" in error && typeof error.code === "string"
         ? error.code
         : "fetch-failed";
     return { ok: false, error: code };
+  } finally {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -474,7 +837,10 @@ async function readImageFromRemoteGateway(rawPath) {
     `http://localhost:${VITE_DEV_SERVER_PORT}/__claw/local-image?path=${encodedPath}`,
   ];
   for (const url of viteUrls) {
-    const result = await tryFetchImageFromUrl(url);
+    const result = await tryFetchImageFromUrl(url, normalizedPath, 0, {
+      allowedOrigins: buildAllowedRemoteFetchOrigins(url),
+      timeoutMs: REMOTE_GATEWAY_FETCH_TIMEOUT_MS,
+    });
     if (result.ok) {
       return result;
     }
@@ -482,9 +848,12 @@ async function readImageFromRemoteGateway(rawPath) {
   }
 
   // Strategy 2: Try Gateway HTTP endpoints (in case Gateway adds support in the future)
-  for (const baseUrl of gatewayHttpBaseCandidates) {
-    const targetUrl = `${baseUrl}/__claw/local-image?path=${encodedPath}`;
-    const result = await tryFetchImageFromUrl(targetUrl);
+  const gatewayUrls = buildRemoteGatewayUrlCandidates(normalizedPath);
+  for (const targetUrl of gatewayUrls) {
+    const result = await tryFetchImageFromUrl(targetUrl, normalizedPath, 0, {
+      allowedOrigins: buildAllowedRemoteFetchOrigins(targetUrl),
+      timeoutMs: REMOTE_GATEWAY_FETCH_TIMEOUT_MS,
+    });
     if (result.ok) {
       return result;
     }
@@ -1064,36 +1433,18 @@ ipcMain.handle("desktop:fetch-image-url", async (_event, rawUrl) => {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return { ok: false, error: "invalid-url-protocol" };
   }
-  try {
-    const response = await fetch(parsed.toString(), {
-      method: "GET",
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      return { ok: false, error: `http-${response.status}` };
-    }
-    const arrayBuffer = await response.arrayBuffer();
-    const data = Buffer.from(arrayBuffer);
-    if (data.length === 0) {
-      return { ok: false, error: "empty-body" };
-    }
-    const contentType = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    const mimeType = contentType.startsWith("image/")
-      ? contentType
-      : imageMimeTypeFromPath(parsed.pathname) || "image/png";
-    return {
-      ok: true,
-      mimeType,
-      size: data.length,
-      dataUrl: `data:${mimeType};base64,${data.toString("base64")}`,
-    };
-  } catch (error) {
-    const code =
-      error && typeof error === "object" && "code" in error && typeof error.code === "string"
-        ? error.code
-        : "fetch-failed";
-    return { ok: false, error: code };
+  const fetched = await tryFetchImageFromUrl(parsed.toString(), parsed.pathname, 0, {
+    allowedOrigins: buildAllowedRemoteFetchOrigins(parsed.toString(), false),
+  });
+  if (!fetched.ok) {
+    return { ok: false, error: fetched.error };
   }
+  return {
+    ok: true,
+    mimeType: fetched.mimeType,
+    size: fetched.size,
+    dataUrl: `data:${fetched.mimeType};base64,${fetched.data.toString("base64")}`,
+  };
 });
 
 ipcMain.handle("desktop:set-gateway-url", (_event, rawGatewayUrl) => {
@@ -1153,12 +1504,14 @@ function createMainWindow() {
     return mainWindow;
   }
 
+  const appIcon = getAppIcon();
   const nextWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
     minWidth: 1000,
     minHeight: 640,
     autoHideMenuBar: true,
+    icon: appIcon || undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -1277,6 +1630,10 @@ function createMainWindow() {
 }
 
 app.whenReady().then(() => {
+  const appIcon = getAppIcon();
+  if (process.platform === "darwin" && appIcon && app.dock) {
+    app.dock.setIcon(appIcon);
+  }
   protocol.handle(DESKTOP_LOCAL_IMAGE_SCHEME, handleDesktopLocalImageRequest);
   protocol.handle(CLAW_FS_SCHEME, handleClawFsRequest);
   createMainWindow();

@@ -50,6 +50,7 @@
     "appId": "com.openclaw.para",
     "productName": "ClawFace",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "icon": "public/clawface-logo.png",
     "directories": {
       "output": "desktop-dist"
     },
