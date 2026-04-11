@@ -24,6 +24,7 @@ import { renderMarkdown } from "../lib/markdown.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
+import { createBottomPinScheduler } from "../lib/scroll-anchoring.ts";
 
 export type SessionInfo = {
   agentId: string;
@@ -643,28 +644,24 @@ export default function ChatView(props: ChatViewProps) {
     if (!container || !thread || !autoScrollEnabled || typeof ResizeObserver === "undefined") {
       return;
     }
-    let rafId: number | null = null;
-    const scrollToBottom = () => {
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId);
-      }
-      rafId = window.requestAnimationFrame(() => {
-        rafId = null;
-        if (!scrollRef.current || !autoScrollEnabled) {
+    const bottomPinScheduler = createBottomPinScheduler({
+      requestFrame: window.requestAnimationFrame,
+      cancelFrame: window.cancelAnimationFrame,
+      shouldPin: () => Boolean(scrollRef.current) && autoScrollEnabled,
+      pinToBottom: () => {
+        if (!scrollRef.current) {
           return;
         }
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-      });
-    };
+      },
+    });
     const observer = new ResizeObserver(() => {
-      scrollToBottom();
+      bottomPinScheduler.schedule();
     });
     observer.observe(thread);
     return () => {
       observer.disconnect();
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId);
-      }
+      bottomPinScheduler.dispose();
     };
   }, [autoScrollEnabled, props.sessionKey, scrollRef]);
 

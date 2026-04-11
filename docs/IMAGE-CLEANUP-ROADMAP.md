@@ -87,7 +87,7 @@ Notes:
 
 ## 5. Add Focused Validation Coverage
 
-Status: In progress
+Status: Done
 
 Problem:
 - The generated-image fixes span multiple branches and fallbacks, but the behavior is mostly validated manually today.
@@ -106,4 +106,16 @@ Notes:
 - Added focused coverage for delayed hydration timer decisions in `src/lib/media-hydration.ts`.
 - Added focused coverage for final tool-message bundling in `src/lib/tool-final-messages.ts`.
 - Added focused coverage for final assistant commit eligibility in `src/lib/final-assistant-message.ts`.
-- Live assistant hydration and delayed history recovery still need a cleaner event-level seam before they are a good automated test target.
+- Added a shared final-assistant resolution helper in `src/lib/final-assistant-message.ts` so the active final chat path and lifecycle-end fallback use the same commit + hydration rules.
+- Added focused coverage for the two highest-risk final-assistant outcomes: text-only finals that should keep delayed hydration alive, and attachment-bearing finals that should clear hydration immediately.
+- Added an active final chat-event resolution helper in `src/lib/final-assistant-message.ts` so the live “no assistant message yet, recover via delayed hydration” path has direct automated coverage.
+- Added a tested resize-to-bottom scheduler in `src/lib/scroll-anchoring.ts` so the delayed-attachment scroll anchoring path is no longer only covered manually.
+
+## Roadmap Status
+
+Status: Complete
+
+Notes:
+- The original image-rendering bug is fixed.
+- The follow-up cleanup and validation slices are complete.
+- Future work can treat this as normal product evolution instead of an active cleanup track.
