@@ -251,6 +251,15 @@ Users running OpenClaw on another machine can still see generated images and oth
 - path-prefix mapping is no longer the only viable media strategy
 - local/shared-volume installs still work without regression
 
+##### Progress note
+The ClawFace-side contract is now in place:
+- remote image resolution has been extracted into a dedicated resolver layer
+- the frontend can now consume broader RPC and HTTP media/artifact response shapes
+- remote source references no longer have to masquerade as local desktop file paths to enter the resolution flow
+
+The remaining gap is backend-side:
+- OpenClaw still needs to expose a first-class gateway media/artifact read method or HTTP endpoint for truly remote installs without shared volumes
+
 ---
 
 # Phase 3 — Tool visibility and OpenClaw actionfulness
