@@ -24,6 +24,19 @@ test("shouldCommitFinalAssistantMessage commits attachment-only final messages",
   );
 });
 
+test("shouldCommitFinalAssistantMessage skips empty final messages when neither text nor attachments are renderable", () => {
+  const { shouldCommitFinalAssistantMessage } = loadFinalAssistantMessageModule();
+
+  assert.equal(
+    shouldCommitFinalAssistantMessage({
+      hasRenderableText: false,
+      hasRenderableAttachment: false,
+      shouldSkipText: false,
+    }),
+    false,
+  );
+});
+
 test("shouldCommitFinalAssistantMessage preserves text-plus-attachment finals even if the text itself would be skipped", () => {
   const { shouldCommitFinalAssistantMessage } = loadFinalAssistantMessageModule();
 
