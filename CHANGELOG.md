@@ -109,6 +109,20 @@ This version should be treated as the explicit starting point before deeper impl
 - This release is primarily a **project-baseline declaration** and planning checkpoint
 - Future releases should track actual implementation progress against Milestone 1 and later roadmap phases
 
+## v0.4.1 (2026-04-11)
+
+### Fix
+
+- update npm packages to latest
+- address PR feedback
+- address PR feedback
+- tool-result messages now run media extraction
+
+### Refactor
+
+- finish image rendering cleanup and regression coverage
+- images not showing up in chat
+
 ## v0.4.0 (2026-04-09)
 
 ### Feat
