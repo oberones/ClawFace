@@ -230,6 +230,27 @@ Attachments feel like first-class objects, not raw blobs.
 - attachment UX feels polished
 - image rendering is less tangled with chat rendering logic
 
+#### Queued follow-up slice — Remote media/artifact portability
+Remote/self-hosted OpenClaw installs still need a gateway-served media/artifact path when backend files are not locally shared.
+
+##### User value
+Users running OpenClaw on another machine can still see generated images and other media outputs without needing shared local filesystem access.
+
+##### Scope
+- gateway-served media/artifact reads for generated images and media attachments
+- frontend fallback from local path mapping/file reads to gateway-served media resolution
+- preserving host-local and shared-volume container behavior while adding truly remote portability
+
+##### Architecture work tied to the slice
+- formalize the remote side of the `platform/images` contract
+- prefer structured media/artifact reads over leaking backend filesystem paths into renderer concerns
+- narrow the assumption that attachment rendering can always resolve through local desktop paths
+
+##### Done when
+- generated images render for remote OpenClaw installs without shared local volumes
+- path-prefix mapping is no longer the only viable media strategy
+- local/shared-volume installs still work without regression
+
 ---
 
 # Phase 3 — Tool visibility and OpenClaw actionfulness
