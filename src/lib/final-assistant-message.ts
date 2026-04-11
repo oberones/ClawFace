@@ -3,10 +3,13 @@ export function shouldCommitFinalAssistantMessage(params: {
   hasRenderableAttachment: boolean;
   shouldSkipText: boolean;
 }): boolean {
-  if (!params.hasRenderableText) {
-    return true;
+  if (!params.hasRenderableText && !params.hasRenderableAttachment) {
+    return false;
   }
   if (params.hasRenderableAttachment) {
+    return true;
+  }
+  if (!params.hasRenderableText) {
     return true;
   }
   return !params.shouldSkipText;

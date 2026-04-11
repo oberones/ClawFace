@@ -4374,6 +4374,12 @@ export default function App() {
     deferredHistoryHydrationTimersRef.current = [];
   };
 
+  const removeDeferredHistoryHydrationTimer = (timerId: number) => {
+    deferredHistoryHydrationTimersRef.current = deferredHistoryHydrationTimersRef.current.filter(
+      (existingTimerId) => existingTimerId !== timerId,
+    );
+  };
+
   const switchView = useCallback((target: "chat" | "files") => {
     if (target === activeViewRef.current) return;
     setActiveView(target);
@@ -4992,8 +4998,10 @@ export default function App() {
     }
     const delaysMs = [180, 900, 2500];
     deferredHistoryHydrationTimersRef.current.push(
-      ...delaysMs.map((delayMs, index) =>
-        window.setTimeout(() => {
+      ...delaysMs.map((delayMs, index) => {
+        let timerId = 0;
+        timerId = window.setTimeout(() => {
+          removeDeferredHistoryHydrationTimer(timerId);
           const pendingAssistantReply = getAssistantReplyForRun(normalizedRunId);
           const activeStreamText = (pendingStreamTextRef.current ?? streamTextRef.current ?? "").trim();
           const tickDecision = decideScheduledHistoryHydrationTick({
@@ -5016,8 +5024,9 @@ export default function App() {
             return;
           }
           void loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
-        }, delayMs)
-      ),
+        }, delayMs);
+        return timerId;
+      }),
     );
   };
 
