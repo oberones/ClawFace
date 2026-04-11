@@ -645,8 +645,8 @@ export default function ChatView(props: ChatViewProps) {
       return;
     }
     const bottomPinScheduler = createBottomPinScheduler({
-      requestFrame: window.requestAnimationFrame,
-      cancelFrame: window.cancelAnimationFrame,
+      requestFrame: (callback) => window.requestAnimationFrame(callback),
+      cancelFrame: (handle) => window.cancelAnimationFrame(handle),
       shouldPin: () => Boolean(scrollRef.current) && autoScrollEnabled,
       pinToBottom: () => {
         if (!scrollRef.current) {
