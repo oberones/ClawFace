@@ -9,6 +9,9 @@ const CLAW_FS_SCHEME = "claw-fs";
 const IMAGE_CACHE_LIMIT = 5;
 const BLANK_CHECK_DELAY_MS = 1400;
 const MAX_BLANK_RECOVERY_ATTEMPTS = 2;
+const DESKTOP_DEV_SERVER_URL = typeof process.env.CLAWFACE_DEV_SERVER_URL === "string"
+  ? process.env.CLAWFACE_DEV_SERVER_URL.trim().replace(/\/+$/g, "")
+  : "";
 const LOCAL_GATEWAY_HOSTS = new Set([
   "localhost",
   "127.0.0.1",
@@ -72,21 +75,37 @@ function getWorkspaceRoot(homeDir) {
   return path.join(homeDir, ".openclaw", "workspace");
 }
 
-function mapWorkspacePathToLocalHome(rawPath, homeDir) {
+function getMediaRoot(homeDir) {
+  return path.join(homeDir, ".openclaw", "media");
+}
+
+function mapOpenClawPathToLocalHome(rawPath, homeDir, dirName) {
   const normalized = normalizePathSeparators(rawPath).trim();
-  const marker = "/.openclaw/workspace/";
+  const marker = `/.openclaw/${dirName}/`;
   const markerIndex = normalized.toLowerCase().indexOf(marker);
   if (markerIndex < 0) {
+    const rootMarker = `/.openclaw/${dirName}`;
+    if (normalized.toLowerCase().endsWith(rootMarker)) {
+      return path.join(homeDir, ".openclaw", dirName);
+    }
     return null;
   }
   const suffix = normalized.slice(markerIndex + marker.length);
   if (!suffix) {
-    return path.join(homeDir, ".openclaw", "workspace");
+    return path.join(homeDir, ".openclaw", dirName);
   }
-  return path.join(homeDir, ".openclaw", "workspace", suffix);
+  return path.join(homeDir, ".openclaw", dirName, suffix);
 }
 
-function resolveWorkspaceRelativePath(rawPath, homeDir) {
+function mapWorkspacePathToLocalHome(rawPath, homeDir) {
+  return mapOpenClawPathToLocalHome(rawPath, homeDir, "workspace");
+}
+
+function mapMediaPathToLocalHome(rawPath, homeDir) {
+  return mapOpenClawPathToLocalHome(rawPath, homeDir, "media");
+}
+
+function resolveOpenClawRelativePath(rawPath, homeDir, dirName) {
   const normalized = normalizePathSeparators(rawPath)
     .trim()
     .replace(/^\.\/+/, "")
@@ -94,24 +113,50 @@ function resolveWorkspaceRelativePath(rawPath, homeDir) {
   if (!normalized) {
     return null;
   }
-  if (normalized.startsWith(".openclaw/workspace/")) {
+  const lower = normalized.toLowerCase();
+  const dotRelativeMarker = `.openclaw/${dirName}/`;
+  const bareRelativeMarker = `openclaw/${dirName}/`;
+  if (lower === `.openclaw/${dirName}` || lower === `openclaw/${dirName}`) {
+    return path.join(homeDir, ".openclaw", dirName);
+  }
+  if (lower.startsWith(dotRelativeMarker)) {
     return path.join(homeDir, normalized);
   }
-  if (normalized.startsWith("openclaw/workspace/")) {
+  if (lower.startsWith(bareRelativeMarker)) {
     return path.join(homeDir, `.${normalized}`);
   }
+  return null;
+}
+
+function resolveWorkspaceRelativePath(rawPath, homeDir) {
+  const resolved = resolveOpenClawRelativePath(rawPath, homeDir, "workspace");
+  if (resolved) {
+    return resolved;
+  }
+  const normalized = normalizePathSeparators(rawPath)
+    .trim()
+    .replace(/^\.\/+/, "")
+    .replace(/^\/+/, "");
   if (!normalized.includes("/") && isLikelyImageFileName(normalized)) {
     return path.join(homeDir, ".openclaw", "workspace", normalized);
   }
   return null;
 }
 
-function getCachedImage(pathKey, mimeType) {
+function resolveMediaRelativePath(rawPath, homeDir) {
+  return resolveOpenClawRelativePath(rawPath, homeDir, "media");
+}
+
+function getCachedImage(pathKey, mimeType, stat) {
   const entry = imageDataCache.get(pathKey);
   if (!entry) {
     return null;
   }
   if (entry.mimeType !== mimeType) {
+    imageDataCache.delete(pathKey);
+    return null;
+  }
+  if (stat && (entry.size !== stat.size || entry.mtimeMs !== stat.mtimeMs)) {
     imageDataCache.delete(pathKey);
     return null;
   }
@@ -163,6 +208,7 @@ function resolveLocalImagePathCandidates(rawPath) {
   }
   const homeDir = app.getPath("home");
   const workspaceRoot = getWorkspaceRoot(homeDir);
+  const mediaRoot = getMediaRoot(homeDir);
   const initial = stripPathDecorators(rawPath);
   if (!initial) {
     return [];
@@ -219,9 +265,19 @@ function resolveLocalImagePathCandidates(rawPath) {
       pushCandidate(workspaceMapped);
     }
 
+    const mediaMapped = mapMediaPathToLocalHome(variant, homeDir);
+    if (mediaMapped) {
+      pushCandidate(mediaMapped);
+    }
+
     const workspaceResolved = resolveWorkspaceRelativePath(variant, homeDir);
     if (workspaceResolved) {
       pushCandidate(workspaceResolved);
+    }
+
+    const mediaResolved = resolveMediaRelativePath(variant, homeDir);
+    if (mediaResolved) {
+      pushCandidate(mediaResolved);
     }
 
     if (path.isAbsolute(variant)) {
@@ -235,10 +291,12 @@ function resolveLocalImagePathCandidates(rawPath) {
     if (normalized) {
       if (normalized.includes("/") || isLikelyImageFileName(normalized)) {
         pushCandidate(path.join(workspaceRoot, normalized));
+        pushCandidate(path.join(mediaRoot, normalized));
       }
       const baseName = path.basename(normalized);
       if (isLikelyImageFileName(baseName)) {
         pushCandidate(path.join(workspaceRoot, baseName));
+        pushCandidate(path.join(mediaRoot, baseName));
       }
     }
 
@@ -445,7 +503,11 @@ async function readImageFromCandidates(candidates) {
       continue;
     }
     try {
-      const cached = getCachedImage(candidate, mimeType);
+      const stat = await fs.promises.stat(candidate);
+      if (!stat.isFile()) {
+        continue;
+      }
+      const cached = getCachedImage(candidate, mimeType, stat);
       if (cached) {
         return {
           ok: true,
@@ -455,14 +517,11 @@ async function readImageFromCandidates(candidates) {
           data: cached.data,
         };
       }
-      const stat = await fs.promises.stat(candidate);
-      if (!stat.isFile()) {
-        continue;
-      }
       const data = await fs.promises.readFile(candidate);
       setCachedImage(candidate, {
         mimeType,
         size: stat.size,
+        mtimeMs: stat.mtimeMs,
         data,
       });
       return {
@@ -1108,13 +1167,16 @@ function createMainWindow() {
     },
   });
 
-  const entryPath = path.join(__dirname, "..", "dist", "index.html");
-  if (!fs.existsSync(entryPath)) {
-    throw new Error(`Desktop bundle is missing: ${entryPath}`);
-  }
-
   mainWindow = nextWindow;
-  nextWindow.loadFile(entryPath);
+  if (DESKTOP_DEV_SERVER_URL) {
+    nextWindow.loadURL(DESKTOP_DEV_SERVER_URL);
+  } else {
+    const entryPath = path.join(__dirname, "..", "dist", "index.html");
+    if (!fs.existsSync(entryPath)) {
+      throw new Error(`Desktop bundle is missing: ${entryPath}`);
+    }
+    nextWindow.loadFile(entryPath);
+  }
   let blankRecoveryAttempts = 0;
   let blankCheckTimer = null;
 

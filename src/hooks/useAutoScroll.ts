@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ToolItem } from "../lib/types.ts";
 
 const AUTO_SCROLL_BOTTOM_THRESHOLD = 10;
 
 type UseAutoScrollOptions = {
   messageCount: number;
+  messageTailKey: string | null;
   lastMessageRole: string | null;
   orderedTools: ToolItem[];
   streamText: string | null;
@@ -20,6 +21,7 @@ type UseAutoScrollOptions = {
 export function useAutoScroll(options: UseAutoScrollOptions) {
   const {
     messageCount,
+    messageTailKey,
     lastMessageRole,
     orderedTools,
     streamText,
@@ -46,7 +48,7 @@ export function useAutoScroll(options: UseAutoScrollOptions) {
     container.scrollTop = container.scrollHeight;
   }, [orderedTools, autoScrollEnabled, showToolActivity]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = scrollRef.current;
     if (!container || !autoScrollEnabled) {
       return;
@@ -59,6 +61,7 @@ export function useAutoScroll(options: UseAutoScrollOptions) {
     }
     container.scrollTop = container.scrollHeight;
   }, [
+    messageTailKey,
     visibleMessageCount,
     lastMessageRole,
     streamText,

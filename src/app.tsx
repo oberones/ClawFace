@@ -29,6 +29,24 @@ import {
   type ReplyDoneSoundTone,
   type UiSettings,
 } from "./lib/ui-settings.ts";
+import {
+  applyPathPrefixMappings,
+  normalizePathPrefixMappingsText,
+  setActivePathPrefixMappingHomeDir,
+  setActivePathPrefixMappingsText,
+} from "./lib/path-prefix-mappings.ts";
+import {
+  normalizeMediaPathCandidate,
+  preferSpecificImagePathCandidates,
+} from "./lib/media-path-utils.ts";
+import {
+  decideFinalizedRunHydration,
+  decideScheduledHistoryHydrationTick,
+  runMayStillProduceMedia,
+  toolMayProduceMedia,
+} from "./lib/media-hydration.ts";
+import { shouldCommitFinalAssistantMessage } from "./lib/final-assistant-message.ts";
+import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 
@@ -39,6 +57,7 @@ const STORAGE_KEYS = {
   uiSettings: "clawui.ui.settings",
   uiSettingsSchemes: "clawui.ui.settings.schemes",
   activeUiSettingsScheme: "clawui.ui.settings.activeScheme",
+  pathPrefixMappings: "clawui.path.prefixMappings",
   modelShortcutSchemes: "clawui.model.shortcuts",
   agentSessionShortcutSchemes: "clawui.agent.session.shortcuts",
   appActionShortcuts: "clawui.app.action.shortcuts",
@@ -614,6 +633,29 @@ function loadUiSettings(): UiSettings {
 function saveUiSettings(settings: UiSettings) {
   try {
     localStorage.setItem(STORAGE_KEYS.uiSettings, JSON.stringify(settings));
+  } catch {
+    // ignore
+  }
+}
+
+function loadPathPrefixMappingsText(): string {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.pathPrefixMappings);
+    if (!raw) {
+      return "";
+    }
+    return normalizePathPrefixMappingsText(raw);
+  } catch {
+    return "";
+  }
+}
+
+function savePathPrefixMappingsText(text: string) {
+  try {
+    localStorage.setItem(
+      STORAGE_KEYS.pathPrefixMappings,
+      normalizePathPrefixMappingsText(text),
+    );
   } catch {
     // ignore
   }
@@ -1395,6 +1437,7 @@ type ToolUpdate = {
   runId?: string;
   args?: unknown;
   output?: string;
+  mediaPaths?: string[];
   errorMessage?: string;
   startedAt?: number;
   updatedAt?: number;
@@ -2169,6 +2212,7 @@ function mergeToolItems(prev: ToolItem[], updates: ToolUpdate[]): ToolItem[] {
       runId: update.runId ?? existing?.runId,
       args: update.args ?? existing?.args,
       output: update.output ?? existing?.output,
+      mediaPaths: update.mediaPaths ?? existing?.mediaPaths,
       errorMessage: update.errorMessage ?? existing?.errorMessage,
       startedAt: update.startedAt ?? existing?.startedAt ?? Date.now(),
       updatedAt: update.updatedAt ?? Date.now(),
@@ -2251,6 +2295,107 @@ function hasToolHint(candidate: Record<string, unknown>): boolean {
   );
 }
 
+function collectStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return values.filter((value, index, arr) => arr.indexOf(value) === index);
+}
+
+function collectNestedStringValues(source: unknown, keys: string[]): string[] {
+  if (!isRecord(source)) {
+    return [];
+  }
+  const out: string[] = [];
+  const queue: unknown[] = [source];
+  const seen = new Set<unknown>();
+  const normalizedKeys = new Set(keys.map((key) => key.toLowerCase()));
+  let traversed = 0;
+  const MAX_NODES = 160;
+
+  while (queue.length > 0 && traversed < MAX_NODES) {
+    const current = queue.shift();
+    if (!current || seen.has(current) || !isRecord(current)) {
+      continue;
+    }
+    seen.add(current);
+    traversed += 1;
+
+    for (const [key, value] of Object.entries(current)) {
+      const normalizedKey = key.toLowerCase();
+      if (normalizedKeys.has(normalizedKey)) {
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          if (trimmed) {
+            out.push(trimmed);
+          }
+        } else if (Array.isArray(value)) {
+          for (const item of value) {
+            if (typeof item === "string" && item.trim()) {
+              out.push(item.trim());
+            } else if (isRecord(item)) {
+              queue.push(item);
+            }
+          }
+        } else if (isRecord(value)) {
+          queue.push(value);
+        }
+      }
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (isRecord(item)) {
+            queue.push(item);
+          }
+        }
+      } else if (isRecord(value)) {
+        queue.push(value);
+      }
+    }
+  }
+
+  return out;
+}
+
+function extractToolMediaPaths(source: Record<string, unknown>): string[] {
+  const details = isRecord(source.details) ? source.details : null;
+  const media = isRecord(source.media) ? source.media : null;
+  const nestedMediaCandidates = collectNestedStringValues(source, [
+    "path",
+    "paths",
+    "mediaurl",
+    "mediaurls",
+    "url",
+    "urls",
+    "file",
+    "filepath",
+    "filePath",
+    "uri",
+    "src",
+    "href",
+  ]);
+  const direct = collectStringArray(source.paths);
+  const mediaUrls = media ? collectStringArray(media.mediaUrls) : [];
+  const detailPaths = details ? collectStringArray(details.paths) : [];
+  const detailMediaUrls = details && isRecord(details.media) ? collectStringArray(details.media.mediaUrls) : [];
+  return preferSpecificImagePathCandidates(
+    dedupeStrings([
+      ...direct,
+      ...mediaUrls,
+      ...detailPaths,
+      ...detailMediaUrls,
+      ...nestedMediaCandidates,
+    ]),
+    (value) => Boolean(inferImageMimeTypeFromPath(value)),
+  );
+}
+
 function dedupeToolUpdates(updates: ToolUpdate[]): ToolUpdate[] {
   const map = new Map<string, ToolUpdate>();
   for (const update of updates) {
@@ -2261,6 +2406,7 @@ function dedupeToolUpdates(updates: ToolUpdate[]): ToolUpdate[] {
       runId: update.runId ?? prev?.runId,
       args: update.args ?? prev?.args,
       output: update.output ?? prev?.output,
+      mediaPaths: update.mediaPaths ?? prev?.mediaPaths,
       status: update.status ?? prev?.status ?? "update",
       outcome: update.outcome ?? prev?.outcome ?? ((update.status ?? prev?.status ?? "update") === "result" ? "succeeded" : "running"),
       errorMessage: update.errorMessage ?? prev?.errorMessage,
@@ -2295,12 +2441,15 @@ function extractToolUpdatesFromAgent(payload: unknown, fallbackRunId?: string | 
       getString(fn, ["name"]) ??
       null;
     const args = candidate.args ?? candidate.arguments ?? candidate.input ?? fn.arguments;
+    const extractedText = extractText(candidate)?.trim() ?? "";
+    const mediaPaths = extractToolMediaPaths(candidate);
     const outputValue =
       candidate.partialResult ??
       candidate.delta ??
       candidate.result ??
       candidate.output ??
-      candidate.response;
+      candidate.response ??
+      (extractedText ? extractedText : undefined);
     const hinted = hasToolHint(candidate);
     const looksLikeToolByPayload =
       (args !== undefined || outputValue !== undefined) && (Boolean(name) || Boolean(toolId));
@@ -2330,6 +2479,7 @@ function extractToolUpdatesFromAgent(payload: unknown, fallbackRunId?: string | 
       runId: payloadRunId,
       args,
       output: normalizedOutput,
+      mediaPaths: mediaPaths.length > 0 ? mediaPaths : undefined,
       errorMessage: outcome.errorMessage,
       startedAt: ts,
       updatedAt: Date.now(),
@@ -2377,6 +2527,7 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
       ) {
         const id = pickToolCallId(part) ?? `tool:content:${ts}:${i}`;
         const output = formatToolOutput(part.content ?? part.result ?? part.output);
+        const mediaPaths = extractToolMediaPaths(part);
         const outcome = resolveToolOutcome({
           candidate: part,
           rawState: getString(part, ["phase", "status", "state", "event", "type"]),
@@ -2390,6 +2541,7 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
           outcome: outcome.outcome,
           runId,
           output,
+          mediaPaths: mediaPaths.length > 0 ? mediaPaths : undefined,
           errorMessage: outcome.errorMessage,
           startedAt: ts,
           updatedAt: ts,
@@ -2423,6 +2575,7 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
   if (role === "tool" || role === "toolresult" || role === "tool_result" || role === "function") {
     const id = pickToolCallId(message) ?? `tool:role:${ts}`;
     const output = extractText(message) ?? formatToolOutput(message.result ?? message.output);
+    const mediaPaths = extractToolMediaPaths(message);
     const outcome = resolveToolOutcome({
       candidate: message,
       rawState: getString(message, ["phase", "status", "state", "event", "type"]),
@@ -2436,6 +2589,7 @@ function extractToolUpdatesFromMessage(message: unknown, fallbackTimestamp?: num
       outcome: outcome.outcome,
       runId,
       output,
+      mediaPaths: mediaPaths.length > 0 ? mediaPaths : undefined,
       errorMessage: outcome.errorMessage,
       startedAt: ts,
       updatedAt: ts,
@@ -2634,6 +2788,93 @@ function extractAssistantTextFromAgentPayload(payload: Record<string, unknown>):
   return null;
 }
 
+function collectReplyPayloadMediaUrls(value: unknown): string[] {
+  if (!isRecord(value)) {
+    return [];
+  }
+  const directMediaUrl = getString(value, ["mediaUrl", "mediaurl"]);
+  return dedupeStrings(
+    [
+      ...collectStringArray(value.mediaUrls),
+      ...collectStringArray(value.mediaurls),
+      ...collectStringArray(value.media),
+      ...(directMediaUrl ? [directMediaUrl] : []),
+    ].filter(Boolean),
+  );
+}
+
+function hasReplyPayloadLikeContent(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return Boolean(
+    getString(value, ["text", "delta", "content", "output", "response"]) ||
+    collectReplyPayloadMediaUrls(value).length > 0,
+  );
+}
+
+function coerceAssistantReplyMessage(value: unknown): unknown {
+  if (!hasReplyPayloadLikeContent(value)) {
+    return value;
+  }
+  const role = getString(value, ["role"]) ?? "assistant";
+  return typeof value.role === "string" && value.role === role ? value : { ...value, role };
+}
+
+function mergeAssistantReplyPayload(
+  previous: Record<string, unknown> | null | undefined,
+  next: Record<string, unknown>,
+): Record<string, unknown> {
+  const mergedMediaUrls = dedupeStrings([
+    ...collectReplyPayloadMediaUrls(previous),
+    ...collectReplyPayloadMediaUrls(next),
+  ]);
+  const previousText = previous && typeof previous.text === "string" ? previous.text : undefined;
+  const previousDelta = previous && typeof previous.delta === "string" ? previous.delta : undefined;
+  const nextText = typeof next.text === "string" ? next.text : undefined;
+  const nextDelta = typeof next.delta === "string" ? next.delta : undefined;
+  return {
+    ...(previous ?? {}),
+    ...next,
+    role: getString(next, ["role"]) ?? getString(previous ?? {}, ["role"]) ?? "assistant",
+    ...(nextText !== undefined || previousText !== undefined
+      ? { text: nextText ?? previousText ?? "" }
+      : {}),
+    ...(nextDelta !== undefined || previousDelta !== undefined
+      ? { delta: nextDelta ?? previousDelta ?? "" }
+      : {}),
+    ...(mergedMediaUrls.length > 0
+      ? { mediaUrls: mergedMediaUrls, mediaUrl: mergedMediaUrls[0] }
+      : {}),
+  };
+}
+
+function mergeAssistantReplyMessageCandidate(
+  message: unknown,
+  pending: Record<string, unknown> | null,
+): unknown {
+  if (!pending) {
+    return coerceAssistantReplyMessage(message);
+  }
+  if (typeof message === "string") {
+    return mergeAssistantReplyPayload(pending, { role: "assistant", text: message });
+  }
+  if (hasReplyPayloadLikeContent(message)) {
+    return mergeAssistantReplyPayload(pending, message);
+  }
+  const extractedText = extractText(message);
+  if (extractedText) {
+    return mergeAssistantReplyPayload(
+      pending,
+      {
+        role: isRecord(message) ? getString(message, ["role"]) ?? "assistant" : "assistant",
+        text: extractedText,
+      },
+    );
+  }
+  return message ?? pending;
+}
+
 function normalizeChatEventPayload(payload: unknown, eventHint?: string): NormalizedChatEvent | null {
   if (!isRecord(payload)) {
     return null;
@@ -2656,6 +2897,11 @@ function normalizeChatEventPayload(payload: unknown, eventHint?: string): Normal
     null;
   const hasDelta = payload.delta !== undefined || data.delta !== undefined;
   const hasMessage = payload.message !== undefined || data.message !== undefined;
+  const hasReplyPayload =
+    hasReplyPayloadLikeContent(payload.reply) ||
+    hasReplyPayloadLikeContent(data.reply) ||
+    hasReplyPayloadLikeContent(data) ||
+    hasReplyPayloadLikeContent(payload);
   const state =
     normalizeChatState(getString(payload, ["state", "phase", "event"])) ??
     normalizeChatState(getString(data, ["state", "phase", "event"])) ??
@@ -2664,7 +2910,7 @@ function normalizeChatEventPayload(payload: unknown, eventHint?: string): Normal
     (abortedHint ? "aborted" : null) ??
     (errorMessage ? "error" : null) ??
     (hasDelta ? "delta" : null) ??
-    (hasMessage ? "final" : null);
+    (hasMessage || hasReplyPayload ? "final" : null);
   if (!state) {
     return null;
   }
@@ -2679,9 +2925,15 @@ function normalizeChatEventPayload(payload: unknown, eventHint?: string): Normal
     payload.delta ??
     data.delta ??
     payload.content ??
-    data.content;
+    data.content ??
+    payload.reply ??
+    data.reply ??
+    (hasReplyPayloadLikeContent(data) ? data : null) ??
+    (hasReplyPayloadLikeContent(payload) ? payload : null);
   const message =
-    typeof messageRaw === "string" ? { role: "assistant", content: messageRaw } : messageRaw;
+    typeof messageRaw === "string"
+      ? { role: "assistant", content: messageRaw }
+      : coerceAssistantReplyMessage(messageRaw);
   return { runId, sessionKey, state, message, errorMessage };
 }
 
@@ -2719,24 +2971,14 @@ function stripWrappingQuotes(value: string): string {
 }
 
 function normalizeMediaDirectivePath(value: string): string {
-  let next = value.trim();
+  let next = normalizeMediaPathCandidate(value);
   if (!next) {
     return "";
   }
   if (next.startsWith("`") && next.endsWith("`") && next.length > 1) {
     next = next.slice(1, -1).trim();
   }
-  next = stripWrappingQuotes(next);
-  // Strip common trailing punctuation generated by LLMs.
-  next = next.replace(/[),.;!?]+$/g, "").trim();
-  if (!next) {
-    return "";
-  }
-  if (/\s/.test(next)) {
-    const firstToken = next.split(/\s+/)[0] ?? "";
-    return firstToken.trim();
-  }
-  return next;
+  return stripWrappingQuotes(next);
 }
 
 function isAbsoluteFsPath(value: string): boolean {
@@ -2787,6 +3029,9 @@ function setRuntimePathHints(next: { homeDir?: string | null; workspaceDir?: str
   }
   if (!runtimePathHints.workspaceDir && runtimePathHints.homeDir) {
     runtimePathHints.workspaceDir = `${runtimePathHints.homeDir}${WORKSPACE_MARKER}`;
+  }
+  if (runtimePathHints.homeDir) {
+    setActivePathPrefixMappingHomeDir(runtimePathHints.homeDir);
   }
 }
 
@@ -3354,6 +3599,18 @@ function buildWebLocalImageProxyUrl(localPath: string): string {
   return `${origin}/__claw/local-image?path=${encodeURIComponent(localPath)}`;
 }
 
+function resolveMediaRelativeImagePath(value: string): string | null {
+  const trimmed = value.trim().replace(/^\.\/+/, "").replace(/^\/+/, "");
+  if (!trimmed || !inferImageMimeTypeFromPath(trimmed)) {
+    return null;
+  }
+  const homeDir = getRuntimeHomeDir();
+  if (!homeDir) {
+    return null;
+  }
+  return `${homeDir}/.openclaw/media/${trimmed}`;
+}
+
 function resolveWorkspaceRelativeImagePath(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -3379,6 +3636,7 @@ function resolveMediaDirectivePath(rawPath: string): string | null {
   }
   const homeDir = getRuntimeHomeDir();
   const workspaceDir = getRuntimeWorkspaceDir();
+  const normalized = normalizeFsPath(cleaned);
   if (cleaned.startsWith("~/")) {
     if (!homeDir) {
       return null;
@@ -3388,9 +3646,26 @@ function resolveMediaDirectivePath(rawPath: string): string | null {
   if (isAbsoluteFsPath(cleaned)) {
     return cleaned;
   }
-  // Only filename is accepted for relative directives; it maps to ~/.openclaw/workspace.
-  if (cleaned.includes("/") || cleaned.includes("\\")) {
-    return null;
+  if (homeDir) {
+    if (normalized.startsWith(".openclaw/media/")) {
+      return `${homeDir}/${normalized}`;
+    }
+    if (normalized.startsWith("openclaw/media/")) {
+      return `${homeDir}/.${normalized}`;
+    }
+    if (normalized.startsWith(".openclaw/workspace/")) {
+      return `${homeDir}/${normalized}`;
+    }
+    if (normalized.startsWith("openclaw/workspace/")) {
+      return `${homeDir}/.${normalized}`;
+    }
+  }
+  if (normalized.includes("/") || normalized.includes("\\")) {
+    return !isDesktopRuntime() ? cleaned : null;
+  }
+  const mediaRelativePath = resolveMediaRelativeImagePath(cleaned);
+  if (mediaRelativePath) {
+    return mediaRelativePath;
   }
   if (!workspaceDir) {
     if (!isDesktopRuntime()) {
@@ -3423,10 +3698,11 @@ function extractMediaAttachmentsFromText(text: string): {
       retainedLines.push(line);
       continue;
     }
-    const mimeType = inferImageMimeTypeFromPath(resolved);
+    const mappedResolved = applyPathPrefixMappings(resolved, { homeDir: getRuntimeHomeDir() });
+    const mimeType = inferImageMimeTypeFromPath(mappedResolved);
     const dataUrl = isDesktopRuntime()
-      ? buildDesktopLocalImageUrl(resolved)
-      : buildWebLocalImageProxyUrl(resolved) || toFileUrl(resolved);
+      ? buildDesktopLocalImageUrl(mappedResolved)
+      : buildWebLocalImageProxyUrl(mappedResolved) || toFileUrl(mappedResolved);
     if (!mimeType || !dataUrl) {
       retainedLines.push(line);
       continue;
@@ -3437,10 +3713,11 @@ function extractMediaAttachmentsFromText(text: string): {
     seen.add(dataUrl);
     attachments.push({
       id: `${generateUUID()}-media`,
-      name: fileNameFromPath(resolved),
+      name: fileNameFromPath(mappedResolved),
       size: 0,
       type: mimeType,
       dataUrl,
+      sourcePath: resolved,
       isImage: true,
     });
     if (prefix) {
@@ -3466,6 +3743,9 @@ function buildAttachmentSignature(type: string, dataUrl: string): string {
 function toolMessageMayContainImage(raw: unknown): boolean {
   if (!isRecord(raw)) {
     return false;
+  }
+  if (extractToolMediaPaths(raw).length > 0) {
+    return true;
   }
   if (Object.keys(raw).some((key) => key.toLowerCase().includes("image"))) {
     return true;
@@ -3514,10 +3794,24 @@ function toolMessageMayContainImage(raw: unknown): boolean {
       return true;
     }
   }
+  const extractedText = extractText(raw);
+  if (extractedText) {
+    const sample = extractedText.slice(0, 2048).toLowerCase();
+    if (
+      sample.includes("data:image/") ||
+      sample.includes("media:") ||
+      /\.(png|jpe?g|webp|gif|bmp|svg)\b/i.test(sample)
+    ) {
+      return true;
+    }
+  }
   return false;
 }
 
-function normalizeImageSourceData(rawData: string, mimeType: string): { dataUrl: string; fromBase64: boolean } {
+function normalizeImageSourceData(
+  rawData: string,
+  mimeType: string,
+): { dataUrl: string; fromBase64: boolean; sourcePath?: string } {
   const trimmed = rawData.trim();
   if (!trimmed) {
     return { dataUrl: "", fromBase64: false };
@@ -3530,70 +3824,146 @@ function normalizeImageSourceData(rawData: string, mimeType: string): { dataUrl:
   }
   const fromDesktopLocalPath = localPathFromDesktopLocalImageUrl(trimmed);
   if (fromDesktopLocalPath) {
+    const mappedLocalPath = applyPathPrefixMappings(fromDesktopLocalPath, { homeDir: getRuntimeHomeDir() });
     if (isDesktopRuntime()) {
-      return { dataUrl: buildDesktopLocalImageUrl(fromDesktopLocalPath), fromBase64: false };
+      return {
+        dataUrl: buildDesktopLocalImageUrl(mappedLocalPath),
+        fromBase64: false,
+        sourcePath: fromDesktopLocalPath,
+      };
     }
-    const proxied = buildWebLocalImageProxyUrl(fromDesktopLocalPath);
-    return { dataUrl: proxied || trimmed, fromBase64: false };
+    const proxied = buildWebLocalImageProxyUrl(mappedLocalPath);
+    return {
+      dataUrl: proxied || trimmed,
+      fromBase64: false,
+      sourcePath: fromDesktopLocalPath,
+    };
   }
   const fromProxyPath = localPathFromWebProxyUrl(trimmed);
   if (fromProxyPath) {
+    const mappedProxyPath = applyPathPrefixMappings(fromProxyPath, { homeDir: getRuntimeHomeDir() });
     const resolvedProxyPath =
-      isAbsoluteFsPath(fromProxyPath) || fromProxyPath.startsWith("~")
-        ? fromProxyPath
+      isAbsoluteFsPath(mappedProxyPath) || mappedProxyPath.startsWith("~")
+        ? mappedProxyPath
         : getRuntimeWorkspaceDir()
-          ? `${getRuntimeWorkspaceDir()}/${fromProxyPath}`
-          : fromProxyPath;
+          ? `${getRuntimeWorkspaceDir()}/${mappedProxyPath}`
+          : mappedProxyPath;
     if (isDesktopRuntime()) {
-      return { dataUrl: buildDesktopLocalImageUrl(resolvedProxyPath), fromBase64: false };
+      return {
+        dataUrl: buildDesktopLocalImageUrl(resolvedProxyPath),
+        fromBase64: false,
+        sourcePath: fromProxyPath,
+      };
     }
     const proxied = buildWebLocalImageProxyUrl(resolvedProxyPath);
-    return { dataUrl: proxied || trimmed, fromBase64: false };
+    return {
+      dataUrl: proxied || trimmed,
+      fromBase64: false,
+      sourcePath: fromProxyPath,
+    };
   }
   if (/^file:/i.test(trimmed)) {
     if (isDesktopRuntime()) {
       const asLocalPath = filePathFromFileUrl(trimmed);
       if (asLocalPath) {
-        return { dataUrl: buildDesktopLocalImageUrl(asLocalPath), fromBase64: false };
+        const mappedLocalPath = applyPathPrefixMappings(asLocalPath, { homeDir: getRuntimeHomeDir() });
+        return {
+          dataUrl: buildDesktopLocalImageUrl(mappedLocalPath),
+          fromBase64: false,
+          sourcePath: asLocalPath,
+        };
       }
       return { dataUrl: trimmed, fromBase64: false };
     }
     const asLocalPath = filePathFromFileUrl(trimmed);
     if (asLocalPath) {
-      const proxied = buildWebLocalImageProxyUrl(asLocalPath);
-      return { dataUrl: proxied || trimmed, fromBase64: false };
+      const mappedLocalPath = applyPathPrefixMappings(asLocalPath, { homeDir: getRuntimeHomeDir() });
+      const proxied = buildWebLocalImageProxyUrl(mappedLocalPath);
+      return {
+        dataUrl: proxied || trimmed,
+        fromBase64: false,
+        sourcePath: asLocalPath,
+      };
     }
     return { dataUrl: trimmed, fromBase64: false };
   }
   if (isAbsoluteFsPath(trimmed)) {
+    const mappedAbsolutePath = applyPathPrefixMappings(trimmed, { homeDir: getRuntimeHomeDir() });
     if (isDesktopRuntime()) {
-      return { dataUrl: buildDesktopLocalImageUrl(trimmed), fromBase64: false };
+      return {
+        dataUrl: buildDesktopLocalImageUrl(mappedAbsolutePath),
+        fromBase64: false,
+        sourcePath: trimmed,
+      };
     }
     if (!isDesktopRuntime()) {
-      const proxied = buildWebLocalImageProxyUrl(trimmed);
+      const proxied = buildWebLocalImageProxyUrl(mappedAbsolutePath);
       if (proxied) {
-        return { dataUrl: proxied, fromBase64: false };
+        return {
+          dataUrl: proxied,
+          fromBase64: false,
+          sourcePath: trimmed,
+        };
       }
-      const asFileUrl = toFileUrl(trimmed);
+      const asFileUrl = toFileUrl(mappedAbsolutePath);
       if (asFileUrl) {
-        return { dataUrl: asFileUrl, fromBase64: false };
+        return {
+          dataUrl: asFileUrl,
+          fromBase64: false,
+          sourcePath: trimmed,
+        };
       }
     }
-    const asFileUrl = toFileUrl(trimmed);
+    const asFileUrl = toFileUrl(mappedAbsolutePath);
     if (asFileUrl) {
-      return { dataUrl: asFileUrl, fromBase64: false };
+      return {
+        dataUrl: asFileUrl,
+        fromBase64: false,
+        sourcePath: trimmed,
+      };
     }
+  }
+  const mediaRelativePath = resolveMediaRelativeImagePath(trimmed);
+  if (mediaRelativePath) {
+    const mappedMediaPath = applyPathPrefixMappings(mediaRelativePath, { homeDir: getRuntimeHomeDir() });
+    if (isDesktopRuntime()) {
+      return {
+        dataUrl: buildDesktopLocalImageUrl(mappedMediaPath),
+        fromBase64: false,
+        sourcePath: trimmed,
+      };
+    }
+    const proxied = buildWebLocalImageProxyUrl(mappedMediaPath);
+    return {
+      dataUrl: proxied || mappedMediaPath,
+      fromBase64: false,
+      sourcePath: trimmed,
+    };
   }
   const workspaceRelativePath = resolveWorkspaceRelativeImagePath(trimmed);
   if (workspaceRelativePath) {
+    const mappedWorkspacePath = applyPathPrefixMappings(workspaceRelativePath, { homeDir: getRuntimeHomeDir() });
     if (isDesktopRuntime()) {
-      return { dataUrl: buildDesktopLocalImageUrl(workspaceRelativePath), fromBase64: false };
+      return {
+        dataUrl: buildDesktopLocalImageUrl(mappedWorkspacePath),
+        fromBase64: false,
+        sourcePath: workspaceRelativePath,
+      };
     }
-    const proxied = buildWebLocalImageProxyUrl(workspaceRelativePath);
-    return { dataUrl: proxied || workspaceRelativePath, fromBase64: false };
+    const proxied = buildWebLocalImageProxyUrl(mappedWorkspacePath);
+    return {
+      dataUrl: proxied || mappedWorkspacePath,
+      fromBase64: false,
+      sourcePath: workspaceRelativePath,
+    };
   }
   if (trimmed.startsWith("/") && Boolean(inferImageMimeTypeFromPath(trimmed))) {
-    return { dataUrl: trimmed, fromBase64: false };
+    const mappedAbsolutePath = applyPathPrefixMappings(trimmed, { homeDir: getRuntimeHomeDir() });
+    return {
+      dataUrl: mappedAbsolutePath,
+      fromBase64: false,
+      sourcePath: trimmed,
+    };
   }
   return { dataUrl: `data:${mimeType};base64,${trimmed}`, fromBase64: true };
 }
@@ -3603,10 +3973,10 @@ function toChatMessage(raw: unknown, fallbackTimestamp?: number): ChatMessage | 
   if (toolMessage && !toolMessageMayContainImage(raw)) {
     return null;
   }
-  const rawText = toolMessage ? "" : (extractText(raw) ?? "");
+  const rawText = extractText(raw) ?? "";
   let text = rawText;
   let mediaAttachments: Attachment[] = [];
-  if (!toolMessage && rawText && MEDIA_PREFIX_RE.test(rawText)) {
+  if (rawText && MEDIA_PREFIX_RE.test(rawText)) {
     const mediaResult = extractMediaAttachmentsFromText(rawText);
     text = mediaResult.cleanedText;
     mediaAttachments = mediaResult.attachments;
@@ -3624,6 +3994,7 @@ function toChatMessage(raw: unknown, fallbackTimestamp?: number): ChatMessage | 
         size: normalized.fromBase64 ? estimateBase64Bytes(img.data) : normalized.dataUrl.length,
         type: img.mimeType,
         dataUrl: normalized.dataUrl,
+        sourcePath: normalized.sourcePath,
         isImage: true,
       };
     })
@@ -3672,6 +4043,125 @@ function toChatMessageSafe(raw: unknown, fallbackTimestamp?: number): ChatMessag
   } catch {
     return null;
   }
+}
+
+function buildChatMessageDedupeKey(message: ChatMessage): string {
+  const tsKey = Math.floor(message.timestamp / 2000);
+  const textKey = message.text.slice(0, 200);
+  const attachmentKey = (message.attachments ?? [])
+    .map((attachment) => buildAttachmentSignature(attachment.type, attachment.dataUrl))
+    .join("|");
+  return `${message.role}:${tsKey}:${textKey}:${attachmentKey}`;
+}
+
+function appendDistinctMessages(messages: ChatMessage[], additions: Array<ChatMessage | null | undefined>): ChatMessage[] {
+  if (additions.length === 0) {
+    return messages;
+  }
+  const seen = new Set(messages.map((message) => buildChatMessageDedupeKey(message)));
+  let next = messages;
+  for (const addition of additions) {
+    if (!addition) {
+      continue;
+    }
+    const key = buildChatMessageDedupeKey(addition);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    next = [...next, addition];
+  }
+  return next;
+}
+
+function withAssistantRunId(message: ChatMessage | null, runId: string | null | undefined): ChatMessage | null {
+  if (!message || message.role !== "assistant") {
+    return message;
+  }
+  const normalizedRunId = runId?.trim();
+  if (!normalizedRunId) {
+    return message;
+  }
+  if (message.runId === normalizedRunId) {
+    return message;
+  }
+  return {
+    ...message,
+    runId: normalizedRunId,
+  };
+}
+
+function mergeAssistantMessagesForRun(existing: ChatMessage, next: ChatMessage): ChatMessage {
+  const nextText = next.text.trim() ? next.text : existing.text;
+  const nextAttachments =
+    next.attachments && next.attachments.length > 0
+      ? next.attachments
+      : existing.attachments;
+  return {
+    ...existing,
+    ...next,
+    id: existing.id,
+    role: "assistant",
+    text: nextText,
+    attachments: nextAttachments,
+    raw: next.raw ?? existing.raw,
+    runId: next.runId ?? existing.runId,
+  };
+}
+
+function upsertAssistantMessageForRun(
+  messages: ChatMessage[],
+  runId: string | null | undefined,
+  nextMessage: ChatMessage | null | undefined,
+): ChatMessage[] {
+  const prepared = withAssistantRunId(nextMessage ?? null, runId);
+  if (!prepared) {
+    return messages;
+  }
+  const normalizedRunId = runId?.trim();
+  if (!normalizedRunId) {
+    return appendDistinctMessages(messages, [prepared]);
+  }
+
+  let replaced = false;
+  const nextMessages: ChatMessage[] = [];
+  for (const message of messages) {
+    if (message.role === "assistant" && message.runId === normalizedRunId) {
+      if (!replaced) {
+        nextMessages.push(mergeAssistantMessagesForRun(message, prepared));
+        replaced = true;
+      }
+      continue;
+    }
+    nextMessages.push(message);
+  }
+
+  return replaced ? nextMessages : appendDistinctMessages(nextMessages, [prepared]);
+}
+
+function buildAttachmentMessagesFromToolUpdates(toolUpdates: ToolUpdate[]): ChatMessage[] {
+  const messages: ChatMessage[] = [];
+  for (const update of toolUpdates) {
+    const output = update.output?.trim() ?? "";
+    const mediaText = (update.mediaPaths ?? []).map((path) => `MEDIA:${path}`).join("\n");
+    const combined = [output, mediaText].filter(Boolean).join("\n");
+    if (!combined || !MEDIA_PREFIX_RE.test(combined)) {
+      continue;
+    }
+    const parsed = toChatMessageSafe(
+      {
+        role: "toolResult",
+        toolName: update.name,
+        content: combined,
+        timestamp: update.updatedAt,
+      },
+      update.updatedAt,
+    );
+    if (parsed) {
+      messages.push(parsed);
+    }
+  }
+  return messages;
 }
 
 export default function App() {
@@ -3747,6 +4237,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showNewSession, setShowNewSession] = useState(false);
   const [uiSettings, setUiSettings] = useState<UiSettings>(() => loadUiSettings());
+  const [pathPrefixMappingsText, setPathPrefixMappingsText] = useState<string>(
+    () => loadPathPrefixMappingsText(),
+  );
   const [uiSettingsSchemes, setUiSettingsSchemes] = useState<UiSettingsScheme[]>(
     () => loadUiSettingsSchemes(),
   );
@@ -3809,8 +4302,12 @@ export default function App() {
   const sessionsRef = useRef<GatewaySessionRow[]>(sessions);
   const pendingStreamTextRef = useRef<string | null>(null);
   const streamFlushRafRef = useRef<number | null>(null);
+  const assistantReplyByRunRef = useRef<Record<string, Record<string, unknown>>>({});
+  const committedAssistantAttachmentByRunRef = useRef<Record<string, string>>({});
+  const scheduledHistoryHydrationByRunRef = useRef<Record<string, true>>({});
   const pendingSessionCreatesRef = useRef<Set<string>>(new Set());
   const deferredSessionRefreshTimersRef = useRef<number[]>([]);
+  const deferredHistoryHydrationTimersRef = useRef<number[]>([]);
   const deletingSessionKeysRef = useRef<Set<string>>(new Set());
   const sessionCacheRef = useRef<Map<string, SessionViewState>>(new Map());
   const sessionPreviewsRef = useRef<Record<string, SessionPreviewItem[]>>(sessionPreviews);
@@ -3868,6 +4365,19 @@ export default function App() {
       window.clearTimeout(timer);
     }
     deferredSessionRefreshTimersRef.current = [];
+  };
+
+  const clearDeferredHistoryHydrationTimers = () => {
+    for (const timer of deferredHistoryHydrationTimersRef.current) {
+      window.clearTimeout(timer);
+    }
+    deferredHistoryHydrationTimersRef.current = [];
+  };
+
+  const removeDeferredHistoryHydrationTimer = (timerId: number) => {
+    deferredHistoryHydrationTimersRef.current = deferredHistoryHydrationTimersRef.current.filter(
+      (existingTimerId) => existingTimerId !== timerId,
+    );
   };
 
   const switchView = useCallback((target: "chat" | "files") => {
@@ -4180,8 +4690,217 @@ export default function App() {
     agentFinalizeTimerByRunRef.current = next;
   };
 
-  const buildFinalAssistantMessage = (rawMessage: unknown, streamedText: string): ChatMessage | null => {
-    let msg = toChatMessageSafe(rawMessage);
+  const getAssistantReplyForRun = (runId: string | null | undefined): Record<string, unknown> | null => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId) {
+      return null;
+    }
+    return assistantReplyByRunRef.current[normalizedRunId] ?? null;
+  };
+
+  const cacheAssistantReplyForRun = (
+    runId: string | null | undefined,
+    payload: Record<string, unknown> | null | undefined,
+  ) => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId || !payload) {
+      return;
+    }
+    const previous = assistantReplyByRunRef.current[normalizedRunId];
+    assistantReplyByRunRef.current = {
+      ...assistantReplyByRunRef.current,
+      [normalizedRunId]: mergeAssistantReplyPayload(previous, payload),
+    };
+  };
+
+  const clearAssistantReplyForRun = (runId: string | null | undefined) => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId || !assistantReplyByRunRef.current[normalizedRunId]) {
+      return;
+    }
+    const next = { ...assistantReplyByRunRef.current };
+    delete next[normalizedRunId];
+    assistantReplyByRunRef.current = next;
+  };
+
+  const getCommittedAssistantAttachmentSignature = (runId: string | null | undefined): string | null => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId) {
+      return null;
+    }
+    return committedAssistantAttachmentByRunRef.current[normalizedRunId] ?? null;
+  };
+
+  const setCommittedAssistantAttachmentSignature = (
+    runId: string | null | undefined,
+    signature: string | null,
+  ) => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId) {
+      return;
+    }
+    const next = { ...committedAssistantAttachmentByRunRef.current };
+    if (signature) {
+      next[normalizedRunId] = signature;
+    } else {
+      delete next[normalizedRunId];
+    }
+    committedAssistantAttachmentByRunRef.current = next;
+  };
+
+  const clearCommittedAssistantAttachmentForRun = (runId: string | null | undefined) => {
+    setCommittedAssistantAttachmentSignature(runId, null);
+  };
+
+  const hasCommittedAssistantMessageForRun = (runId: string | null | undefined): boolean => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId) {
+      return false;
+    }
+    return messagesRef.current.some((message) => (
+      message.role === "assistant" &&
+      message.runId === normalizedRunId &&
+      (Boolean(message.text.trim()) || Boolean(message.attachments?.length))
+    ));
+  };
+
+  const hasCommittedAssistantAttachmentForRun = (runId: string | null | undefined): boolean => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId) {
+      return false;
+    }
+    return messagesRef.current.some((message) => (
+      message.role === "assistant" &&
+      message.runId === normalizedRunId &&
+      Boolean(message.attachments?.length)
+    ));
+  };
+
+  const runHasExpectedMediaForRun = (
+    runId: string | null | undefined,
+    options?: { toolUpdates?: ToolUpdate[] | null },
+  ): boolean => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId) {
+      return false;
+    }
+    const pendingAssistantReply = getAssistantReplyForRun(normalizedRunId);
+    return runMayStillProduceMedia({
+      pendingToolUpdates: options?.toolUpdates ?? [],
+      priorToolItems: toolItemsRef.current.filter((item) => item.runId === normalizedRunId),
+      pendingAssistantReplyMediaCount: pendingAssistantReply
+        ? collectReplyPayloadMediaUrls(pendingAssistantReply).length
+        : 0,
+    });
+  };
+
+  const clearScheduledHistoryHydrationForRun = (runId: string | null | undefined) => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId || !scheduledHistoryHydrationByRunRef.current[normalizedRunId]) {
+      return;
+    }
+    const next = { ...scheduledHistoryHydrationByRunRef.current };
+    delete next[normalizedRunId];
+    scheduledHistoryHydrationByRunRef.current = next;
+  };
+
+  const markScheduledHistoryHydrationForRun = (runId: string | null | undefined): boolean => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId) {
+      return false;
+    }
+    if (scheduledHistoryHydrationByRunRef.current[normalizedRunId]) {
+      return false;
+    }
+    scheduledHistoryHydrationByRunRef.current = {
+      ...scheduledHistoryHydrationByRunRef.current,
+      [normalizedRunId]: true,
+    };
+    return true;
+  };
+
+  const buildAssistantAttachmentOnlyMessage = (
+    rawMessage: unknown,
+    runId: string | null | undefined,
+    fallbackTimestamp?: number,
+  ): ChatMessage | null => {
+    const parsed = withAssistantRunId(toChatMessageSafe(rawMessage, fallbackTimestamp), runId);
+    const attachments = parsed?.attachments ?? [];
+    if (!parsed || attachments.length === 0) {
+      return null;
+    }
+    return {
+      ...parsed,
+      role: "assistant",
+      text: "",
+    };
+  };
+
+  const buildAssistantAttachmentSignature = (message: ChatMessage | null): string | null => {
+    const attachments = message?.attachments ?? [];
+    if (attachments.length === 0) {
+      return null;
+    }
+    return attachments
+      .map((attachment) => buildAttachmentSignature(attachment.type, attachment.dataUrl))
+      .join("|");
+  };
+
+  const buildAssistantReplyAttachmentProjection = (
+    rawReply: unknown,
+    runId: string | null | undefined,
+  ): {
+    runId: string;
+    assistantReply: Record<string, unknown>;
+    attachmentMessage: ChatMessage;
+    attachmentSignature: string;
+  } | null => {
+    const normalizedRunId = runId?.trim();
+    if (!normalizedRunId || !isRecord(rawReply) || !hasReplyPayloadLikeContent(rawReply)) {
+      return null;
+    }
+    const attachmentMessage = buildAssistantAttachmentOnlyMessage(rawReply, normalizedRunId);
+    const attachmentSignature = buildAssistantAttachmentSignature(attachmentMessage);
+    if (!attachmentMessage || !attachmentSignature) {
+      return null;
+    }
+    return {
+      runId: normalizedRunId,
+      assistantReply: rawReply,
+      attachmentMessage,
+      attachmentSignature,
+    };
+  };
+
+  const commitAssistantReplyAttachmentProjection = (
+    projection: {
+      runId: string;
+      assistantReply: Record<string, unknown>;
+      attachmentMessage: ChatMessage;
+      attachmentSignature: string;
+    } | null,
+    commitAttachmentMessage: (params: { runId: string; attachmentMessage: ChatMessage }) => void,
+  ) => {
+    if (!projection) {
+      return;
+    }
+    cacheAssistantReplyForRun(projection.runId, projection.assistantReply);
+    if (projection.attachmentSignature === getCommittedAssistantAttachmentSignature(projection.runId)) {
+      return;
+    }
+    setCommittedAssistantAttachmentSignature(projection.runId, projection.attachmentSignature);
+    commitAttachmentMessage({
+      runId: projection.runId,
+      attachmentMessage: projection.attachmentMessage,
+    });
+  };
+
+  const buildFinalAssistantMessage = (
+    rawMessage: unknown,
+    streamedText: string,
+    runId?: string | null,
+  ): ChatMessage | null => {
+    let msg = withAssistantRunId(toChatMessageSafe(rawMessage), runId);
     if (msg && msg.role !== "user" && !msg.text.trim() && streamedText) {
       msg = { ...msg, text: streamedText };
     }
@@ -4191,6 +4910,7 @@ export default function App() {
         role: "assistant",
         text: streamedText,
         timestamp: Date.now(),
+        runId: runId?.trim() || undefined,
         raw: rawMessage,
       };
     }
@@ -4210,6 +4930,12 @@ export default function App() {
       text: normalized,
       timestamp: Date.now(),
     };
+  };
+
+  const buildToolAttachmentMessage = (rawMessage: unknown): ChatMessage | null => {
+    const msg = toChatMessageSafe(rawMessage);
+    const hasRenderableAttachment = Boolean(msg?.attachments && msg.attachments.length > 0);
+    return msg && hasRenderableAttachment ? msg : null;
   };
 
   const clearActiveStreamingState = () => {
@@ -4256,6 +4982,94 @@ export default function App() {
     refreshSessionsWithFollowUp(client);
   };
 
+  const scheduleActiveHistoryHydration = (runId: string | null | undefined) => {
+    const normalizedRunId = runId?.trim();
+    const client = clientRef.current;
+    const activeSessionKey = selectedSessionRef.current;
+    if (!normalizedRunId || !client || !activeSessionKey) {
+      return;
+    }
+    if (hasCommittedAssistantAttachmentForRun(normalizedRunId)) {
+      clearScheduledHistoryHydrationForRun(normalizedRunId);
+      return;
+    }
+    if (!markScheduledHistoryHydrationForRun(normalizedRunId)) {
+      return;
+    }
+    const delaysMs = [180, 900, 2500];
+    deferredHistoryHydrationTimersRef.current.push(
+      ...delaysMs.map((delayMs, index) => {
+        let timerId = 0;
+        timerId = window.setTimeout(() => {
+          removeDeferredHistoryHydrationTimer(timerId);
+          const pendingAssistantReply = getAssistantReplyForRun(normalizedRunId);
+          const activeStreamText = (pendingStreamTextRef.current ?? streamTextRef.current ?? "").trim();
+          const tickDecision = decideScheduledHistoryHydrationTick({
+            isStillScheduled: Boolean(scheduledHistoryHydrationByRunRef.current[normalizedRunId]),
+            isFinalAttempt: index === delaysMs.length - 1,
+            hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(normalizedRunId),
+            isCurrentClient: clientRef.current === client,
+            isCurrentSession: selectedSessionRef.current === activeSessionKey,
+            activeRunId: chatRunRef.current,
+            targetRunId: normalizedRunId,
+            thinking: thinkingRef.current,
+            hasActiveStreamText: Boolean(activeStreamText),
+            hasPendingAssistantReply: Boolean(pendingAssistantReply),
+            isHistoryLoadInFlight: historyLoadInFlightRef.current.has(activeSessionKey),
+          });
+          if (tickDecision.clearScheduled) {
+            clearScheduledHistoryHydrationForRun(normalizedRunId);
+          }
+          if (!tickDecision.loadHistory) {
+            return;
+          }
+          void loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
+        }, delayMs);
+        return timerId;
+      }),
+    );
+  };
+
+  const applyFinalizedRunHydrationDecision = (
+    runId: string | null | undefined,
+    decision: "clear" | "schedule",
+  ) => {
+    if (decision === "schedule") {
+      scheduleActiveHistoryHydration(runId);
+      return;
+    }
+    clearScheduledHistoryHydrationForRun(runId);
+  };
+
+  const clearRunAssistantProjectionState = (
+    runId: string | null | undefined,
+    options?: { clearScheduledHydration?: boolean },
+  ) => {
+    clearAssistantReplyForRun(runId);
+    clearCommittedAssistantAttachmentForRun(runId);
+    if (options?.clearScheduledHydration) {
+      clearScheduledHistoryHydrationForRun(runId);
+    }
+  };
+
+  const clearActiveRunTransientState = (
+    runId: string | null | undefined,
+    options?: { clearScheduledHydration?: boolean },
+  ) => {
+    clearRunAssistantProjectionState(runId, options);
+    clearActiveStreamingState();
+  };
+
+  const updateActiveSessionRunActivity = (params: { working: boolean; unread?: boolean }) => {
+    const activeSessionKey = selectedSessionRef.current;
+    if (activeSessionKey) {
+      updateSessionActivity(activeSessionKey, {
+        working: params.working,
+        unread: params.unread ?? false,
+      });
+    }
+  };
+
   const attachLifecycleErrorToActiveTools = useCallback((params: { runId?: string | null; errorMessage?: string | null }) => {
     if (!params.runId || !params.errorMessage) {
       return;
@@ -4293,41 +5107,59 @@ export default function App() {
         return;
       }
       const streamedText = (streamTextRef.current ?? "").trim();
+      const pendingAssistantReply = getAssistantReplyForRun(runId);
       if (params.phase === "end") {
-        if (!streamedText) {
-          clearActiveStreamingState();
-          void reloadActiveSessionHistory();
-          const activeSessionKey = selectedSessionRef.current;
-          if (activeSessionKey) {
-            updateSessionActivity(activeSessionKey, { working: false, unread: false });
+        const finalAssistantMessage = pendingAssistantReply
+          ? buildFinalAssistantMessage(pendingAssistantReply, streamedText, runId)
+          : buildStreamCommittedAssistantMessage(streamedText);
+        if (!finalAssistantMessage) {
+          const hydrationDecision = decideFinalizedRunHydration({
+            hasFinalAssistantMessage: false,
+            hasRenderableAttachment: false,
+            hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(runId),
+            hasCommittedMessage: hasCommittedAssistantMessageForRun(runId),
+            expectsMedia: runHasExpectedMediaForRun(runId),
+          });
+          if (hydrationDecision === "clear") {
+            clearActiveRunTransientState(runId, { clearScheduledHydration: true });
+            refreshSessionListsSoon();
+            updateActiveSessionRunActivity({ working: false, unread: false });
+            return;
           }
+          clearActiveRunTransientState(runId);
+          void reloadActiveSessionHistory();
+          updateActiveSessionRunActivity({ working: false, unread: false });
           return;
         }
-        if (!shouldSkipAssistantFinal(runId, streamedText)) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: generateUUID(),
-              role: "assistant",
-              text: streamedText,
-              timestamp: Date.now(),
-            },
-          ]);
+        const hasRenderableText = Boolean(finalAssistantMessage.text.trim());
+        const hasRenderableAttachment = Boolean(finalAssistantMessage.attachments?.length);
+        const hydrationDecision = decideFinalizedRunHydration({
+          hasFinalAssistantMessage: true,
+          hasRenderableAttachment,
+          hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(runId),
+          hasCommittedMessage: true,
+          expectsMedia: runHasExpectedMediaForRun(runId),
+        });
+        const shouldSkipText = hasRenderableText
+          ? shouldSkipAssistantFinal(runId, finalAssistantMessage.text)
+          : true;
+        if (shouldCommitFinalAssistantMessage({
+          hasRenderableText,
+          hasRenderableAttachment,
+          shouldSkipText,
+        })) {
+          setMessages((prev) => upsertAssistantMessageForRun(prev, runId, finalAssistantMessage));
           notifyReplyCompleted();
         }
-        clearActiveStreamingState();
+        applyFinalizedRunHydrationDecision(runId, hydrationDecision);
+        clearActiveRunTransientState(runId);
         refreshSessionListsSoon();
-        const activeSessionKey = selectedSessionRef.current;
-        if (activeSessionKey) {
-          updateSessionActivity(activeSessionKey, { working: false, unread: false });
-        }
+        updateActiveSessionRunActivity({ working: false, unread: false });
         return;
       }
-      clearActiveStreamingState();
+      clearActiveRunTransientState(runId, { clearScheduledHydration: true });
       const activeSessionKey = selectedSessionRef.current;
-      if (activeSessionKey) {
-        updateSessionActivity(activeSessionKey, { working: false, unread: false });
-      }
+      updateActiveSessionRunActivity({ working: false, unread: false });
       if (params.errorMessage) {
         if (params.sessionKey && activeSessionKey && sessionKeysMatch(params.sessionKey, activeSessionKey)) {
           attachLifecycleErrorToActiveTools({ runId, errorMessage: params.errorMessage });
@@ -4359,6 +5191,7 @@ export default function App() {
     window.addEventListener("keydown", warmup);
     return () => {
       clearDeferredSessionRefreshTimers();
+      clearDeferredHistoryHydrationTimers();
       if (streamFlushRafRef.current !== null) {
         window.cancelAnimationFrame(streamFlushRafRef.current);
         streamFlushRafRef.current = null;
@@ -4368,6 +5201,7 @@ export default function App() {
         window.clearTimeout(timer);
       }
       agentFinalizeTimerByRunRef.current = {};
+      scheduledHistoryHydrationByRunRef.current = {};
       window.removeEventListener("pointerdown", warmup);
       window.removeEventListener("keydown", warmup);
       player.dispose();
@@ -4852,6 +5686,12 @@ export default function App() {
     }
     saveUiSettings(uiSettings);
   }, [uiSettings]);
+
+  useEffect(() => {
+    const normalizedText = normalizePathPrefixMappingsText(pathPrefixMappingsText);
+    setActivePathPrefixMappingsText(normalizedText, { homeDir: getRuntimeHomeDir() });
+    savePathPrefixMappingsText(normalizedText);
+  }, [pathPrefixMappingsText]);
 
   useEffect(() => {
     if (uiSettings.autoHoverSidebar) {
@@ -5615,11 +6455,24 @@ export default function App() {
           lastTs = inferredTs;
           const toolUpdates = extractToolUpdatesFromMessage(raw, inferredTs);
           historyTools = mergeToolItems(historyTools, toolUpdates);
+          if (toolUpdates.length > 0) {
+            historyMessages.splice(
+              historyMessages.length,
+              0,
+              ...buildAttachmentMessagesFromToolUpdates(toolUpdates).filter((message) => {
+                const contentKey = buildChatMessageDedupeKey(message);
+                if (seenContentKeys.has(contentKey)) {
+                  return false;
+                }
+                seenContentKeys.add(contentKey);
+                return true;
+              }),
+            );
+          }
           const parsed = toChatMessageSafe(raw, inferredTs);
           if (parsed) {
-            // Deduplicate messages with identical role + text + similar timestamp
-            const tsKey = Math.floor(parsed.timestamp / 2000); // 2s window
-            const contentKey = `${parsed.role}:${tsKey}:${parsed.text.slice(0, 200)}`;
+            // Deduplicate only when text, timestamp window, and attachments all match.
+            const contentKey = buildChatMessageDedupeKey(parsed);
             if (!seenContentKeys.has(contentKey)) {
               seenContentKeys.add(contentKey);
               historyMessages.push(parsed);
@@ -5687,6 +6540,425 @@ export default function App() {
     }
   }
 
+  const handleCachedFinalChatEvent = (
+    parsed: NormalizedChatEvent,
+    payload: unknown,
+    targetKey: string,
+  ) => {
+    clearAgentFinalizeTimer(parsed.runId);
+    const pendingAssistantReply = getAssistantReplyForRun(parsed.runId);
+    const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
+    if (toolUpdates.length > 0) {
+      updateCacheField(targetKey, (cached) => ({
+        ...cached,
+        toolItems: mergeToolItems(cached.toolItems, toolUpdates),
+      }));
+    }
+    applySessionTokenStatsFromMessage(parsed.message, parsed.sessionKey);
+    applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
+    const isToolFinal = isToolMessage(parsed.message);
+    const cachedStreamText = (sessionCacheRef.current.get(targetKey)?.streamText ?? "").trim();
+    const committedStreamMessage = buildStreamCommittedAssistantMessage(cachedStreamText);
+    const toolAttachmentMessage = isToolFinal ? buildToolAttachmentMessage(parsed.message) : null;
+    const toolAttachmentMessagesFromUpdates = isToolFinal ? buildAttachmentMessagesFromToolUpdates(toolUpdates) : [];
+    const cachedToolFinalMessages = collectToolFinalMessages({
+      committedStreamMessage,
+      includeCommittedStreamMessage: true,
+      toolAttachmentMessage,
+      toolAttachmentMessagesFromUpdates,
+    });
+    if (isToolFinal && committedStreamMessage) {
+      updateCacheField(targetKey, (cached) => ({
+        ...cached,
+        messages: appendDistinctMessages(cached.messages, cachedToolFinalMessages),
+        streamText: null,
+      }));
+      clearRunAssistantProjectionState(parsed.runId);
+      updateSessionActivity(targetKey, { working: true });
+      return;
+    }
+    if (isToolFinal && cachedToolFinalMessages.length > 0) {
+      updateCacheField(targetKey, (cached) => ({
+        ...cached,
+        messages: appendDistinctMessages(cached.messages, cachedToolFinalMessages),
+        streamText: null,
+      }));
+      clearRunAssistantProjectionState(parsed.runId);
+      updateSessionActivity(targetKey, { working: true });
+      return;
+    }
+    const msg = !isToolFinal
+      ? buildFinalAssistantMessage(
+          mergeAssistantReplyMessageCandidate(parsed.message, pendingAssistantReply),
+          cachedStreamText,
+          parsed.runId,
+        )
+      : null;
+    if (!isToolFinal && msg) {
+      updateCacheField(targetKey, (cached) => ({
+        ...cached,
+        messages: upsertAssistantMessageForRun(cached.messages, parsed.runId, msg),
+        streamText: null,
+        chatRunId: null,
+        thinking: false,
+      }));
+      updateSessionActivity(targetKey, { working: false, unread: true });
+    }
+    clearRunAssistantProjectionState(parsed.runId);
+    // Refresh session list so sidebar picks up lastMessagePreview & derivedTitle
+    refreshSessionListsSoon();
+  };
+
+  const handleCachedTerminalChatEvent = (
+    parsed: NormalizedChatEvent,
+    targetKey: string,
+  ) => {
+    clearAgentFinalizeTimer(parsed.runId);
+    clearRunAssistantProjectionState(parsed.runId);
+    clearCachedStreamingState(targetKey);
+    if (parsed.state === "error") {
+      attachLifecycleErrorToCachedTools(targetKey, {
+        runId: parsed.runId,
+        errorMessage: parsed.errorMessage,
+      });
+      updateSessionActivity(targetKey, { working: false, unread: true });
+      return;
+    }
+    updateSessionActivity(targetKey, { working: false });
+  };
+
+  const handleActiveFinalChatEvent = (
+    parsed: NormalizedChatEvent,
+    payload: unknown,
+  ) => {
+    clearAgentFinalizeTimer(parsed.runId);
+    const pendingAssistantReply = getAssistantReplyForRun(parsed.runId);
+    const activeRun = chatRunRef.current;
+    if (activeRun && parsed.runId && parsed.runId !== activeRun) {
+      if (thinkingRef.current) {
+        chatRunRef.current = parsed.runId;
+        setChatRunId(parsed.runId);
+      } else {
+        void reloadActiveSessionHistory();
+        return;
+      }
+    }
+    const activeRunAfterSync = chatRunRef.current;
+    if (activeRunAfterSync && parsed.runId && parsed.runId !== activeRunAfterSync) {
+      void reloadActiveSessionHistory();
+      return;
+    }
+    const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
+    if (toolUpdates.length > 0) {
+      setToolItems((prev) => mergeToolItems(prev, toolUpdates));
+    }
+    applySessionTokenStatsFromMessage(parsed.message, parsed.sessionKey);
+    applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
+    const isToolFinal = isToolMessage(parsed.message);
+    const streamedText = (streamTextRef.current ?? "").trim();
+    const committedStreamMessage = buildStreamCommittedAssistantMessage(streamedText);
+    const toolAttachmentMessage = isToolFinal ? buildToolAttachmentMessage(parsed.message) : null;
+    const toolAttachmentMessagesFromUpdates = isToolFinal ? buildAttachmentMessagesFromToolUpdates(toolUpdates) : [];
+    const activeToolFinalMessages = collectToolFinalMessages({
+      committedStreamMessage,
+      includeCommittedStreamMessage:
+        Boolean(committedStreamMessage) && !shouldSkipAssistantFinal(parsed.runId, committedStreamMessage?.text ?? ""),
+      toolAttachmentMessage,
+      toolAttachmentMessagesFromUpdates,
+    });
+    if (isToolFinal && committedStreamMessage) {
+      const hydrationDecision = decideFinalizedRunHydration({
+        hasFinalAssistantMessage: true,
+        hasRenderableAttachment:
+          Boolean(toolAttachmentMessage) ||
+          toolAttachmentMessagesFromUpdates.length > 0,
+        hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(parsed.runId),
+        hasCommittedMessage: true,
+        expectsMedia: runHasExpectedMediaForRun(parsed.runId, { toolUpdates }),
+      });
+      if (activeToolFinalMessages.length > 0) {
+        setMessages((prev) => appendDistinctMessages(prev, activeToolFinalMessages));
+      }
+      applyFinalizedRunHydrationDecision(parsed.runId, hydrationDecision);
+      clearActiveRunTransientState(parsed.runId);
+      // Model will continue after tool execution — keep activity working.
+      updateActiveSessionRunActivity({ working: true, unread: false });
+      return;
+    }
+    if (isToolFinal && activeToolFinalMessages.length > 0) {
+      setMessages((prev) => appendDistinctMessages(prev, activeToolFinalMessages));
+      clearActiveRunTransientState(parsed.runId);
+      updateActiveSessionRunActivity({ working: true, unread: false });
+      return;
+    }
+    const msg = buildFinalAssistantMessage(
+      mergeAssistantReplyMessageCandidate(parsed.message, pendingAssistantReply),
+      streamedText,
+      parsed.runId,
+    );
+    if (msg) {
+      const hasRenderableText = Boolean(msg.text.trim());
+      const hasRenderableAttachment = Boolean(msg.attachments?.length);
+      const hydrationDecision = decideFinalizedRunHydration({
+        hasFinalAssistantMessage: true,
+        hasRenderableAttachment,
+        hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(parsed.runId),
+        hasCommittedMessage: true,
+        expectsMedia: runHasExpectedMediaForRun(parsed.runId, { toolUpdates }),
+      });
+      const shouldSkipText = hasRenderableText
+        ? shouldSkipAssistantFinal(parsed.runId, msg.text)
+        : true;
+      if (shouldCommitFinalAssistantMessage({
+        hasRenderableText,
+        hasRenderableAttachment,
+        shouldSkipText,
+      })) {
+        setMessages((prev) => upsertAssistantMessageForRun(prev, parsed.runId, msg));
+        notifyReplyCompleted();
+      }
+      applyFinalizedRunHydrationDecision(parsed.runId, hydrationDecision);
+    } else {
+      scheduleActiveHistoryHydration(parsed.runId);
+    }
+    clearActiveRunTransientState(parsed.runId);
+    updateActiveSessionRunActivity({ working: false, unread: false });
+    refreshSessionListsSoon();
+  };
+
+  const handleActiveTerminalChatEvent = (parsed: NormalizedChatEvent) => {
+    clearAgentFinalizeTimer(parsed.runId);
+    clearActiveRunTransientState(parsed.runId, { clearScheduledHydration: true });
+    if (parsed.state === "error") {
+      attachLifecycleErrorToActiveTools({
+        runId: parsed.runId,
+        errorMessage: parsed.errorMessage,
+      });
+      if (parsed.errorMessage) {
+        pushSystemMessage(`Error: ${parsed.errorMessage}`);
+      }
+    }
+    updateActiveSessionRunActivity({ working: false, unread: false });
+  };
+
+  const getAgentEventStream = (payload: Record<string, unknown>): string => {
+    const streamRaw =
+      getString(payload, ["stream", "channel", "topic"]) ??
+      (isRecord(payload.data) ? getString(payload.data, ["stream", "channel", "topic"]) : null);
+    return streamRaw?.toLowerCase() ?? "";
+  };
+
+  const handleCachedAgentToolUpdates = (
+    targetKey: string,
+    runId: string | null,
+    updates: ToolUpdate[],
+  ) => {
+    if (updates.length === 0) {
+      return;
+    }
+    const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(updates);
+    updateCacheField(targetKey, (cached) => ({
+      ...cached,
+      toolItems: mergeToolItems(cached.toolItems, updates),
+      messages: appendDistinctMessages(cached.messages, toolAttachmentMessagesFromUpdates),
+      chatRunId: runId ?? cached.chatRunId,
+    }));
+    updateSessionActivity(targetKey, { working: true });
+  };
+
+  const handleCachedAgentAssistantEvent = (
+    payload: Record<string, unknown>,
+    targetKey: string,
+    runId: string | null,
+  ) => {
+    const assistantReply = coerceAssistantReplyMessage(isRecord(payload.data) ? payload.data : payload);
+    commitAssistantReplyAttachmentProjection(
+      buildAssistantReplyAttachmentProjection(assistantReply, runId),
+      ({ runId: projectedRunId, attachmentMessage }) => {
+        updateCacheField(targetKey, (cached) => ({
+          ...cached,
+          messages: upsertAssistantMessageForRun(cached.messages, projectedRunId, attachmentMessage),
+        }));
+      },
+    );
+    // Skip if chat events are already handling this run's streaming
+    // (mirrors the active-session guard in the main handleAgentEvent path)
+    const cachedChatRunId = sessionCacheRef.current.get(targetKey)?.chatRunId;
+    if (cachedChatRunId && (!runId || runId === cachedChatRunId)) {
+      return;
+    }
+    const next = extractAssistantTextFromAgentPayload(payload);
+    if (!next) {
+      return;
+    }
+    updateCacheField(targetKey, (cached) => ({
+      ...cached,
+      streamText: mergeStreamingText(cached.streamText, next),
+      thinking: false,
+      chatRunId: runId ?? cached.chatRunId,
+    }));
+    updateSessionActivity(targetKey, { working: true });
+  };
+
+  const handleCachedAgentLifecycleEvent = (
+    payload: Record<string, unknown>,
+    targetKey: string,
+    runId: string | null,
+  ) => {
+    if (!isRecord(payload.data)) {
+      return;
+    }
+    const phase = normalizeLifecyclePhase(
+      getString(payload.data, ["phase", "status", "state", "event", "type"]),
+    );
+    if (phase !== "end" && phase !== "error") {
+      return;
+    }
+    clearAgentFinalizeTimer(runId);
+    if (phase === "error") {
+      attachLifecycleErrorToCachedTools(targetKey, {
+        runId,
+        errorMessage:
+          getString(payload.data, ["errorMessage", "error", "reason"]) ??
+          getString(payload, ["errorMessage", "error"]),
+      });
+      updateSessionActivity(targetKey, { working: false, unread: true });
+      return;
+    }
+    updateSessionActivity(targetKey, { working: false });
+  };
+
+  const handleActiveAgentToolUpdates = (updates: ToolUpdate[]) => {
+    if (updates.length === 0) {
+      return;
+    }
+    const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(updates);
+    setToolItems((prev) => mergeToolItems(prev, updates));
+    if (toolAttachmentMessagesFromUpdates.length > 0) {
+      setMessages((prev) => appendDistinctMessages(prev, toolAttachmentMessagesFromUpdates));
+    }
+    updateActiveSessionRunActivity({ working: true, unread: false });
+  };
+
+  const handleActiveAgentAssistantEvent = (
+    payload: Record<string, unknown>,
+    runId: string | null,
+  ) => {
+    const assistantReply = coerceAssistantReplyMessage(isRecord(payload.data) ? payload.data : payload);
+    commitAssistantReplyAttachmentProjection(
+      buildAssistantReplyAttachmentProjection(assistantReply, runId),
+      ({ runId: projectedRunId, attachmentMessage }) => {
+        setMessages((prev) => upsertAssistantMessageForRun(prev, projectedRunId, attachmentMessage));
+      },
+    );
+    const activeRun = chatRunRef.current;
+    if (activeRun && (!runId || runId === activeRun)) {
+      return;
+    }
+    const next = extractAssistantTextFromAgentPayload(payload);
+    if (!next) {
+      return;
+    }
+    if (runId && chatRunRef.current && runId !== chatRunRef.current && thinkingRef.current) {
+      chatRunRef.current = runId;
+      setChatRunId(runId);
+    }
+    mergeStreamTextSynced(next);
+    setThinking(false);
+    updateActiveSessionRunActivity({ working: true, unread: false });
+  };
+
+  const handleActiveAgentLifecycleEvent = (
+    payload: Record<string, unknown>,
+    activeSessionKey: string | null,
+    runId: string | null,
+  ) => {
+    if (!isRecord(payload.data)) {
+      return;
+    }
+    const phase = normalizeLifecyclePhase(
+      getString(payload.data, ["phase", "status", "state", "event", "type"]),
+    );
+    if (phase !== "end" && phase !== "error") {
+      return;
+    }
+    const lifecycleErrorMessage =
+      getString(payload.data, ["errorMessage", "error", "reason"]) ??
+      getString(payload, ["errorMessage", "error"]);
+    if (phase === "error") {
+      attachLifecycleErrorToActiveTools({ runId, errorMessage: lifecycleErrorMessage });
+    }
+    updateActiveSessionRunActivity({ working: false, unread: false });
+    scheduleAgentFinalizeFallback({
+      sessionKey: activeSessionKey,
+      runId,
+      phase,
+      errorMessage: lifecycleErrorMessage,
+    });
+  };
+
+  const handleCachedDeltaChatEvent = (
+    parsed: NormalizedChatEvent,
+    targetKey: string,
+  ) => {
+    const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
+    if (deltaToolUpdates.length > 0) {
+      const toolAttachmentMessage = buildToolAttachmentMessage(parsed.message);
+      const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(deltaToolUpdates);
+      updateCacheField(targetKey, (cached) => ({
+        ...cached,
+        toolItems: mergeToolItems(cached.toolItems, deltaToolUpdates),
+        messages: appendDistinctMessages(cached.messages, [toolAttachmentMessage, ...toolAttachmentMessagesFromUpdates]),
+        chatRunId: parsed.runId ?? cached.chatRunId,
+      }));
+      updateSessionActivity(targetKey, { working: true });
+      return;
+    }
+    if (isToolMessage(parsed.message)) {
+      return;
+    }
+    const next = extractText(parsed.message);
+    if (typeof next !== "string" || next.length === 0) {
+      return;
+    }
+    updateCacheField(targetKey, (cached) => ({
+      ...cached,
+      streamText: mergeStreamingText(cached.streamText, next),
+      thinking: false,
+      chatRunId: parsed.runId ?? cached.chatRunId,
+    }));
+    updateSessionActivity(targetKey, { working: true });
+  };
+
+  const handleActiveDeltaChatEvent = (parsed: NormalizedChatEvent) => {
+    if (chatRunRef.current && parsed.runId && parsed.runId !== chatRunRef.current) {
+      if (!thinkingRef.current) {
+        return;
+      }
+      chatRunRef.current = parsed.runId;
+      setChatRunId(parsed.runId);
+    }
+    const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
+    if (deltaToolUpdates.length > 0) {
+      const toolAttachmentMessage = buildToolAttachmentMessage(parsed.message);
+      const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(deltaToolUpdates);
+      setToolItems((prev) => mergeToolItems(prev, deltaToolUpdates));
+      setMessages((prev) => appendDistinctMessages(prev, [toolAttachmentMessage, ...toolAttachmentMessagesFromUpdates]));
+      updateActiveSessionRunActivity({ working: true, unread: false });
+      return;
+    }
+    if (isToolMessage(parsed.message)) {
+      return;
+    }
+    const next = extractText(parsed.message);
+    if (typeof next !== "string" || next.length === 0) {
+      return;
+    }
+    mergeStreamTextSynced(next);
+    setThinking(false);
+    updateActiveSessionRunActivity({ working: true, unread: false });
+  };
+
   function handleChatEvent(payload: unknown, eventHint?: string) {
     const parsed = normalizeChatEventPayload(payload, eventHint);
     if (!parsed) {
@@ -5701,190 +6973,39 @@ export default function App() {
       if (!activeSessionKey || !(activeRun && parsed.runId && parsed.runId === activeRun)) {
         const targetKey = parsed.sessionKey!;
         if (parsed.state === "delta") {
-          const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
-          if (deltaToolUpdates.length > 0) {
-            updateCacheField(targetKey, (cached) => ({
-              ...cached,
-              toolItems: mergeToolItems(cached.toolItems, deltaToolUpdates),
-              chatRunId: parsed.runId ?? cached.chatRunId,
-            }));
-          } else if (!isToolMessage(parsed.message)) {
-            const next = extractText(parsed.message);
-            if (typeof next === "string" && next.length > 0) {
-              updateCacheField(targetKey, (cached) => ({
-                ...cached,
-                streamText: mergeStreamingText(cached.streamText, next),
-                thinking: false,
-                chatRunId: parsed.runId ?? cached.chatRunId,
-              }));
-            }
-          }
-          updateSessionActivity(targetKey, { working: true });
+          handleCachedDeltaChatEvent(parsed, targetKey);
           return;
         }
 
         if (parsed.state === "final") {
-          clearAgentFinalizeTimer(parsed.runId);
-          const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
-          if (toolUpdates.length > 0) {
-            updateCacheField(targetKey, (cached) => ({
-              ...cached,
-              toolItems: mergeToolItems(cached.toolItems, toolUpdates),
-            }));
-          }
-          applySessionTokenStatsFromMessage(parsed.message, parsed.sessionKey);
-          applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
-          const isToolFinal = isToolMessage(parsed.message);
-          const cachedStreamText = (sessionCacheRef.current.get(targetKey)?.streamText ?? "").trim();
-          const committedStreamMessage = buildStreamCommittedAssistantMessage(cachedStreamText);
-          if (isToolFinal && committedStreamMessage) {
-            updateCacheField(targetKey, (cached) => ({
-              ...cached,
-              messages: [...cached.messages, committedStreamMessage],
-              streamText: null,
-            }));
-            updateSessionActivity(targetKey, { working: true });
-          }
-          const msg = !isToolFinal
-            ? buildFinalAssistantMessage(parsed.message, cachedStreamText)
-            : null;
-          if (!isToolFinal && msg) {
-            updateCacheField(targetKey, (cached) => ({
-              ...cached,
-              messages: [...cached.messages, msg],
-              streamText: null,
-              chatRunId: null,
-              thinking: false,
-            }));
-            updateSessionActivity(targetKey, { working: false, unread: true });
-          }
-          // Refresh session list so sidebar picks up lastMessagePreview & derivedTitle
-          refreshSessionListsSoon();
+          handleCachedFinalChatEvent(parsed, payload, targetKey);
           return;
         }
 
         if (parsed.state === "aborted" || parsed.state === "error") {
-          clearAgentFinalizeTimer(parsed.runId);
-          clearCachedStreamingState(targetKey);
-          if (parsed.state === "error") {
-            attachLifecycleErrorToCachedTools(targetKey, {
-              runId: parsed.runId,
-              errorMessage: parsed.errorMessage,
-            });
-            updateSessionActivity(targetKey, { working: false, unread: true });
-          } else {
-            updateSessionActivity(targetKey, { working: false });
-          }
+          handleCachedTerminalChatEvent(parsed, targetKey);
           return;
         }
         return;
       }
     }
     if (parsed.state === "delta") {
-      if (chatRunRef.current && parsed.runId && parsed.runId !== chatRunRef.current) {
-        if (!thinkingRef.current) {
-          return;
-        }
-        chatRunRef.current = parsed.runId;
-        setChatRunId(parsed.runId);
-      }
-      const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
-      if (deltaToolUpdates.length > 0) {
-        setToolItems((prev) => mergeToolItems(prev, deltaToolUpdates));
-        if (activeSessionKey) {
-          updateSessionActivity(activeSessionKey, { working: true, unread: false });
-        }
-        return;
-      }
-      if (isToolMessage(parsed.message)) {
-        return;
-      }
-      const next = extractText(parsed.message);
-      if (typeof next === "string" && next.length > 0) {
-        mergeStreamTextSynced(next);
-        setThinking(false);
-        if (activeSessionKey) {
-          updateSessionActivity(activeSessionKey, { working: true, unread: false });
-        }
-      }
+      handleActiveDeltaChatEvent(parsed);
       return;
     }
 
     if (parsed.state === "final") {
-      clearAgentFinalizeTimer(parsed.runId);
-      const activeRun = chatRunRef.current;
-      if (activeRun && parsed.runId && parsed.runId !== activeRun) {
-        if (thinkingRef.current) {
-          chatRunRef.current = parsed.runId;
-          setChatRunId(parsed.runId);
-        } else {
-          void reloadActiveSessionHistory();
-          return;
-        }
-      }
-      const activeRunAfterSync = chatRunRef.current;
-      if (activeRunAfterSync && parsed.runId && parsed.runId !== activeRunAfterSync) {
-        void reloadActiveSessionHistory();
-        return;
-      }
-      const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
-      if (toolUpdates.length > 0) {
-        setToolItems((prev) => mergeToolItems(prev, toolUpdates));
-      }
-      applySessionTokenStatsFromMessage(parsed.message, parsed.sessionKey);
-      applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
-      const isToolFinal = isToolMessage(parsed.message);
-      const streamedText = (streamTextRef.current ?? "").trim();
-      const committedStreamMessage = buildStreamCommittedAssistantMessage(streamedText);
-      if (isToolFinal && committedStreamMessage) {
-        if (!shouldSkipAssistantFinal(parsed.runId, committedStreamMessage.text)) {
-          setMessages((prev) => [...prev, committedStreamMessage]);
-        }
-        clearActiveStreamingState();
-        // Model will continue after tool execution — keep activity working.
-        if (activeSessionKey) {
-          updateSessionActivity(activeSessionKey, { working: true, unread: false });
-        }
-        return;
-      }
-      const msg = buildFinalAssistantMessage(parsed.message, streamedText);
-      if (msg) {
-        const hasRenderableText = Boolean(msg.text.trim());
-        if (!hasRenderableText || !shouldSkipAssistantFinal(parsed.runId, msg.text)) {
-          setMessages((prev) => [...prev, msg]);
-          notifyReplyCompleted();
-        }
-      }
-      clearActiveStreamingState();
-      if (activeSessionKey) {
-        updateSessionActivity(activeSessionKey, { working: false, unread: false });
-      }
-      refreshSessionListsSoon();
+      handleActiveFinalChatEvent(parsed, payload);
       return;
     }
 
     if (parsed.state === "aborted") {
-      clearAgentFinalizeTimer(parsed.runId);
-      clearActiveStreamingState();
-      if (activeSessionKey) {
-        updateSessionActivity(activeSessionKey, { working: false, unread: false });
-      }
+      handleActiveTerminalChatEvent(parsed);
       return;
     }
 
     if (parsed.state === "error") {
-      clearAgentFinalizeTimer(parsed.runId);
-      clearActiveStreamingState();
-      attachLifecycleErrorToActiveTools({
-        runId: parsed.runId,
-        errorMessage: parsed.errorMessage,
-      });
-      if (activeSessionKey) {
-        updateSessionActivity(activeSessionKey, { working: false, unread: false });
-      }
-      if (parsed.errorMessage) {
-        pushSystemMessage(`Error: ${parsed.errorMessage}`);
-      }
+      handleActiveTerminalChatEvent(parsed);
     }
   }
 
@@ -5907,110 +7028,27 @@ export default function App() {
       if (!activeSessionKey || !(activeRun && runId && runId === activeRun)) {
         const targetKey = sessionKey!;
         const updates = extractToolUpdatesFromAgent(payload, runId);
-        if (updates.length > 0) {
-          updateCacheField(targetKey, (cached) => ({
-            ...cached,
-            toolItems: mergeToolItems(cached.toolItems, updates),
-            chatRunId: runId ?? cached.chatRunId,
-          }));
-          updateSessionActivity(targetKey, { working: true });
-        }
-        const streamRaw =
-          getString(payload, ["stream", "channel", "topic"]) ??
-          (isRecord(payload.data) ? getString(payload.data, ["stream", "channel", "topic"]) : null);
-        const stream = streamRaw?.toLowerCase() ?? "";
+        handleCachedAgentToolUpdates(targetKey, runId, updates);
+        const stream = getAgentEventStream(payload);
         if (stream === "assistant") {
-          // Skip if chat events are already handling this run's streaming
-          // (mirrors the active-session guard in the main handleAgentEvent path)
-          const cachedChatRunId = sessionCacheRef.current.get(targetKey)?.chatRunId;
-          if (cachedChatRunId && (!runId || runId === cachedChatRunId)) {
-            return;
-          }
-          const next = extractAssistantTextFromAgentPayload(payload);
-          if (next) {
-            updateCacheField(targetKey, (cached) => ({
-              ...cached,
-              streamText: mergeStreamingText(cached.streamText, next),
-              thinking: false,
-              chatRunId: runId ?? cached.chatRunId,
-            }));
-            updateSessionActivity(targetKey, { working: true });
-          }
+          handleCachedAgentAssistantEvent(payload, targetKey, runId);
           return;
         }
-        if (stream === "lifecycle" && isRecord(payload.data)) {
-          const phase = normalizeLifecyclePhase(
-            getString(payload.data, ["phase", "status", "state", "event", "type"]),
-          );
-          if (phase === "end" || phase === "error") {
-            clearAgentFinalizeTimer(runId);
-            if (phase === "error") {
-              attachLifecycleErrorToCachedTools(targetKey, {
-                runId,
-                errorMessage:
-                  getString(payload.data, ["errorMessage", "error", "reason"]) ??
-                  getString(payload, ["errorMessage", "error"]),
-              });
-              updateSessionActivity(targetKey, { working: false, unread: true });
-            } else {
-              updateSessionActivity(targetKey, { working: false });
-            }
-          }
+        if (stream === "lifecycle") {
+          handleCachedAgentLifecycleEvent(payload, targetKey, runId);
         }
         return;
       }
     }
     const updates = extractToolUpdatesFromAgent(payload, runId);
-    if (updates.length > 0) {
-      setToolItems((prev) => mergeToolItems(prev, updates));
-      if (activeSessionKey) {
-        updateSessionActivity(activeSessionKey, { working: true, unread: false });
-      }
-    }
-    const streamRaw =
-      getString(payload, ["stream", "channel", "topic"]) ??
-      (isRecord(payload.data) ? getString(payload.data, ["stream", "channel", "topic"]) : null);
-    const stream = streamRaw?.toLowerCase() ?? "";
+    handleActiveAgentToolUpdates(updates);
+    const stream = getAgentEventStream(payload);
     if (stream === "assistant") {
-      const activeRun = chatRunRef.current;
-      if (activeRun && (!runId || runId === activeRun)) {
-        return;
-      }
-      const next = extractAssistantTextFromAgentPayload(payload);
-      if (next) {
-        if (runId && chatRunRef.current && runId !== chatRunRef.current && thinkingRef.current) {
-          chatRunRef.current = runId;
-          setChatRunId(runId);
-        }
-        mergeStreamTextSynced(next);
-        setThinking(false);
-        if (activeSessionKey) {
-          updateSessionActivity(activeSessionKey, { working: true, unread: false });
-        }
-      }
+      handleActiveAgentAssistantEvent(payload, runId);
       return;
     }
-    if (stream === "lifecycle" && isRecord(payload.data)) {
-      const phase = normalizeLifecyclePhase(
-        getString(payload.data, ["phase", "status", "state", "event", "type"]),
-      );
-      if (phase === "end" || phase === "error") {
-        const lifecycleErrorMessage =
-          getString(payload.data, ["errorMessage", "error", "reason"]) ??
-          getString(payload, ["errorMessage", "error"]);
-        if (phase === "error") {
-          attachLifecycleErrorToActiveTools({ runId, errorMessage: lifecycleErrorMessage });
-        }
-        if (activeSessionKey) {
-          updateSessionActivity(activeSessionKey, { working: false, unread: false });
-        }
-        scheduleAgentFinalizeFallback({
-          sessionKey: activeSessionKey,
-          runId,
-          phase,
-          errorMessage: lifecycleErrorMessage,
-        });
-      }
+    if (stream === "lifecycle") {
+      handleActiveAgentLifecycleEvent(payload, activeSessionKey, runId);
     }
   }
 
@@ -7054,6 +8092,8 @@ export default function App() {
         onPasswordChange={setPassword}
         fsServerUrl={fsServerUrl}
         onFsServerUrlChange={setFsServerUrl}
+        pathPrefixMappingsText={pathPrefixMappingsText}
+        onPathPrefixMappingsTextChange={setPathPrefixMappingsText}
         uiSettings={uiSettings}
         onUiSettingsChange={setUiSettings}
         uiSettingsSchemes={uiSettingsSchemes.map((item) => ({

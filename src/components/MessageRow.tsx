@@ -149,6 +149,7 @@ export type MessageRowProps = {
   followupType?: "tool";
   onOpenImage: (attachment: Attachment) => void;
   onResolveRemoteImage?: (filePath: string) => Promise<string | null>;
+  imageGenerationPending?: boolean;
 };
 
 export const MessageRow = React.memo(
@@ -218,6 +219,7 @@ export const MessageRow = React.memo(
                   attachment={att}
                   onOpen={props.onOpenImage}
                   resolveRemoteImage={props.onResolveRemoteImage}
+                  generationPending={props.imageGenerationPending}
                 />
               )}
               renderFileAttachment={(att) => <MessageFileAttachment attachment={att} />}
@@ -247,5 +249,6 @@ export const MessageRow = React.memo(
     prev.sessionFlyIn === next.sessionFlyIn &&
     prev.followupType === next.followupType &&
     prev.onOpenImage === next.onOpenImage &&
-    prev.onResolveRemoteImage === next.onResolveRemoteImage,
+    prev.onResolveRemoteImage === next.onResolveRemoteImage &&
+    prev.imageGenerationPending === next.imageGenerationPending,
 );
