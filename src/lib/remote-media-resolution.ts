@@ -13,31 +13,10 @@ export const DEFAULT_REMOTE_MEDIA_READ_METHODS = [
   "media.read",
 ] as const;
 
-const REMOTE_MEDIA_HTTP_ENDPOINTS: Array<{
-  pathname: string;
-  queryKeys: string[];
-}> = [
-  {
-    pathname: "/__claw/media/read",
-    queryKeys: ["source", "path", "filePath", "uri", "artifact", "artifactPath", "artifactUri"],
-  },
-  {
-    pathname: "/media/read",
-    queryKeys: ["source", "path", "filePath", "uri", "artifact", "artifactPath", "artifactUri"],
-  },
-  {
-    pathname: "/__claw/artifacts/read",
-    queryKeys: ["artifact", "artifactPath", "artifactUri", "source", "path", "filePath", "uri"],
-  },
-  {
-    pathname: "/artifacts/read",
-    queryKeys: ["artifact", "artifactPath", "artifactUri", "source", "path", "filePath", "uri"],
-  },
-  {
-    pathname: "/__claw/local-image",
-    queryKeys: ["path"],
-  },
-] as const;
+const MAX_GATEWAY_REMOTE_MEDIA_URL_CANDIDATES = 18;
+const MAX_REMOTE_MEDIA_READ_METHODS = 8;
+
+type RemoteMediaReferenceKind = "artifact" | "path" | "opaque";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -121,6 +100,29 @@ function isSkippableRemoteReference(value: string): boolean {
     return true;
   }
   return false;
+}
+
+function classifyRemoteMediaReference(reference: string): RemoteMediaReferenceKind {
+  const trimmed = stripPathDecorators(reference);
+  if (!trimmed) {
+    return "opaque";
+  }
+  if (/^artifact:/i.test(trimmed)) {
+    return "artifact";
+  }
+  if (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("~/") ||
+    /^[A-Za-z]:[\\/]/.test(trimmed) ||
+    trimmed.startsWith(".openclaw/") ||
+    trimmed.startsWith("openclaw/") ||
+    trimmed.includes("/.openclaw/") ||
+    trimmed.includes("\\.openclaw\\") ||
+    Boolean(inferImageMimeTypeFromPath(trimmed))
+  ) {
+    return "path";
+  }
+  return "opaque";
 }
 
 export function inferImageMimeTypeFromPath(value: string): string | null {
@@ -264,7 +266,7 @@ export function extractRenderableImageSourceFromUnknown(
 export function pickRemoteMediaReadMethods(methods: Iterable<string>): string[] {
   const values = [...methods].filter((entry) => typeof entry === "string" && entry.trim());
   if (values.length === 0) {
-    return [...DEFAULT_REMOTE_MEDIA_READ_METHODS];
+    return [...DEFAULT_REMOTE_MEDIA_READ_METHODS].slice(0, MAX_REMOTE_MEDIA_READ_METHODS);
   }
   const scored = values
     .map((method) => {
@@ -305,10 +307,11 @@ export function pickRemoteMediaReadMethods(methods: Iterable<string>): string[] 
       lower.includes("artifact")
     );
   });
-  const merged = [...methodsByScore, ...relatedMethods, ...DEFAULT_REMOTE_MEDIA_READ_METHODS].filter(
+  const advertisedDefaults = DEFAULT_REMOTE_MEDIA_READ_METHODS.filter((method) => values.includes(method));
+  const merged = [...methodsByScore, ...relatedMethods, ...advertisedDefaults].filter(
     (method, index, arr) => arr.indexOf(method) === index,
   );
-  return merged.length > 0 ? merged : [...DEFAULT_REMOTE_MEDIA_READ_METHODS];
+  return merged.slice(0, MAX_REMOTE_MEDIA_READ_METHODS);
 }
 
 export function buildRemoteMediaReadParamVariants(reference: string): Record<string, unknown>[] {
@@ -316,30 +319,48 @@ export function buildRemoteMediaReadParamVariants(reference: string): Record<str
   if (!normalizedReference) {
     return [];
   }
-  const paramBases: Record<string, unknown>[] = [
-    { source: normalizedReference },
-    { path: normalizedReference },
-    { filePath: normalizedReference },
-    { file_path: normalizedReference },
-    { mediaPath: normalizedReference },
-    { media_path: normalizedReference },
-    { uri: normalizedReference },
-    { url: normalizedReference },
-    { artifact: normalizedReference },
-    { artifactPath: normalizedReference },
-    { artifact_path: normalizedReference },
-    { artifactUri: normalizedReference },
-    { artifact_uri: normalizedReference },
-  ];
-  const extraShapes: Array<Record<string, unknown>> = [
-    {},
-    { encoding: "base64" },
-    { format: "base64" },
-    { responseType: "base64" },
-  ];
+  const referenceKind = classifyRemoteMediaReference(normalizedReference);
+  const paramBases: Record<string, unknown>[] =
+    referenceKind === "artifact"
+      ? [
+          { artifact: normalizedReference },
+          { artifactPath: normalizedReference },
+          { artifactUri: normalizedReference },
+          { source: normalizedReference },
+          { uri: normalizedReference },
+        ]
+      : referenceKind === "path"
+        ? [
+            { path: normalizedReference },
+            { filePath: normalizedReference },
+            { mediaPath: normalizedReference },
+            { source: normalizedReference },
+            { uri: normalizedReference },
+          ]
+        : [
+            { source: normalizedReference },
+            { uri: normalizedReference },
+            { artifact: normalizedReference },
+            { path: normalizedReference },
+            { filePath: normalizedReference },
+          ];
+  const extraShapesByIndex =
+    referenceKind === "artifact"
+      ? new Map<number, Array<Record<string, unknown>>>([
+          [0, [{ encoding: "base64" }]],
+          [3, [{ encoding: "base64" }]],
+        ])
+      : referenceKind === "path"
+        ? new Map<number, Array<Record<string, unknown>>>([
+            [0, [{ encoding: "base64" }]],
+            [1, [{ encoding: "base64" }]],
+          ])
+        : new Map<number, Array<Record<string, unknown>>>([[0, [{ encoding: "base64" }]]]);
   const seen = new Set<string>();
   const variants: Record<string, unknown>[] = [];
-  for (const base of paramBases) {
+  for (let index = 0; index < paramBases.length; index += 1) {
+    const base = paramBases[index];
+    const extraShapes = [{}, ...(extraShapesByIndex.get(index) ?? [])];
     for (const extra of extraShapes) {
       const candidate = { ...base, ...extra };
       const key = JSON.stringify(candidate);
@@ -403,21 +424,51 @@ export function buildGatewayRemoteMediaUrlCandidates(rawGatewayUrl: string, refe
   if (!normalizedReference) {
     return [];
   }
+  const referenceKind = classifyRemoteMediaReference(normalizedReference);
   const seen = new Set<string>();
   const candidates: string[] = [];
   const push = (value: string) => {
     const next = value.trim();
-    if (!next || seen.has(next)) {
+    if (!next || seen.has(next) || candidates.length >= MAX_GATEWAY_REMOTE_MEDIA_URL_CANDIDATES) {
       return;
     }
     seen.add(next);
     candidates.push(next);
   };
+  const endpointCandidates =
+    referenceKind === "artifact"
+      ? [
+          ["/__claw/artifacts/read", "artifact"],
+          ["/__claw/artifacts/read", "artifactUri"],
+          ["/__claw/media/read", "artifact"],
+          ["/__claw/media/read", "source"],
+          ["/artifacts/read", "artifact"],
+          ["/media/read", "artifact"],
+        ]
+      : referenceKind === "path"
+        ? [
+            ["/__claw/local-image", "path"],
+            ["/__claw/media/read", "path"],
+            ["/__claw/media/read", "filePath"],
+            ["/media/read", "path"],
+            ["/media/read", "filePath"],
+          ]
+        : [
+            ["/__claw/media/read", "source"],
+            ["/__claw/media/read", "uri"],
+            ["/__claw/artifacts/read", "artifact"],
+            ["/media/read", "source"],
+            ["/artifacts/read", "artifact"],
+          ];
   for (const base of toGatewayHttpBaseCandidates(rawGatewayUrl)) {
-    for (const endpoint of REMOTE_MEDIA_HTTP_ENDPOINTS) {
-      for (const queryKey of endpoint.queryKeys) {
-        push(`${base}${endpoint.pathname}?${queryKey}=${encodeURIComponent(normalizedReference)}`);
+    for (const [pathname, queryKey] of endpointCandidates) {
+      push(`${base}${pathname}?${queryKey}=${encodeURIComponent(normalizedReference)}`);
+      if (candidates.length >= MAX_GATEWAY_REMOTE_MEDIA_URL_CANDIDATES) {
+        break;
       }
+    }
+    if (candidates.length >= MAX_GATEWAY_REMOTE_MEDIA_URL_CANDIDATES) {
+      break;
     }
   }
   return candidates;

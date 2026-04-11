@@ -135,6 +135,7 @@ const ATTACHMENT_FINGERPRINT_TAIL = 64;
 const WORKSPACE_MARKER = "/.openclaw/workspace";
 const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 const REMOTE_IMAGE_CACHE_LIMIT = 5;
+const REMOTE_IMAGE_HTTP_FETCH_TIMEOUT_MS = 2000;
 const runtimePathHints: { homeDir: string; workspaceDir: string } = {
   homeDir: "",
   workspaceDir: "",
@@ -3221,10 +3222,19 @@ async function resolveRemoteImageViaHttpProxy(
         // fallback to renderer-side fetch
       }
     }
+    let timeoutId: number | null = null;
     try {
+      const controller = typeof AbortController === "function" ? new AbortController() : null;
+      timeoutId =
+        controller !== null
+          ? window.setTimeout(() => {
+              controller.abort();
+            }, REMOTE_IMAGE_HTTP_FETCH_TIMEOUT_MS)
+          : null;
       const response = await fetch(candidate, {
         method: "GET",
         cache: "no-store",
+        signal: controller?.signal,
       });
       if (!response.ok) {
         continue;
@@ -3235,6 +3245,10 @@ async function resolveRemoteImageViaHttpProxy(
       }
     } catch {
       // try next candidate
+    } finally {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
     }
   }
   return null;
@@ -4328,10 +4342,6 @@ export default function App() {
       return null;
     }
     const methods = pickRemoteMediaReadMethods(gatewayMethodsRef.current);
-    if (methods.length === 0) {
-      return null;
-    }
-
     const paramVariants = buildRemoteMediaReadParamVariants(normalizedPath);
 
     const seenParamKeys = new Set<string>();
