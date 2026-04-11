@@ -19,8 +19,14 @@ test("pickRemoteMediaReadMethods prioritizes artifact/media read methods and kee
   );
 
   assert.deepEqual(result.slice(0, 3), ["workspace.file.read", "artifact.read", "media.read"]);
-  assert.ok(result.includes("artifacts.read"));
-  assert.ok(result.includes("files.read"));
+  assert.equal(result.includes("artifacts.read"), false);
+  assert.equal(result.includes("files.read"), false);
+});
+
+test("pickRemoteMediaReadMethods does not invent RPC methods when the gateway advertises unrelated methods", () => {
+  const { pickRemoteMediaReadMethods } = loadRemoteMediaResolutionModule();
+
+  assert.deepEqual(pickRemoteMediaReadMethods(new Set(["chat.send", "sessions.list"])), []);
 });
 
 test("buildRemoteMediaReadParamVariants covers path-like and artifact-like request shapes", () => {
@@ -31,8 +37,9 @@ test("buildRemoteMediaReadParamVariants covers path-like and artifact-like reque
 
   assert.ok(result.some((entry) => entry.source === "artifact://generated/123"));
   assert.ok(result.some((entry) => entry.artifact === "artifact://generated/123"));
-  assert.ok(result.some((entry) => entry.path === "artifact://generated/123"));
-  assert.ok(result.some((entry) => entry.filePath === "artifact://generated/123" && entry.encoding === "base64"));
+  assert.ok(result.some((entry) => entry.artifactPath === "artifact://generated/123"));
+  assert.ok(result.some((entry) => entry.artifact === "artifact://generated/123" && entry.encoding === "base64"));
+  assert.equal(result.some((entry) => entry.path === "artifact://generated/123"), false);
   assert.equal(new Set(asKeys.map((key, index) => `${key}:${JSON.stringify(result[index])}`)).size, result.length);
 });
 
@@ -94,7 +101,7 @@ test("buildGatewayRemoteMediaUrlCandidates emits media and compatibility endpoin
 
   assert.ok(
     result.includes(
-      "https://gateway.example.com/control/ws/__claw/media/read?source=artifact%3A%2F%2Fimages%2Fgenerated-123",
+      "https://gateway.example.com/control/ws/__claw/media/read?artifact=artifact%3A%2F%2Fimages%2Fgenerated-123",
     ),
   );
   assert.ok(
@@ -102,10 +109,22 @@ test("buildGatewayRemoteMediaUrlCandidates emits media and compatibility endpoin
       "https://gateway.example.com/control/ws/__claw/artifacts/read?artifact=artifact%3A%2F%2Fimages%2Fgenerated-123",
     ),
   );
-  assert.ok(
-    result.includes(
-      "https://gateway.example.com/control/ws/__claw/local-image?path=artifact%3A%2F%2Fimages%2Fgenerated-123",
-    ),
-  );
   assert.equal(new Set(result).size, result.length);
+  assert.ok(result.length <= 18);
+});
+
+test("buildGatewayRemoteMediaUrlCandidates prioritizes compatibility path probes for path-like references", () => {
+  const { buildGatewayRemoteMediaUrlCandidates } = loadRemoteMediaResolutionModule();
+
+  const result = buildGatewayRemoteMediaUrlCandidates(
+    "wss://gateway.example.com/control/ws",
+    "/tmp/generated-image.png",
+  );
+
+  assert.deepEqual(result.slice(0, 3), [
+    "https://gateway.example.com/control/ws/__claw/local-image?path=%2Ftmp%2Fgenerated-image.png",
+    "https://gateway.example.com/control/ws/__claw/media/read?path=%2Ftmp%2Fgenerated-image.png",
+    "https://gateway.example.com/control/ws/__claw/media/read?filePath=%2Ftmp%2Fgenerated-image.png",
+  ]);
+  assert.ok(result.length <= 18);
 });

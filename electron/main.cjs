@@ -30,28 +30,8 @@ const IMAGE_MIME_BY_EXT = {
   ".bmp": "image/bmp",
   ".svg": "image/svg+xml",
 };
-const REMOTE_MEDIA_HTTP_ENDPOINTS = [
-  {
-    pathname: "/__claw/media/read",
-    queryKeys: ["source", "path", "filePath", "uri", "artifact", "artifactPath", "artifactUri"],
-  },
-  {
-    pathname: "/media/read",
-    queryKeys: ["source", "path", "filePath", "uri", "artifact", "artifactPath", "artifactUri"],
-  },
-  {
-    pathname: "/__claw/artifacts/read",
-    queryKeys: ["artifact", "artifactPath", "artifactUri", "source", "path", "filePath", "uri"],
-  },
-  {
-    pathname: "/artifacts/read",
-    queryKeys: ["artifact", "artifactPath", "artifactUri", "source", "path", "filePath", "uri"],
-  },
-  {
-    pathname: "/__claw/local-image",
-    queryKeys: ["path"],
-  },
-];
+const REMOTE_GATEWAY_FETCH_TIMEOUT_MS = 2000;
+const MAX_REMOTE_GATEWAY_URLS = 18;
 const imageDataCache = new Map();
 let gatewayHttpBaseCandidates = [];
 let gatewayUsesRemoteHost = false;
@@ -67,6 +47,29 @@ function imageMimeTypeFromPath(filePath) {
 
 function isLikelyImageFileName(value) {
   return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(value || "");
+}
+
+function classifyRemoteMediaReference(value) {
+  const trimmed = stripPathDecorators(value);
+  if (!trimmed) {
+    return "opaque";
+  }
+  if (/^artifact:/i.test(trimmed)) {
+    return "artifact";
+  }
+  if (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("~/") ||
+    /^[A-Za-z]:[\\/]/.test(trimmed) ||
+    trimmed.startsWith(".openclaw/") ||
+    trimmed.startsWith("openclaw/") ||
+    trimmed.includes("/.openclaw/") ||
+    trimmed.includes("\\.openclaw\\") ||
+    isLikelyImageFileName(trimmed)
+  ) {
+    return "path";
+  }
+  return "opaque";
 }
 
 function normalizePathSeparators(value) {
@@ -474,6 +477,98 @@ function isRemoteGatewayCandidates(candidates) {
 // Vite dev server port for local image proxy (run `npm run dev` on the Gateway machine)
 const VITE_DEV_SERVER_PORT = process.env.CLAWUI_IMAGE_PROXY_PORT || "3000";
 
+function buildAllowedRemoteFetchOrigins(seedUrl, includeGatewayOrigins = true) {
+  const allowed = new Set();
+  const pushOrigin = (rawUrl) => {
+    try {
+      const origin = new URL(rawUrl).origin;
+      if (origin && origin !== "null") {
+        allowed.add(origin);
+      }
+    } catch {
+      // ignore invalid origin candidates
+    }
+  };
+  pushOrigin(seedUrl);
+  if (includeGatewayOrigins) {
+    for (const baseUrl of gatewayHttpBaseCandidates) {
+      pushOrigin(baseUrl);
+    }
+  }
+  return allowed;
+}
+
+function isAllowedFollowUpUrl(rawUrl, allowedOrigins) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false;
+    }
+    if (!(allowedOrigins instanceof Set) || allowedOrigins.size === 0) {
+      return true;
+    }
+    return allowedOrigins.has(parsed.origin);
+  } catch {
+    return false;
+  }
+}
+
+function buildRemoteGatewayUrlCandidates(reference) {
+  const normalizedReference = stripPathDecorators(reference);
+  if (!normalizedReference) {
+    return [];
+  }
+  const referenceKind = classifyRemoteMediaReference(normalizedReference);
+  const endpointCandidates =
+    referenceKind === "artifact"
+      ? [
+          ["/__claw/artifacts/read", "artifact"],
+          ["/__claw/artifacts/read", "artifactUri"],
+          ["/__claw/media/read", "artifact"],
+          ["/__claw/media/read", "source"],
+          ["/artifacts/read", "artifact"],
+          ["/media/read", "artifact"],
+        ]
+      : referenceKind === "path"
+        ? [
+            ["/__claw/local-image", "path"],
+            ["/__claw/media/read", "path"],
+            ["/__claw/media/read", "filePath"],
+            ["/media/read", "path"],
+            ["/media/read", "filePath"],
+          ]
+        : [
+            ["/__claw/media/read", "source"],
+            ["/__claw/media/read", "uri"],
+            ["/__claw/artifacts/read", "artifact"],
+            ["/media/read", "source"],
+            ["/artifacts/read", "artifact"],
+          ];
+  const seen = new Set();
+  const candidates = [];
+  const push = (value) => {
+    const next = String(value || "").trim();
+    if (!next || seen.has(next) || candidates.length >= MAX_REMOTE_GATEWAY_URLS) {
+      return;
+    }
+    seen.add(next);
+    candidates.push(next);
+  };
+  const encodedReference = encodeURIComponent(normalizedReference);
+  for (const baseUrl of gatewayHttpBaseCandidates) {
+    for (const [pathname, queryKey] of endpointCandidates) {
+      push(`${baseUrl}${pathname}?${queryKey}=${encodedReference}`);
+      if (candidates.length >= MAX_REMOTE_GATEWAY_URLS) {
+        break;
+      }
+    }
+    if (candidates.length >= MAX_REMOTE_GATEWAY_URLS) {
+      break;
+    }
+  }
+  return candidates;
+}
+
 function looksLikeBase64Payload(value) {
   const compact = String(value || "").replace(/\s+/g, "");
   if (compact.length < 24 || compact.length % 4 === 1) {
@@ -617,7 +712,7 @@ function decodeDataImageUrl(dataUrl) {
   }
 }
 
-async function resolveFetchedImageSource(source, sourcePathHint, depth) {
+async function resolveFetchedImageSource(source, sourcePathHint, depth, options) {
   const trimmed = String(source || "").trim();
   if (!trimmed) {
     return { ok: false, error: "empty-body" };
@@ -626,19 +721,34 @@ async function resolveFetchedImageSource(source, sourcePathHint, depth) {
     return decodeDataImageUrl(trimmed);
   }
   if (/^https?:\/\//i.test(trimmed)) {
-    return tryFetchImageFromUrl(trimmed, sourcePathHint, depth + 1);
+    if (!isAllowedFollowUpUrl(trimmed, options?.allowedOrigins)) {
+      return { ok: false, error: "disallowed-follow-up-origin" };
+    }
+    return tryFetchImageFromUrl(trimmed, sourcePathHint, depth + 1, options);
   }
   return { ok: false, error: "wrong-content-type:unusable-response" };
 }
 
-async function tryFetchImageFromUrl(targetUrl, sourcePathHint = "", depth = 0) {
+async function tryFetchImageFromUrl(targetUrl, sourcePathHint = "", depth = 0, options = {}) {
   if (depth > 2) {
     return { ok: false, error: "redirect-depth-exceeded" };
   }
+  const timeoutMs =
+    typeof options.timeoutMs === "number" && options.timeoutMs > 0
+      ? options.timeoutMs
+      : 0;
+  let timeoutId = null;
+  const controller = timeoutMs > 0 ? new AbortController() : null;
   try {
+    if (controller) {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+    }
     const response = await fetch(targetUrl, {
       method: "GET",
       cache: "no-store",
+      signal: controller?.signal,
     });
     if (!response.ok) {
       return { ok: false, error: `http-${response.status}` };
@@ -654,7 +764,7 @@ async function tryFetchImageFromUrl(targetUrl, sourcePathHint = "", depth = 0) {
         if (!extracted) {
           return { ok: false, error: "wrong-content-type:json" };
         }
-        return resolveFetchedImageSource(extracted, sourcePathHint, depth);
+        return resolveFetchedImageSource(extracted, sourcePathHint, depth, options);
       } catch {
         return { ok: false, error: "invalid-json" };
       }
@@ -670,13 +780,13 @@ async function tryFetchImageFromUrl(targetUrl, sourcePathHint = "", depth = 0) {
         if (!extracted) {
           return { ok: false, error: `wrong-content-type:${contentType || "unknown"}` };
         }
-        return resolveFetchedImageSource(extracted, sourcePathHint, depth);
+        return resolveFetchedImageSource(extracted, sourcePathHint, depth, options);
       } catch {
         const extracted = extractRenderableImageSourceFromUnknown(payload, sourcePathHint);
         if (!extracted) {
           return { ok: false, error: `wrong-content-type:${contentType || "unknown"}` };
         }
-        return resolveFetchedImageSource(extracted, sourcePathHint, depth);
+        return resolveFetchedImageSource(extracted, sourcePathHint, depth, options);
       }
     }
     const arrayBuffer = await response.arrayBuffer();
@@ -698,11 +808,18 @@ async function tryFetchImageFromUrl(targetUrl, sourcePathHint = "", depth = 0) {
       data,
     };
   } catch (error) {
+    if (error && typeof error === "object" && error.name === "AbortError") {
+      return { ok: false, error: "timeout" };
+    }
     const code =
       error && typeof error === "object" && "code" in error && typeof error.code === "string"
         ? error.code
         : "fetch-failed";
     return { ok: false, error: code };
+  } finally {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -720,7 +837,10 @@ async function readImageFromRemoteGateway(rawPath) {
     `http://localhost:${VITE_DEV_SERVER_PORT}/__claw/local-image?path=${encodedPath}`,
   ];
   for (const url of viteUrls) {
-    const result = await tryFetchImageFromUrl(url, normalizedPath);
+    const result = await tryFetchImageFromUrl(url, normalizedPath, 0, {
+      allowedOrigins: buildAllowedRemoteFetchOrigins(url),
+      timeoutMs: REMOTE_GATEWAY_FETCH_TIMEOUT_MS,
+    });
     if (result.ok) {
       return result;
     }
@@ -728,25 +848,12 @@ async function readImageFromRemoteGateway(rawPath) {
   }
 
   // Strategy 2: Try Gateway HTTP endpoints (in case Gateway adds support in the future)
-  const gatewayUrls = [];
-  const seenGatewayUrls = new Set();
-  const pushGatewayUrl = (value) => {
-    const next = String(value || "").trim();
-    if (!next || seenGatewayUrls.has(next)) {
-      return;
-    }
-    seenGatewayUrls.add(next);
-    gatewayUrls.push(next);
-  };
-  for (const baseUrl of gatewayHttpBaseCandidates) {
-    for (const endpoint of REMOTE_MEDIA_HTTP_ENDPOINTS) {
-      for (const queryKey of endpoint.queryKeys) {
-        pushGatewayUrl(`${baseUrl}${endpoint.pathname}?${queryKey}=${encodedPath}`);
-      }
-    }
-  }
+  const gatewayUrls = buildRemoteGatewayUrlCandidates(normalizedPath);
   for (const targetUrl of gatewayUrls) {
-    const result = await tryFetchImageFromUrl(targetUrl, normalizedPath);
+    const result = await tryFetchImageFromUrl(targetUrl, normalizedPath, 0, {
+      allowedOrigins: buildAllowedRemoteFetchOrigins(targetUrl),
+      timeoutMs: REMOTE_GATEWAY_FETCH_TIMEOUT_MS,
+    });
     if (result.ok) {
       return result;
     }
@@ -1326,7 +1433,9 @@ ipcMain.handle("desktop:fetch-image-url", async (_event, rawUrl) => {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return { ok: false, error: "invalid-url-protocol" };
   }
-  const fetched = await tryFetchImageFromUrl(parsed.toString(), parsed.pathname);
+  const fetched = await tryFetchImageFromUrl(parsed.toString(), parsed.pathname, 0, {
+    allowedOrigins: buildAllowedRemoteFetchOrigins(parsed.toString(), false),
+  });
   if (!fetched.ok) {
     return { ok: false, error: fetched.error };
   }
