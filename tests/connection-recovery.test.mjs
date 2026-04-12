@@ -15,6 +15,7 @@ test("shouldAnnounceConnectionRecovery only fires for post-connect recoveries", 
   const { shouldAnnounceConnectionRecovery } = loadConnectionRecoveryModule();
 
   assert.equal(shouldAnnounceConnectionRecovery("disconnected", false), false);
+  assert.equal(shouldAnnounceConnectionRecovery("disconnected", true), false);
   assert.equal(shouldAnnounceConnectionRecovery("connected", true), false);
   assert.equal(shouldAnnounceConnectionRecovery("connecting", true), true);
   assert.equal(shouldAnnounceConnectionRecovery("error", true), true);
