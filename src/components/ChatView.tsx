@@ -1056,10 +1056,11 @@ export default function ChatView(props: ChatViewProps) {
     () =>
       deriveConnectionFeedback({
         connectionStatus,
+        hasActiveSession: Boolean(props.sessionKey),
         disabledReason: props.disabledReason,
         composerRuntimeState,
       }),
-    [connectionStatus, props.disabledReason, composerRuntimeState],
+    [connectionStatus, props.disabledReason, composerRuntimeState, props.sessionKey],
   );
 
   const currentSessionRuntime = useMemo<{
@@ -1068,6 +1069,14 @@ export default function ChatView(props: ChatViewProps) {
     detail: string;
     tone: "neutral" | "active" | "warning";
   }>(() => {
+    if (connectionFeedback.sessionBanner) {
+      return {
+        status: connectionStatus === "connecting" ? "reconnecting" : "disconnected",
+        label: connectionFeedback.sessionBanner.title,
+        detail: connectionFeedback.sessionBanner.message,
+        tone: connectionFeedback.sessionBanner.tone === "info" ? "neutral" : "warning",
+      };
+    }
     if (isSessionSwitching) {
       return {
         status: "switching",
@@ -1116,7 +1125,17 @@ export default function ChatView(props: ChatViewProps) {
         : "Create or select a session to start working.",
       tone: "neutral",
     };
-  }, [isSessionSwitching, props.canAbort, props.isCurrentSessionLoading, props.sessionKey, props.streamText, props.thinking, props.toolItems]);
+  }, [
+    connectionFeedback.sessionBanner,
+    connectionStatus,
+    isSessionSwitching,
+    props.canAbort,
+    props.isCurrentSessionLoading,
+    props.sessionKey,
+    props.streamText,
+    props.thinking,
+    props.toolItems,
+  ]);
 
   const sendDisabled = composerRuntimeState !== "ready";
   const sendLabel = composerRuntimeState === "busy" ? "Busy" : "Send";
@@ -1175,6 +1194,26 @@ export default function ChatView(props: ChatViewProps) {
           </button>
         </div>
       </header>
+
+      {connectionFeedback.sessionBanner && (
+        <div
+          className={`session-recovery-banner${connectionFeedback.sessionBanner.tone === "info" ? " is-info" : " is-warning"}`}
+        >
+          <div className="session-recovery-banner-copy">
+            <div className="session-recovery-banner-title">{connectionFeedback.sessionBanner.title}</div>
+            <div className="session-recovery-banner-detail">{connectionFeedback.sessionBanner.message}</div>
+          </div>
+          {connectionFeedback.sessionBanner.action === "open-settings" && (
+            <button
+              type="button"
+              className="ui-btn ui-btn-light session-recovery-banner-action"
+              onClick={props.onOpenSettings}
+            >
+              Open Settings
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="chat-scroll-wrap">
       <div ref={scrollRef} onScroll={onScroll} className="chat-scroll">

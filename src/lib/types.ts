@@ -198,6 +198,8 @@ export type SessionRuntimeStatus =
   | "idle"
   | "loading"
   | "switching"
+  | "reconnecting"
+  | "disconnected"
   | "thinking"
   | "streaming"
   | "working";
