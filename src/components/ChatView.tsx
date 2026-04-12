@@ -4,6 +4,8 @@ import type {
   Attachment,
   ChatMessage,
   ConnectionStatus,
+  ModelListItem,
+  SessionInfo,
   SessionRuntimeStatus,
   SessionTransitionState,
   ToolItem,
@@ -27,20 +29,6 @@ import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
 import { createBottomPinScheduler } from "../lib/scroll-anchoring.ts";
 
-export type SessionInfo = {
-  agentId: string;
-  agentLabel: string;
-  modelLabel: string;
-  modelId: string;
-  contextLimit: number | null;
-  contextTokens: number | null;
-  inputTokens: number | null;
-  outputTokens: number | null;
-  totalTokens: number | null;
-  thinkingLevel: string | null;
-  responseUsage?: "on" | "off" | "tokens" | "full" | null;
-};
-
 type ChatViewProps = {
   sessionKey: string | null;
   messages: ChatMessage[];
@@ -57,7 +45,7 @@ type ChatViewProps = {
   connectionStatus?: ConnectionStatus;
   disabledReason?: string | null;
   sessionInfo: SessionInfo;
-  models: Array<{ id: string; name: string; provider: string; contextWindow?: number }>;
+  models: ModelListItem[];
   uiSettings: UiSettings;
   canLoadOlder: boolean;
   loadingOlder: boolean;

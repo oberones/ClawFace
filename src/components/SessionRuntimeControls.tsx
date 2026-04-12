@@ -1,23 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { ModelListItem, SessionInfo } from "../lib/types.ts";
 import { THINKING_LEVEL_CHOICES } from "../lib/runtime-controls.ts";
-
-type RuntimeControlModel = {
-  id: string;
-  name: string;
-  provider: string;
-  contextWindow?: number;
-};
 
 type SessionRuntimeControlsProps = {
   sessionKey: string | null;
-  sessionInfo: {
-    agentLabel: string;
-    modelLabel: string;
-    modelId: string;
-    thinkingLevel: string | null;
-  };
-  models: RuntimeControlModel[];
+  sessionInfo: SessionInfo;
+  models: ModelListItem[];
   modelBadgeScale: number;
   onModelSelect: (model: string) => void;
   onThinkingSelect: (level: string) => void;
@@ -35,7 +24,7 @@ export function SessionRuntimeControls(props: SessionRuntimeControlsProps) {
   const modelBadgePaddingX = `${Math.round(12 * props.modelBadgeScale)}px`;
 
   const modelChoices = useMemo(() => {
-    const unique = new Map<string, RuntimeControlModel>();
+    const unique = new Map<string, ModelListItem>();
     for (const model of props.models) {
       const full = `${model.provider}/${model.id}`;
       if (!unique.has(full)) {
@@ -50,11 +39,11 @@ export function SessionRuntimeControls(props: SessionRuntimeControlsProps) {
   const activeModel = props.sessionInfo.modelId || props.sessionInfo.modelLabel || "";
   const activeThinking = (props.sessionInfo.thinkingLevel ?? "off").toLowerCase();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     props.onMenuOpenChange?.(menusOpen);
   }, [menusOpen, props.onMenuOpenChange]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     return () => props.onMenuOpenChange?.(false);
   }, [props.onMenuOpenChange]);
 
@@ -74,7 +63,7 @@ export function SessionRuntimeControls(props: SessionRuntimeControlsProps) {
     return () => window.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     closeMenus();
   }, [props.sessionKey]);
 
