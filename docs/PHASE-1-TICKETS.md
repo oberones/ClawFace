@@ -3667,6 +3667,64 @@ It keeps the runtime-control cleanup moving in the same direction as the rest of
 #### Recommended next step
 Move on from `4.1` unless real usage shows another concrete runtime-control problem worth solving.
 
+## Ticket 4.2.1 — Centralize connection recovery feedback and add an actionable composer notice
+### Goal
+Start `4.2` with a user-facing recovery cut that makes connection failures easier to understand and less passive.
+
+### Why
+Before this cut, the connection status and recovery copy were still scattered:
+
+- status labels in `ChatView`
+- composer warning text in `ChatView`
+- protocol / pairing notes in `app.tsx`
+
+That made it easy for reconnect messaging to drift and left the main warning surface as plain text with no direct recovery affordance.
+
+### Scope
+- centralize connection/recovery copy in a shared helper
+- reuse that helper for header status and composer warning state
+- turn connection-related composer warnings into a structured notice with an explicit action where appropriate
+- preserve the existing runtime/send gating behavior
+
+### Deliverable
+A first recovery-focused UI pass where connection problems feel more guided and the copy lives behind one shared seam.
+
+### Done when
+- header status and composer connection/recovery messaging no longer duplicate their core state mapping
+- disconnected and error states offer an in-place path to settings
+- helper-level validation exists for the new connection-feedback mapping
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/connection-feedback.ts` as the shared source of truth for:
+  - gateway status label
+  - status-dot tone
+  - structured composer recovery notice
+- updated `ChatView` to consume that helper instead of carrying separate connection/recovery string branches inline
+- updated `Composer` to render a structured notice with an optional action button instead of only plain warning text
+- disconnected and connection-error notices now offer `Open Settings` directly from the composer surface
+
+#### User-facing improvements landed
+- connection failures now feel less passive because the main warning surface can point directly to settings when that is the next useful step
+- reconnect/pairing/connecting copy is more consistent between the header and the composer
+
+#### Why this is the right first 4.2 slice
+It improves the recovery story immediately, but it is still a small enough cut that it does not force a broader reconnect-state rewrite yet.
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+Look at the next continuity-focused 4.2 cut:
+- clarify what happens to the current session surface when the gateway drops mid-flow
+- decide whether the app needs a more explicit reconnect/recovery banner beyond the composer notice
+
 ## Ticket 4.3.1 — Extract the low-risk settings sections from `SettingsModal`
 ### Goal
 Start Slice `4.3` by extracting the easiest standalone settings sections into dedicated components without changing behavior.
