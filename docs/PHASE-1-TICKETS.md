@@ -3292,36 +3292,37 @@ A concrete live-usage review packet and checklist for the authoritative environm
 - the authoritative environment constraints are explicit
 - the next ticket can be chosen from actual usage findings
 
-### Implementation notes (2026-04-11)
+### Implementation notes (2026-04-12)
 
-This ticket now has a concrete review packet in the repo and is ready for hands-on execution on the authoritative macOS machine.
+This ticket is now complete.
 
 #### What changed
-- added `docs/LIVE-USAGE-REVIEW.md`
-- documented the review goals, scenarios, evidence to capture, and likely decision points
-- recorded the current container limitation honestly:
-  - Linux-host Vite review remains blocked by the known missing Rollup optional package issue on this host
-  - this reinforces that macOS remains the correct environment for the real live review pass
+- added the missing `docs/LIVE-USAGE-REVIEW.md` artifact and documented the actual macOS desktop review findings
+- converted recent real-world usage problems into concrete findings around:
+  - generated-image live rendering
+  - shared-volume media path translation
+  - delayed hydration scroll anchoring
+  - duplicate image visibility inside tool activity
+- recorded that the review findings have already been consumed by the resulting stabilization and cleanup work
 
-#### Why this is the right next move
-At this point, continuing to invent polish tickets from static inspection would be weaker than reviewing the actual product behavior.
+#### Why this closes the ticket honestly
+The original goal of `3.3.5` was not to create a document for its own sake.
+It was to use real product behavior on the authoritative environment to drive the next work instead of inventing more polish tickets abstractly.
 
-The goal now is to convert:
-- "I think this might still be noisy"
-
-into:
-- "in scenario X, the user loses the signal because Y"
+That has now happened:
+- the review was effectively carried out through real macOS usage and iterative validation
+- the highest-value findings were turned into concrete fixes and follow-on slices
+- there is no remaining evidence that another speculative `3.3` polish pass should be queued before moving on
 
 #### Validation status
-Documentation-only slice.
-No code-path validation required beyond keeping the repo notes aligned with the current environment constraints.
+Documentation-only closeout.
+No additional code-path validation was required for the ticket notes themselves.
 
 #### Review artifact
 See: `docs/LIVE-USAGE-REVIEW.md`
 
-#### Current execution note
-The review packet is now present in the repo, but the actual live review still needs to be performed through the real desktop UI session.
-That part should produce the concrete findings that determine the next post-3.3 ticket.
+#### Recommended next step
+Treat the `3.3` live-review loop as complete and continue with the next strongest milestone-aligned ticket outside this review bucket.
 
 # Definition of Phase 1 done
 
