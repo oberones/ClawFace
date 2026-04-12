@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import type { Attachment } from "../lib/types.ts";
+import type { Attachment, ModelListItem, SessionInfo } from "../lib/types.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { useAttachmentIngestion } from "../hooks/useAttachmentIngestion.ts";
@@ -16,22 +16,6 @@ type CommandSuggestion = {
   name: string;
   description: string;
   value?: string;
-};
-
-type SessionInfo = {
-  totalTokens?: number | null;
-  inputTokens?: number | null;
-  outputTokens?: number | null;
-  modelId?: string | null;
-  modelLabel?: string | null;
-  contextLimit?: number | null;
-};
-
-type ModelItem = {
-  id: string;
-  name: string;
-  provider: string;
-  contextWindow?: number | null;
 };
 
 export type ComposerProps = {
@@ -61,7 +45,7 @@ export type ComposerProps = {
   };
   footer: {
     sessionInfo: SessionInfo;
-    models: ModelItem[];
+    models: ModelListItem[];
     onCompact?: () => void;
   };
 };

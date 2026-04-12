@@ -382,6 +382,9 @@ The user can control the interaction context without falling into settings hell.
 - present the active session's model and thinking controls as one coherent in-thread runtime cluster
 - remove the duplicated composer-footer thinking picker once that cluster exists
 
+#### Follow-through cleanup
+- after the clustered control surface proves itself in use, extract it into its own component boundary instead of leaving it inline in `ChatView`
+
 ---
 
 ### Slice 4.2 — Error, reconnect, and recovery polish

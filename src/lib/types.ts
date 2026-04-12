@@ -116,6 +116,29 @@ export type ModelsListResult = {
   }>;
 };
 
+export type ModelListItem = {
+  id: string;
+  name: string;
+  provider: string;
+  contextWindow?: number | null;
+  available?: boolean | null;
+  local?: boolean | null;
+};
+
+export type SessionInfo = {
+  agentId: string;
+  agentLabel: string;
+  modelLabel: string;
+  modelId: string;
+  contextLimit: number | null;
+  contextTokens: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  thinkingLevel: string | null;
+  responseUsage?: "on" | "off" | "tokens" | "full" | null;
+};
+
 export type ToolItem = {
   id: string;
   name: string;
