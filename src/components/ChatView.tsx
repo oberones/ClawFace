@@ -1074,7 +1074,7 @@ export default function ChatView(props: ChatViewProps) {
         status: connectionStatus === "connecting" ? "reconnecting" : "disconnected",
         label: connectionFeedback.sessionBanner.title,
         detail: connectionFeedback.sessionBanner.message,
-        tone: "warning",
+        tone: connectionFeedback.sessionBanner.tone === "info" ? "neutral" : "warning",
       };
     }
     if (isSessionSwitching) {

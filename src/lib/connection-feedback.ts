@@ -86,43 +86,51 @@ export function deriveConnectionFeedback(params: ConnectionFeedbackParams): Conn
                 }
               : null;
 
-  const sessionBanner =
-    !params.hasActiveSession
-      ? null
-      : params.connectionStatus === "connecting"
-        ? {
-            tone: "info" as const,
-            title: "Reconnecting to gateway",
-            message:
-              "Keeping this session visible while the gateway reconnects. New events and history refresh will resume automatically.",
-            action: null,
-          }
-        : params.connectionStatus === "pairing-required"
-          ? {
-              tone: "warning" as const,
-              title: "Pairing required",
-              message: params.disabledReason || "This session is paused until this device is approved by the gateway.",
-              action: null,
-            }
-          : params.connectionStatus === "error"
-            ? {
-                tone: "warning" as const,
-                title: "Session paused",
-                message:
-                  params.disabledReason ||
-                  "The gateway connection failed. This session stays visible, but sending and history refresh are paused until the connection recovers.",
-                action: "open-settings" as const,
-              }
-            : params.connectionStatus === "disconnected"
-              ? {
-                  tone: "warning" as const,
-                  title: "Gateway disconnected",
-                  message:
-                    params.disabledReason ||
-                    "This session stays visible, but sending and history refresh are paused until the gateway reconnects.",
-                  action: "open-settings" as const,
-                }
-              : null;
+  let sessionBanner: SessionRecoveryBanner | null = null;
+  if (params.hasActiveSession) {
+    switch (params.connectionStatus) {
+      case "connecting":
+        sessionBanner = {
+          tone: "info",
+          title: "Reconnecting to gateway",
+          message:
+            "Keeping this session visible while the gateway reconnects. New events and history refresh will resume automatically.",
+          action: null,
+        };
+        break;
+      case "pairing-required":
+        sessionBanner = {
+          tone: "warning",
+          title: "Pairing required",
+          message: params.disabledReason || "This session is paused until this device is approved by the gateway.",
+          action: null,
+        };
+        break;
+      case "error":
+        sessionBanner = {
+          tone: "warning",
+          title: "Session paused",
+          message:
+            params.disabledReason ||
+            "The gateway connection failed. This session stays visible, but sending and history refresh are paused until the connection recovers.",
+          action: "open-settings",
+        };
+        break;
+      case "disconnected":
+        sessionBanner = {
+          tone: "warning",
+          title: "Gateway disconnected",
+          message:
+            params.disabledReason ||
+            "This session stays visible, but sending and history refresh are paused until the gateway reconnects.",
+          action: "open-settings",
+        };
+        break;
+      default:
+        sessionBanner = null;
+        break;
+    }
+  }
 
   return {
     statusLabel,
