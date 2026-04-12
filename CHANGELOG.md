@@ -109,6 +109,16 @@ This version should be treated as the explicit starting point before deeper impl
 - This release is primarily a **project-baseline declaration** and planning checkpoint
 - Future releases should track actual implementation progress against Milestone 1 and later roadmap phases
 
+## v0.5.1 (2026-04-12)
+
+### Fix
+
+- address PR feedback
+
+### Refactor
+
+- decompose settings modal and add focused 4.3 coverage
+
 ## v0.5.0 (2026-04-11)
 
 ### Feat
