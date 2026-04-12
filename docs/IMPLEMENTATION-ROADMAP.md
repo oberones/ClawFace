@@ -414,6 +414,11 @@ The app feels resilient instead of brittle.
 - add a visible continuity banner for selected-session recovery states so the user does not have to infer everything from the composer alone
 - keep the thread visible while being explicit about what is paused and what will resume automatically
 
+#### Recovery follow-through
+- add a short-lived shell-level “Gateway reconnected” signal for real post-disconnect recoveries, not initial startup
+- add a short-lived “Session refreshed” signal once the selected session history reload completes after reconnect
+- keep the new recovery copy behind a small shared helper so reconnect messaging does not drift across the shell
+
 ---
 
 ### Slice 4.3 — Settings decomposition and cleanup
