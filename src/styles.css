@@ -1050,6 +1050,41 @@ body::before {
   font-size: 12px;
 }
 
+.session-recovery-flash {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 22px 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 80%, white);
+  background: rgba(248, 250, 252, 0.92);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.07);
+}
+
+.session-recovery-flash.is-info {
+  border-color: color-mix(in srgb, #93c5fd 48%, white);
+  background: color-mix(in srgb, #eff6ff 84%, white);
+}
+
+.session-recovery-flash.is-success {
+  border-color: color-mix(in srgb, #86efac 46%, white);
+  background: color-mix(in srgb, #f0fdf4 84%, white);
+}
+
+.session-recovery-flash-title {
+  color: var(--claw-text);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.session-recovery-flash-detail {
+  color: var(--claw-text-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 /* ── Message navigation buttons ─────────────────────────── */
 .msg-nav-buttons {
   position: absolute;
