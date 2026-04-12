@@ -404,6 +404,11 @@ The app feels resilient instead of brittle.
 #### Done when
 - backend interruptions no longer make the app feel sketchy
 
+#### First cut
+- centralize connection/recovery copy instead of scattering it across `app.tsx` and `ChatView.tsx`
+- turn the composer's connection warning into a small recovery surface with an explicit action when settings are the right next step
+- add focused helper-level coverage for connection/recovery messaging so reconnect copy and actions do not drift
+
 ---
 
 ### Slice 4.3 — Settings decomposition and cleanup

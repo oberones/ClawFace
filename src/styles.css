@@ -3202,6 +3202,20 @@ body::before {
   color: #7f1d1d;
 }
 
+.composer-warning-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ui-btn.composer-warning-action {
+  flex-shrink: 0;
+  min-height: auto;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
 .composer-info {
   border-color: #bfdbfe;
   background: #eff6ff;
