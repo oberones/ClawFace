@@ -24,6 +24,7 @@ import {
 } from "../lib/message-image-source.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
+import { deriveConnectionFeedback } from "../lib/connection-feedback.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
@@ -1046,31 +1047,21 @@ export default function ChatView(props: ChatViewProps) {
               copy: "Type a message to get started, or use a /command.",
               showHints: true,
             };
-  const statusLabel =
-    connectionStatus === "connected"
-      ? "Gateway connected"
-      : connectionStatus === "connecting"
-        ? "Connecting to gateway…"
-        : connectionStatus === "pairing-required"
-          ? "Gateway pairing required"
-          : connectionStatus === "error"
-            ? "Gateway connection error"
-            : "Gateway disconnected";
-  const statusDotClass =
-    connectionStatus === "connected"
-      ? "connected"
-      : connectionStatus === "connecting"
-        ? "connecting"
-        : connectionStatus === "pairing-required"
-          ? "warning"
-          : connectionStatus === "error"
-            ? "warning"
-            : "disconnected";
   const composerRuntimeState = !props.connected
     ? "offline"
     : props.canAbort || props.thinking
       ? "busy"
       : "ready";
+  const connectionFeedback = useMemo(
+    () =>
+      deriveConnectionFeedback({
+        connectionStatus,
+        connected: props.connected,
+        disabledReason: props.disabledReason,
+        composerRuntimeState,
+      }),
+    [connectionStatus, props.connected, props.disabledReason, composerRuntimeState],
+  );
 
   const currentSessionRuntime = useMemo<{
     status: SessionRuntimeStatus;
@@ -1128,19 +1119,6 @@ export default function ChatView(props: ChatViewProps) {
     };
   }, [isSessionSwitching, props.canAbort, props.isCurrentSessionLoading, props.sessionKey, props.streamText, props.thinking, props.toolItems]);
 
-  const composerWarning =
-    connectionStatus === "connecting"
-      ? props.disabledReason || "Connecting to the gateway…"
-      : connectionStatus === "pairing-required"
-        ? props.disabledReason || "Pairing required before sending messages."
-        : connectionStatus === "error"
-          ? props.disabledReason || "Gateway connection error. Check settings and retry."
-          : !props.connected
-            ? props.disabledReason || "Gateway disconnected. Update settings to reconnect."
-            : composerRuntimeState === "busy"
-              ? "A run is already in progress. You can keep editing, but stop it or wait for it to finish before sending again."
-              : null;
-
   const sendDisabled = composerRuntimeState !== "ready";
   const sendLabel = composerRuntimeState === "busy" ? "Busy" : "Send";
 
@@ -1169,8 +1147,8 @@ export default function ChatView(props: ChatViewProps) {
             </div>
           </div>
           <div className="topbar-status">
-            <span className={`status-dot ${statusDotClass}`} />
-            <span>{statusLabel}</span>
+            <span className={`status-dot ${connectionFeedback.statusDotClass}`} />
+            <span>{connectionFeedback.statusLabel}</span>
           </div>
         </div>
 
@@ -1351,7 +1329,18 @@ export default function ChatView(props: ChatViewProps) {
 
       <Composer
         composerLaunchActive={composerLaunchActive}
-        composerWarning={composerWarning}
+        composerNotice={
+          connectionFeedback.composerNotice
+            ? {
+                tone: connectionFeedback.composerNotice.tone,
+                message: connectionFeedback.composerNotice.message,
+                actionLabel:
+                  connectionFeedback.composerNotice.action === "open-settings" ? "Open Settings" : undefined,
+                onAction:
+                  connectionFeedback.composerNotice.action === "open-settings" ? props.onOpenSettings : undefined,
+              }
+            : null
+        }
         uiSettings={{
           composerActionScale: actionScale,
           footerStatsFontSize: props.uiSettings.footerStatsFontSize,
