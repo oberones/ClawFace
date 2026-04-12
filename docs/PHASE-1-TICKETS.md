@@ -3350,3 +3350,196 @@ Further Phase 1 work should only be added if a clearly high-leverage reliability
 Otherwise, the correct next move is to proceed to **Phase 2 — Desktop-native media and attachment workflows**.
 
 That is the bar for leaving Phase 1 and moving confidently into media-heavy and tool-visibility slices.
+
+## Ticket 4.3.1 — Extract the low-risk settings sections from `SettingsModal`
+### Goal
+Start Slice `4.3` by extracting the easiest standalone settings sections into dedicated components without changing behavior.
+
+### Why
+`SettingsModal.tsx` is one of the repo's major architecture hotspots, but it is not the kind of file that should be split through a risky big-bang rewrite.
+
+The safest first move is to extract the sections that are already conceptually independent and minimally entangled with local modal state.
+
+That gives the settings surface a real decomposition path while avoiding churn in the denser shortcut and notification-audio clusters.
+
+### Scope
+- extract the UI settings scheme section
+- extract the gateway / connection section
+- extract the path-prefix mapping section
+- keep `SettingsModal.tsx` as the orchestrating container for now
+- preserve current behavior and visual layout
+
+### Deliverable
+A first-pass section boundary for the settings surface, with dedicated components for the low-risk clusters.
+
+### Done when
+- `SettingsModal.tsx` no longer inlines the scheme, gateway, and path-mapping sections
+- the extracted sections have clear prop boundaries
+- no settings behavior regresses
+- `make typecheck` and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- extracted `SettingsSchemesSection`
+- extracted `GatewaySettingsSection`
+- extracted `PathPrefixMappingsSection`
+- kept `SettingsModal.tsx` as the state-owning container while narrowing its rendering responsibility
+
+#### Why this is the right first 4.3 slice
+This reduces the "multiple apps inside one modal" problem without touching the riskier shortcut, notification-audio, or appearance-editor clusters yet.
+
+It creates real section boundaries first, which makes the next settings cleanup slices less speculative.
+
+#### Recommended next step
+Continue `4.3` by extracting one of the denser product-facing clusters next, probably:
+- typography / appearance settings, or
+- shortcut settings
+
+## Ticket 4.3.2 — Extract the typography and appearance settings cluster
+### Goal
+Continue Slice `4.3` by moving the appearance-oriented settings into dedicated sections backed by shared field controls.
+
+### Why
+After the first low-risk extraction pass, the cleanest next move is the appearance cluster because it is still mostly local-product UI state and does not carry the heavier behavioral coupling of shortcuts or notification-audio flows.
+
+That makes it a good second decomposition cut: meaningful structural progress without risking the more stateful settings interactions yet.
+
+### Scope
+- extract the typography / layout section
+- extract the color system section
+- extract the markdown readability section
+- centralize reusable settings field controls used across those sections
+- preserve current behavior and layout
+
+### Deliverable
+A narrower `SettingsModal.tsx` and a reusable field-control seam for future settings-section extractions.
+
+### Done when
+- typography, color, and markdown sections no longer render inline inside `SettingsModal.tsx`
+- shared number/toggle/color field controls are no longer local-only to `SettingsModal.tsx`
+- no settings behavior regresses
+- `make typecheck` and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- extracted shared settings form primitives into `SettingsFieldControls`
+- extracted `TypographyLayoutSection`
+- extracted `ColorSystemSection`
+- extracted `MarkdownReadabilitySection`
+- kept the more stateful chat-controls and shortcut clusters inside `SettingsModal.tsx` for now
+
+#### Why this is the right next 4.3 slice
+This continues real structural cleanup while staying on the safer side of the settings surface.
+
+It also creates a reusable control seam that should make later shortcut and chat-controls extraction less repetitive.
+
+#### Recommended next step
+Continue `4.3` with one of the two remaining heavier clusters:
+- `Chat Controls`, or
+- the shortcut settings groups
+
+## Ticket 4.3.3 — Extract the chat controls cluster from `SettingsModal`
+### Goal
+Continue Slice `4.3` by moving the chat-controls cluster into a dedicated settings section component without changing behavior.
+
+### Why
+After the low-risk and appearance-focused extractions, the next clean structural cut is the chat-controls cluster.
+
+It is heavier than typography and color settings because it includes reply-done sound behavior and custom audio state, but it is still more self-contained than the shortcut groups.
+
+That makes it the right next step before tackling keyboard-scheme-heavy settings.
+
+### Scope
+- extract the chat-controls section
+- preserve reply-done sound preview behavior
+- preserve custom audio upload and clear behavior
+- keep `SettingsModal.tsx` as the state owner for local modal state
+
+### Deliverable
+A dedicated `ChatControlsSection` with a clear prop boundary around chat-display and reply-done-sound settings.
+
+### Done when
+- the chat-controls cluster no longer renders inline inside `SettingsModal.tsx`
+- reply-done sound behavior is unchanged
+- no settings behavior regresses
+- `make typecheck` and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- extracted `ChatControlsSection`
+- kept custom sound upload state in `SettingsModal.tsx` but passed it through a narrower section-level interface
+- preserved the existing reply-done sound preview/update behavior
+- later extracted pure reply-done audio validation helpers and added focused unit coverage for file validation, audio data URL normalization, and saved-name normalization
+
+#### Why this is the right next 4.3 slice
+This removes another large product-facing cluster from the modal without yet touching the most behavior-dense shortcut groups.
+
+It also leaves the settings surface with a much clearer remaining cleanup target instead of many mixed concerns piled together.
+
+#### Recommended next step
+Finish the current `4.3` cleanup pass by extracting the remaining shortcut clusters:
+- app action shortcuts
+- model shortcut schemes
+- agent session shortcuts
+
+## Ticket 4.3.4 — Extract the shortcut settings cluster from `SettingsModal`
+### Goal
+Finish the main `4.3` decomposition pass by moving the remaining shortcut-heavy settings into dedicated section components.
+
+### Why
+After the earlier settings extractions, the shortcut groups were the last large inline settings island in `SettingsModal.tsx`.
+
+They also carried the most obvious repeated UI logic:
+- key capture inputs
+- modifier toggles
+- repeated shortcut-row chrome
+
+That made them the right final major extraction pass for the current settings cleanup track.
+
+### Scope
+- extract the app action shortcuts section
+- extract the model shortcut schemes section
+- extract the agent session shortcuts section
+- centralize shared shortcut key/modifier editor controls
+- preserve current behavior and layout
+
+### Deliverable
+A `SettingsModal` container that orchestrates settings state while delegating the last major shortcut clusters to dedicated section components.
+
+### Done when
+- the three shortcut sections no longer render inline inside `SettingsModal.tsx`
+- shared shortcut editor controls are centralized instead of duplicated
+- shortcut behavior is unchanged
+- `make typecheck` and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- extracted `AppActionShortcutsSection`
+- extracted `ModelShortcutSchemesSection`
+- extracted `AgentSessionShortcutsSection`
+- extracted shared shortcut helpers and editor controls into `ShortcutSettingsShared`
+- later added focused unit coverage for shortcut key normalization, keyboard-event normalization, and thinking-label formatting via pure helper seams
+
+#### Why this is the right next 4.3 slice
+This removes the last major repeated settings-rendering island from the modal and leaves `SettingsModal.tsx` much closer to a true orchestration container.
+
+It also prevents future shortcut-setting changes from requiring edits in three almost-identical inline render blocks.
+
+#### Recommended next step
+Pause the current `4.3` cleanup track here unless real usage shows further settings pain.
+
+If we continue later, the next work should probably be:
+- smaller cleanup inside the remaining state-owning modal container, or
+- broader settings information architecture decisions rather than more extraction for extraction’s sake
