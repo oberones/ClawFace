@@ -1,5 +1,11 @@
 import type { ConnectionStatus } from "./types.ts";
 
+const RECOVERABLE_CONNECTION_STATUSES = new Set<ConnectionStatus>([
+  "connecting",
+  "error",
+  "pairing-required",
+]);
+
 export type ConnectionRecoveryNotice = {
   tone: "info" | "success";
   title: string;
@@ -7,7 +13,7 @@ export type ConnectionRecoveryNotice = {
 };
 
 export function shouldAnnounceConnectionRecovery(previousStatus: ConnectionStatus, hasConnectedBefore: boolean): boolean {
-  return hasConnectedBefore && previousStatus !== "connected";
+  return hasConnectedBefore && RECOVERABLE_CONNECTION_STATUSES.has(previousStatus);
 }
 
 export function buildConnectionRecoveryNotice(params: {
