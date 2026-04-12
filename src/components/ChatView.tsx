@@ -12,6 +12,7 @@ import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
 import { ToolActivityPanel } from "./ToolActivityPanel.tsx";
 import { Composer } from "./Composer.tsx";
+import { SessionRuntimeControls } from "./SessionRuntimeControls.tsx";
 import { buildMotionVars, MessageRow } from "./MessageRow.tsx";
 import {
   buildDesktopLocalImageUrl,
@@ -21,7 +22,6 @@ import {
 } from "../lib/message-image-source.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
-import { THINKING_LEVEL_CHOICES } from "../lib/runtime-controls.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
@@ -98,8 +98,7 @@ type ThreadSnapshot = {
 
 export default function ChatView(props: ChatViewProps) {
   const [activeCommand, setActiveCommand] = useState(0);
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
-  const [thinkingMenuOpen, setThinkingMenuOpen] = useState(false);
+  const [runtimeControlsMenuOpen, setRuntimeControlsMenuOpen] = useState(false);
   const [toolExpanded, setToolExpanded] = useState<Record<string, boolean>>({});
   const [imageLightbox, setImageLightbox] = useState<Attachment | null>(null);
   const [chatImpulseActive, setChatImpulseActive] = useState(false);
@@ -115,8 +114,6 @@ export default function ChatView(props: ChatViewProps) {
   const [streamPopActive, setStreamPopActive] = useState(false);
   const lightboxReadTriedRef = useRef<Set<string>>(new Set());
   const isComposingRef = useRef(false);
-  const modelMenuRef = useRef<HTMLDivElement | null>(null);
-  const thinkingMenuRef = useRef<HTMLDivElement | null>(null);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const mainThreadRef = useRef<HTMLDivElement | null>(null);
   const prevSessionKeyRef = useRef<string | null>(props.sessionKey);
@@ -253,23 +250,6 @@ export default function ChatView(props: ChatViewProps) {
   const sessionFlyInMessageIdSet = useMemo(() => new Set(sessionFlyInMessageIds), [sessionFlyInMessageIds]);
   const sessionFlyInToolIdSet = useMemo(() => new Set(sessionFlyInToolIds), [sessionFlyInToolIds]);
   const sessionFlyInToolPanelKeySet = useMemo(() => new Set(sessionFlyInToolPanelKeys), [sessionFlyInToolPanelKeys]);
-
-  const modelChoices = useMemo(() => {
-    const unique = new Map<string, { id: string; name: string; provider: string; contextWindow?: number }>();
-    for (const model of props.models) {
-      const full = `${model.provider}/${model.id}`;
-      if (!unique.has(full)) {
-        unique.set(full, model);
-      }
-    }
-    return [...unique.entries()]
-      .map(([full, model]) => ({ full, ...model }))
-      .sort((a, b) => a.full.localeCompare(b.full));
-  }, [props.models]);
-
-  const activeModel = props.sessionInfo.modelId || props.sessionInfo.modelLabel || "";
-  const thinkChoices = THINKING_LEVEL_CHOICES;
-  const activeThinking = (props.sessionInfo.thinkingLevel ?? "off").toLowerCase();
 
   useEffect(() => {
     if (snapshotSessionKeyRef.current !== props.sessionKey) {
@@ -613,8 +593,7 @@ export default function ChatView(props: ChatViewProps) {
     setToolExpanded({});
     resetAutoScrollState();
     setImageLightbox(null);
-    setModelMenuOpen(false);
-    setThinkingMenuOpen(false);
+    setRuntimeControlsMenuOpen(false);
     setChatImpulseActive(false);
     setComposerLaunchActive(false);
     setPoppingMessageIds([]);
@@ -755,22 +734,6 @@ export default function ChatView(props: ChatViewProps) {
   }, [clearSessionFlyInMarks, clearSessionSwitchTimers]);
 
   useEffect(() => {
-    const onClickOutside = (event: MouseEvent) => {
-      if (!(event.target instanceof Node)) {
-        return;
-      }
-      if (modelMenuRef.current && !modelMenuRef.current.contains(event.target)) {
-        setModelMenuOpen(false);
-      }
-      if (thinkingMenuRef.current && !thinkingMenuRef.current.contains(event.target)) {
-        setThinkingMenuOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", onClickOutside);
-    return () => window.removeEventListener("mousedown", onClickOutside);
-  }, []);
-
-  useEffect(() => {
     if (!imageLightbox) {
       return;
     }
@@ -889,9 +852,6 @@ export default function ChatView(props: ChatViewProps) {
   const sendPaddingY = `${Math.round(8 * actionScale)}px`;
   const sendPaddingX = `${Math.round(20 * actionScale)}px`;
   const modelBadgeScale = props.uiSettings.modelBadgeScale;
-  const modelBadgeFontSize = `${Math.round(12 * modelBadgeScale)}px`;
-  const modelBadgePaddingY = `${Math.round(4 * modelBadgeScale)}px`;
-  const modelBadgePaddingX = `${Math.round(12 * modelBadgeScale)}px`;
   const toolFontSize = `${props.uiSettings.toolCallFontSize}px`;
   const toolMinorFontSize = `${Math.max(10, props.uiSettings.toolCallFontSize - 2)}px`;
   const typographyFontSize = `${props.uiSettings.fontSize}px`;
@@ -1198,7 +1158,7 @@ export default function ChatView(props: ChatViewProps) {
 
   return (
     <section className="claw-chat-area chat-shell">
-      <header className={`chat-header ${modelMenuOpen || thinkingMenuOpen ? "menu-layer-active" : ""}`}>
+      <header className={`chat-header ${runtimeControlsMenuOpen ? "menu-layer-active" : ""}`}>
         <div className="chat-header-main">
           <div className="chat-header-identity">
             <div className="chat-brand-lockup">
@@ -1227,84 +1187,15 @@ export default function ChatView(props: ChatViewProps) {
         </div>
 
         <div className="chat-header-actions">
-          <div className="session-runtime-controls">
-            <div className={`relative ${modelMenuOpen ? "menu-open-ctx" : ""}`} ref={modelMenuRef}>
-              <button
-                type="button"
-                onClick={() => setModelMenuOpen((prev) => !prev)}
-                className="ui-btn ui-btn-light session-runtime-control session-runtime-control-primary"
-                style={{
-                  fontSize: modelBadgeFontSize,
-                  padding: `${modelBadgePaddingY} ${modelBadgePaddingX}`,
-                }}
-              >
-                Agent: {props.sessionInfo.agentLabel || "-"} · Model:{" "}
-                {props.sessionInfo.modelLabel || "-"}
-              </button>
-
-              {modelMenuOpen && (
-                <div className="floating-menu session-runtime-menu" style={{ fontSize: modelBadgeFontSize }}>
-                  {modelChoices.length === 0 && <div className="floating-empty">No available models.</div>}
-                  {modelChoices.map((model) => {
-                    const isActive =
-                      model.full === activeModel || model.id === activeModel || model.name === activeModel;
-                    return (
-                      <button
-                        key={model.full}
-                        type="button"
-                        onClick={() => {
-                          setModelMenuOpen(false);
-                          props.onModelSelect(model.full);
-                        }}
-                        className={`floating-item ${isActive ? "active" : ""}`}
-                      >
-                        <div className="floating-item-title">{model.full}</div>
-                        <div className="floating-item-subtitle">{model.name}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className={`relative ${thinkingMenuOpen ? "menu-open-ctx" : ""}`} ref={thinkingMenuRef}>
-              <button
-                type="button"
-                onClick={() => setThinkingMenuOpen((prev) => !prev)}
-                className="ui-btn ui-btn-light session-runtime-control"
-                style={{
-                  fontSize: modelBadgeFontSize,
-                  padding: `${modelBadgePaddingY} ${modelBadgePaddingX}`,
-                }}
-              >
-                Thinking: {activeThinking}
-              </button>
-
-              {thinkingMenuOpen && (
-                <div
-                  className="floating-menu session-runtime-menu session-runtime-thinking-menu"
-                  style={{ fontSize: modelBadgeFontSize }}
-                >
-                  {thinkChoices.map((level) => {
-                    const isActive = level === activeThinking;
-                    return (
-                      <button
-                        key={level}
-                        type="button"
-                        onClick={() => {
-                          setThinkingMenuOpen(false);
-                          props.onThinkingSelect(level);
-                        }}
-                        className={`thinking-item ${isActive ? "active" : ""}`}
-                      >
-                        {level}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+          <SessionRuntimeControls
+            sessionKey={props.sessionKey}
+            sessionInfo={props.sessionInfo}
+            models={props.models}
+            modelBadgeScale={modelBadgeScale}
+            onModelSelect={props.onModelSelect}
+            onThinkingSelect={props.onThinkingSelect}
+            onMenuOpenChange={setRuntimeControlsMenuOpen}
+          />
 
           {props.canAbort && (
             <button type="button" onClick={props.onAbort} className="ui-btn ui-btn-light" style={{ color: "#b45309" }}>
@@ -1562,12 +1453,10 @@ export default function ChatView(props: ChatViewProps) {
 
       {/* Scrim: portaled to document.body so it paints below menus.
           Dims the background when a dropdown menu is open. */}
-      {(modelMenuOpen || thinkingMenuOpen || (showSlashMenu && commandSuggestions.length > 0)) && createPortal(
+      {showSlashMenu && commandSuggestions.length > 0 && createPortal(
         <div
           className="menu-scrim"
           onClick={() => {
-            setModelMenuOpen(false);
-            setThinkingMenuOpen(false);
             // For slash menu: blur the textarea so the user can interact with the page
             if (showSlashMenu) {
               const ta = document.querySelector(".composer-textarea") as HTMLElement | null;
