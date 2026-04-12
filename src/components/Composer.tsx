@@ -20,7 +20,12 @@ type CommandSuggestion = {
 
 export type ComposerProps = {
   composerLaunchActive: boolean;
-  composerWarning: string | null;
+  composerNotice: {
+    tone: "warning" | "info";
+    message: string;
+    actionLabel?: string;
+    onAction?: () => void;
+  } | null;
   uiSettings: UiSettings;
   input: {
     draft: string;
@@ -85,7 +90,22 @@ export function Composer(props: ComposerProps) {
           </div>
         )}
 
-        {props.composerWarning && <div className="composer-warning">{props.composerWarning}</div>}
+        {props.composerNotice && (
+          <div className={`composer-warning${props.composerNotice.tone === "info" ? " composer-info" : ""}`}>
+            <div className="composer-warning-row">
+              <span>{props.composerNotice.message}</span>
+              {props.composerNotice.onAction && props.composerNotice.actionLabel && (
+                <button
+                  type="button"
+                  className="ui-btn ui-btn-light composer-warning-action"
+                  onClick={props.composerNotice.onAction}
+                >
+                  {props.composerNotice.actionLabel}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         {attachmentError && <div className="composer-warning">Attachment error: {attachmentError}</div>}
         {attachmentIngestion.lastPasteFeedback && (
           <div className="composer-warning composer-info">{attachmentIngestion.lastPasteFeedback}</div>
