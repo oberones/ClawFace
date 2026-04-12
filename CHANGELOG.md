@@ -109,6 +109,19 @@ This version should be treated as the explicit starting point before deeper impl
 - This release is primarily a **project-baseline declaration** and planning checkpoint
 - Future releases should track actual implementation progress against Milestone 1 and later roadmap phases
 
+## v0.5.2 (2026-04-12)
+
+### Fix
+
+- address PR feedback
+- address PR feedback
+
+### Refactor
+
+- extra header runtime cluster to separate component
+- extract session model and thinking controls
+- centralize session runtime patching I centralized session runtime patching in src/app.tsx (line 7681), and that shared seam is now reused by direct model/thinking changes plus model-shortcut application in src/app.tsx (line 5213). I also pulled the thinking vocabulary into src/lib/runtime-controls.ts (line 1), so the chat UI in src/components/ChatView.tsx (line 24) and slash-command help in src/lib/slash-commands.ts (line 1) now stay aligned.
+
 ## v0.5.1 (2026-04-12)
 
 ### Fix
