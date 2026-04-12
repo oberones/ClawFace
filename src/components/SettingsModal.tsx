@@ -8,6 +8,7 @@ import { ColorSystemSection } from "./settings-sections/ColorSystemSection.tsx";
 import { GatewaySettingsSection } from "./settings-sections/GatewaySettingsSection.tsx";
 import { MarkdownReadabilitySection } from "./settings-sections/MarkdownReadabilitySection.tsx";
 import { ModelShortcutSchemesSection } from "./settings-sections/ModelShortcutSchemesSection.tsx";
+import { NewSessionDefaultsSection } from "./settings-sections/NewSessionDefaultsSection.tsx";
 import { PathPrefixMappingsSection } from "./settings-sections/PathPrefixMappingsSection.tsx";
 import {
   type AgentSessionShortcutSchemeEntry,
@@ -254,10 +255,13 @@ export default function SettingsModal(props: SettingsModalProps) {
 
             <AppActionShortcutsSection
               appActionShortcuts={props.appActionShortcuts}
+              onChangeAppActionShortcut={props.onChangeAppActionShortcut}
+            />
+
+            <NewSessionDefaultsSection
               models={props.models}
               newSessionPreferredModel={props.newSessionPreferredModel}
               onNewSessionPreferredModelChange={props.onNewSessionPreferredModelChange}
-              onChangeAppActionShortcut={props.onChangeAppActionShortcut}
             />
 
             <ModelShortcutSchemesSection

@@ -52,6 +52,12 @@ import {
   pickRemoteMediaReadMethods,
 } from "./lib/remote-media-resolution.ts";
 import {
+  applyModelRuntimeOverride,
+  applyThinkingRuntimeOverride,
+  buildSessionRuntimePatchDecision,
+} from "./lib/runtime-control-state.ts";
+import { normalizeModelKey, normalizeThinkingValue } from "./lib/runtime-controls.ts";
+import {
   resolveActiveFinalAssistantEvent,
   resolveFinalAssistantMessage,
 } from "./lib/final-assistant-message.ts";
@@ -1769,11 +1775,6 @@ function resolveQueueMode(configSnapshot: unknown): string {
   );
 }
 
-function normalizeThinkingValue(value: string | null | undefined): string {
-  const normalized = value?.trim().toLowerCase() ?? "";
-  return normalized || "off";
-}
-
 function clearOverride<T extends string>(
   map: Record<string, T>,
   key: string,
@@ -1784,10 +1785,6 @@ function clearOverride<T extends string>(
   const next = { ...map };
   delete next[key];
   return next;
-}
-
-function normalizeModelKey(value: string): string {
-  return value.trim().toLowerCase();
 }
 
 function resolveCanonicalModelFromCatalog(
@@ -5214,26 +5211,17 @@ export default function App() {
     scheme: ModelShortcutScheme,
     source: "shortcut" | "manual",
   ) => {
-    const client = clientRef.current;
     const key = selectedSessionRef.current;
-    if (!client || !key) {
+    if (!key) {
       return;
     }
     const thinking = normalizeThinkingValue(scheme.thinkingLevel);
     try {
-      await client.request("sessions.patch", {
+      await patchSessionRuntimeSettings({
         key,
         model: scheme.model,
         thinkingLevel: thinking,
       });
-      if (normalizeModelKey(scheme.model) === "default") {
-        setSessionModelOverrides((prev) => clearOverride(prev, key));
-      } else {
-        setSessionModelOverrides((prev) => ({ ...prev, [key]: scheme.model }));
-      }
-      setSessionThinkingOverrides((prev) => ({ ...prev, [key]: thinking }));
-      await refreshSessions(client);
-      await loadModels(client);
       if (source === "shortcut") {
         pushSystemMessage(
           `switched by ${resolveShortcutLabel(scheme.combo)} → ${scheme.model} · thinking ${thinking}`,
@@ -7428,40 +7416,21 @@ export default function App() {
             break;
           }
           const nextModel = args.trim();
-          await client.request("sessions.patch", {
+          await patchSessionRuntimeSettings({
             key: selectedSessionKey,
             model: nextModel,
           });
-          if (normalizeModelKey(nextModel) === "default") {
-            setSessionModelOverrides((prev) => clearOverride(prev, selectedSessionKey));
-          } else {
-            setSessionModelOverrides((prev) => ({
-              ...prev,
-              [selectedSessionKey]: nextModel,
-            }));
-          }
           pushSystemMessage(`model set to ${nextModel}`);
-          await refreshSessions(client);
-          await loadModels(client);
           break;
         }
         case "think": {
           const rawValue = args.trim();
           const value = normalizeThinkingValue(rawValue);
-          await client.request("sessions.patch", {
+          await patchSessionRuntimeSettings({
             key: selectedSessionKey,
             thinkingLevel: rawValue ? value : null,
           });
-          if (rawValue) {
-            setSessionThinkingOverrides((prev) => ({
-              ...prev,
-              [selectedSessionKey]: value,
-            }));
-          } else {
-            setSessionThinkingOverrides((prev) => clearOverride(prev, selectedSessionKey));
-          }
           pushSystemMessage(`thinking set to ${rawValue ? value : "default"}`);
-          await refreshSessions(client);
           break;
         }
         case "verbose": {
@@ -7683,47 +7652,67 @@ export default function App() {
     }
   }
 
-  async function handleSelectModel(model: string) {
+  async function patchSessionRuntimeSettings(params: {
+    key: string | null;
+    model?: string;
+    thinkingLevel?: string | null;
+  }) {
     const client = clientRef.current;
-    const key = selectedSessionRef.current;
+    const key = params.key;
     if (!client || !key) {
-      return;
+      return false;
     }
-    try {
-      const nextModel = model.trim();
-      await client.request("sessions.patch", {
-        key,
-        model: nextModel,
-      });
-      if (normalizeModelKey(nextModel) === "default") {
-        setSessionModelOverrides((prev) => clearOverride(prev, key));
-      } else {
-        setSessionModelOverrides((prev) => ({ ...prev, [key]: nextModel }));
-      }
-      await refreshSessions(client);
+
+    const decision = buildSessionRuntimePatchDecision({
+      model: params.model,
+      thinkingLevel: params.thinkingLevel,
+    });
+
+    if (!decision.shouldPatch) {
+      return true;
+    }
+
+    await client.request("sessions.patch", {
+      key,
+      ...decision.patch,
+    });
+
+    if (decision.nextModel !== undefined) {
+      setSessionModelOverrides((prev) =>
+        applyModelRuntimeOverride(prev, key, decision.nextModel),
+      );
+    }
+
+    if (decision.nextThinkingLevel !== undefined) {
+      setSessionThinkingOverrides((prev) =>
+        applyThinkingRuntimeOverride(prev, key, decision.nextThinkingLevel),
+      );
+    }
+
+    await refreshSessions(client);
+    if (decision.refreshModels) {
       await loadModels(client);
+    }
+    return true;
+  }
+
+  async function handleSelectModel(model: string) {
+    try {
+      await patchSessionRuntimeSettings({
+        key: selectedSessionRef.current,
+        model,
+      });
     } catch (err) {
       pushSystemMessage(`Model switch failed: ${String(err)}`);
     }
   }
 
   async function handleSelectThinking(level: string) {
-    const client = clientRef.current;
-    const key = selectedSessionRef.current;
-    if (!client || !key) {
-      return;
-    }
     try {
-      const nextLevel = normalizeThinkingValue(level);
-      await client.request("sessions.patch", {
-        key,
-        thinkingLevel: nextLevel,
+      await patchSessionRuntimeSettings({
+        key: selectedSessionRef.current,
+        thinkingLevel: level,
       });
-      setSessionThinkingOverrides((prev) => ({
-        ...prev,
-        [key]: nextLevel,
-      }));
-      await refreshSessions(client);
     } catch (err) {
       pushSystemMessage(`Thinking switch failed: ${String(err)}`);
     }

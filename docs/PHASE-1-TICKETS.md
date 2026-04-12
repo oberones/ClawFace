@@ -3352,6 +3352,205 @@ Otherwise, the correct next move is to proceed to **Phase 2 — Desktop-native m
 
 That is the bar for leaving Phase 1 and moving confidently into media-heavy and tool-visibility slices.
 
+## Ticket 4.1.1 — Audit current model/runtime control surface
+### Goal
+Map the current model and thinking control surface before changing it, so the first `4.1` cleanup cut improves real product coherence instead of just moving controls around.
+
+### Why
+Runtime controls are now important enough to daily use that they should feel intentional, but the current surface grew incrementally.
+
+Today, model and thinking controls are spread across:
+- the chat header
+- the composer footer
+- slash commands
+- the new-session modal
+- settings
+
+That makes it too easy to keep adding small tweaks without ever deciding which controls belong:
+- inline with the current conversation
+- in session creation/defaults
+- in settings
+
+### Scope
+- audit the current model-selection surface
+- audit the current thinking-level surface
+- audit where new-session model defaults live
+- identify duplicated session-patch logic and state ownership
+- propose the smallest next product-facing cleanup cut
+
+### Deliverable
+A concrete audit of the current runtime-control surface plus a recommended next `4.1` implementation slice.
+
+### Done when
+- the current control surfaces are mapped
+- the current state ownership is explained
+- the highest-value runtime-control cleanup cut is identified
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- audited the current runtime-control UI surfaces in:
+  - `src/components/ChatView.tsx`
+  - `src/components/Composer.tsx`
+  - `src/components/NewSessionModal.tsx`
+  - `src/components/settings-sections/AppActionShortcutsSection.tsx`
+  - `src/lib/slash-commands.ts`
+- audited the current runtime-control state ownership and patch handlers in `src/app.tsx`
+
+#### Current runtime-control map
+- model selection for the active session currently lives in the `ChatView` header
+- thinking selection for the active session currently lives in the `Composer` footer
+- slash commands also expose both controls through `/model` and `/think`
+- new-session model choice exists in `NewSessionModal`
+- the remembered preferred model for shortcut-driven new sessions currently lives in `AppActionShortcutsSection`
+
+#### Findings
+##### 1. The current-session runtime controls are split across two different in-thread surfaces
+- model selection is in the header
+- thinking selection is in the composer footer
+
+That means the current interaction context is not expressed as a single coherent cluster.
+The user has to look in two different places to answer:
+- what model am I using?
+- what reasoning level am I using?
+
+##### 2. Session patch logic is duplicated between direct UI handlers and slash commands
+The `app.tsx` handlers for header/footer controls and the `/model` and `/think` slash-command branches both:
+- patch the session
+- update local override state
+- refresh session/session-model state
+
+That duplication is manageable now, but it is the wrong foundation for future runtime-control cleanup.
+
+##### 3. The remembered new-session model default is conceptually misplaced
+The "Bound model (auto-applied on shortcut create)" control currently lives inside `AppActionShortcutsSection`.
+
+That is understandable historically, but product-wise it is really:
+- a runtime/new-session default
+- not primarily a shortcut-editing concern
+
+That makes settings harder to scan and blurs the line between:
+- shortcut definitions
+- runtime defaults
+
+##### 4. Runtime control state is app-owned, but the UI contract is still scattered
+`src/app.tsx` currently owns the important runtime-control state:
+- `sessionModelOverrides`
+- `sessionThinkingOverrides`
+- `thinkingLevel`
+- `newSessionPreferredModel`
+- the derived `sessionInfo` view model
+
+But that state is then exposed through separate prop paths into `ChatView`, `Composer`, `NewSessionModal`, and settings.
+
+That is good enough for the current product, but it means the next `4.1` slice should probably tighten a dedicated runtime-control boundary rather than add more props in parallel.
+
+##### 5. The control vocabulary is already drifting slightly
+The in-thread UI exposes:
+- `off`
+- `minimal`
+- `low`
+- `medium`
+- `high`
+- `xhigh`
+
+But the slash-command help text currently advertises only:
+- `off`
+- `low`
+- `medium`
+- `high`
+
+That mismatch is small, but it is exactly the kind of drift an audit should catch before the control surface grows further.
+
+#### Why this is the right first 4.1 slice
+This gives `4.1` a concrete starting point instead of treating runtime controls as a vague polish bucket.
+
+The main value of the audit is that it turns "runtime controls feel a little scattered" into a specific next move:
+- unify the session-runtime control boundary
+- separate runtime defaults from shortcut editing
+- reduce duplicated patch/update behavior
+
+#### Validation status
+Documentation-only audit.
+No code-path validation required for this ticket itself.
+
+#### Recommended next step
+Proceed to a first implementation slice that:
+- introduces a small shared runtime-control patch/update seam for model and thinking changes
+- chooses a more coherent ownership story for the remembered new-session model default
+- decides whether model and thinking should remain split between header and composer or be presented as one compact current-session control cluster
+
+## Ticket 4.1.2 — Introduce a shared runtime patch seam and separate new-session defaults from shortcuts
+### Goal
+Take the first real `4.1` implementation cut by tightening the model/thinking update path and moving the remembered new-session model default into a clearer product surface.
+
+### Why
+After the audit, the highest-value safe cut was not a major UI relocation.
+It was to fix two specific problems first:
+
+- model/thinking updates were being patched through multiple parallel code paths
+- the remembered model for new sessions lived inside shortcut editing, where it did not really belong
+
+That makes this a good first implementation slice because it improves both product clarity and architectural footing without forcing the bigger header-vs-composer control-layout decision yet.
+
+### Scope
+- introduce a shared app-level helper for patching session model/thinking changes
+- reuse that helper from direct UI handlers and slash commands
+- reuse that helper from model-shortcut application where practical
+- move the remembered new-session preferred model into its own settings section
+- align the `/think` help text with the actual thinking choices exposed in the UI
+
+### Deliverable
+A first runtime-control cleanup pass that reduces duplication and gives new-session defaults a clearer home.
+
+### Done when
+- model/thinking session patches no longer rely on duplicated update logic across the main UI and slash commands
+- the preferred model for new sessions is no longer edited inside the shortcut section
+- runtime-control vocabulary is more consistent
+- `make typecheck` and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- added a shared `patchSessionRuntimeSettings(...)` seam in `src/app.tsx` and reused it for:
+  - direct model selection
+  - direct thinking selection
+  - `/model`
+  - `/think`
+  - model-shortcut application
+- added `src/lib/runtime-controls.ts` as a small shared home for thinking-level option vocabulary
+- later extracted pure runtime-control decision helpers and added focused unit coverage for:
+  - model/thinking patch normalization
+  - override-map updates
+  - thinking-vocabulary consistency
+- moved the remembered new-session preferred model into a dedicated `NewSessionDefaultsSection`
+- removed that default-model editor from `AppActionShortcutsSection`
+
+#### User-facing improvements landed
+- the settings surface now expresses the new-session preferred model as a runtime default instead of a shortcut-specific option
+- the slash-command help for `/think` now matches the actual UI choices more closely
+
+#### Why this is the right first implementation cut
+This improves the runtime-control boundary without forcing a bigger layout change than we can justify yet.
+
+It also gives the next `4.1` slice a better base:
+- one patch/update seam instead of several
+- one explicit place for new-session defaults
+- one shared thinking-level vocabulary source
+
+#### Validation status
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+Take the next `4.1` product-facing cut around presentation:
+- either introduce a more coherent current-session runtime control cluster in-thread
+- or explicitly decide that model and thinking should stay split, but with a clearer shared boundary and visual relationship
+
 ## Ticket 4.3.1 — Extract the low-risk settings sections from `SettingsModal`
 ### Goal
 Start Slice `4.3` by extracting the easiest standalone settings sections into dedicated components without changing behavior.
