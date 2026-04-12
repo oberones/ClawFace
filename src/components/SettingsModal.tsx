@@ -24,7 +24,6 @@ import {
 } from "./settings-sections/shortcut-settings-utils.ts";
 import { TypographyLayoutSection } from "./settings-sections/TypographyLayoutSection.tsx";
 import {
-  formatBytes,
   normalizeReplyDoneAudioDataUrl,
   normalizeReplyDoneAudioFileName,
   validateReplyDoneAudioFile,

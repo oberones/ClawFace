@@ -1,5 +1,6 @@
 import React from "react";
 import type { UiSettings } from "../../lib/ui-settings.ts";
+import { formatBytes } from "./reply-done-audio-utils.ts";
 import type { ReplyDoneSoundPatch } from "./SettingsSectionTypes.ts";
 import { NumberField, ToggleField } from "./SettingsFieldControls.tsx";
 
@@ -13,13 +14,6 @@ type ChatControlsSectionProps = {
   onCustomSoundChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onClearCustomSound: () => void;
 };
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
 
 export function ChatControlsSection(props: ChatControlsSectionProps) {
   return (
