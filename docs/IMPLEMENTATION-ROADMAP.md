@@ -378,6 +378,10 @@ The user can control the interaction context without falling into settings hell.
 - align runtime-control vocabulary between the visible UI and slash-command help before making a larger layout change
 - helper-level regression coverage now exists for the runtime patch decision seam and shared thinking vocabulary
 
+#### Next product-facing cut
+- present the active session's model and thinking controls as one coherent in-thread runtime cluster
+- remove the duplicated composer-footer thinking picker once that cluster exists
+
 ---
 
 ### Slice 4.2 — Error, reconnect, and recovery polish
