@@ -1056,11 +1056,10 @@ export default function ChatView(props: ChatViewProps) {
     () =>
       deriveConnectionFeedback({
         connectionStatus,
-        connected: props.connected,
         disabledReason: props.disabledReason,
         composerRuntimeState,
       }),
-    [connectionStatus, props.connected, props.disabledReason, composerRuntimeState],
+    [connectionStatus, props.disabledReason, composerRuntimeState],
   );
 
   const currentSessionRuntime = useMemo<{
