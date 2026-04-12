@@ -1227,43 +1227,83 @@ export default function ChatView(props: ChatViewProps) {
         </div>
 
         <div className="chat-header-actions">
-          <div className={`relative ${modelMenuOpen ? "menu-open-ctx" : ""}`} ref={modelMenuRef}>
-            <button
-              type="button"
-              onClick={() => setModelMenuOpen((prev) => !prev)}
-              className="ui-btn ui-btn-light"
-              style={{
-                fontSize: modelBadgeFontSize,
-                padding: `${modelBadgePaddingY} ${modelBadgePaddingX}`,
-              }}
-            >
-              Agent: {props.sessionInfo.agentLabel || "-"} · Model:{" "}
-              {props.sessionInfo.modelLabel || "-"}
-            </button>
+          <div className="session-runtime-controls">
+            <div className={`relative ${modelMenuOpen ? "menu-open-ctx" : ""}`} ref={modelMenuRef}>
+              <button
+                type="button"
+                onClick={() => setModelMenuOpen((prev) => !prev)}
+                className="ui-btn ui-btn-light session-runtime-control session-runtime-control-primary"
+                style={{
+                  fontSize: modelBadgeFontSize,
+                  padding: `${modelBadgePaddingY} ${modelBadgePaddingX}`,
+                }}
+              >
+                Agent: {props.sessionInfo.agentLabel || "-"} · Model:{" "}
+                {props.sessionInfo.modelLabel || "-"}
+              </button>
 
-            {modelMenuOpen && (
-              <div className="floating-menu" style={{ fontSize: modelBadgeFontSize }}>
-                {modelChoices.length === 0 && <div className="floating-empty">No available models.</div>}
-                {modelChoices.map((model) => {
-                  const isActive =
-                    model.full === activeModel || model.id === activeModel || model.name === activeModel;
-                  return (
-                    <button
-                      key={model.full}
-                      type="button"
-                      onClick={() => {
-                        setModelMenuOpen(false);
-                        props.onModelSelect(model.full);
-                      }}
-                      className={`floating-item ${isActive ? "active" : ""}`}
-                    >
-                      <div className="floating-item-title">{model.full}</div>
-                      <div className="floating-item-subtitle">{model.name}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              {modelMenuOpen && (
+                <div className="floating-menu session-runtime-menu" style={{ fontSize: modelBadgeFontSize }}>
+                  {modelChoices.length === 0 && <div className="floating-empty">No available models.</div>}
+                  {modelChoices.map((model) => {
+                    const isActive =
+                      model.full === activeModel || model.id === activeModel || model.name === activeModel;
+                    return (
+                      <button
+                        key={model.full}
+                        type="button"
+                        onClick={() => {
+                          setModelMenuOpen(false);
+                          props.onModelSelect(model.full);
+                        }}
+                        className={`floating-item ${isActive ? "active" : ""}`}
+                      >
+                        <div className="floating-item-title">{model.full}</div>
+                        <div className="floating-item-subtitle">{model.name}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className={`relative ${thinkingMenuOpen ? "menu-open-ctx" : ""}`} ref={thinkingMenuRef}>
+              <button
+                type="button"
+                onClick={() => setThinkingMenuOpen((prev) => !prev)}
+                className="ui-btn ui-btn-light session-runtime-control"
+                style={{
+                  fontSize: modelBadgeFontSize,
+                  padding: `${modelBadgePaddingY} ${modelBadgePaddingX}`,
+                }}
+              >
+                Thinking: {activeThinking}
+              </button>
+
+              {thinkingMenuOpen && (
+                <div
+                  className="floating-menu session-runtime-menu session-runtime-thinking-menu"
+                  style={{ fontSize: modelBadgeFontSize }}
+                >
+                  {thinkChoices.map((level) => {
+                    const isActive = level === activeThinking;
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => {
+                          setThinkingMenuOpen(false);
+                          props.onThinkingSelect(level);
+                        }}
+                        className={`thinking-item ${isActive ? "active" : ""}`}
+                      >
+                        {level}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {props.canAbort && (
@@ -1465,18 +1505,9 @@ export default function ChatView(props: ChatViewProps) {
           onSend: sendWithPhysics,
         }}
         footer={{
-          thinkingMenuOpen,
-          thinkingMenuRef,
-          activeThinking,
-          thinkChoices,
           sessionInfo: props.sessionInfo,
           models: props.models,
           onCompact: props.onCompact,
-          onThinkingMenuToggle: () => setThinkingMenuOpen((prev) => !prev),
-          onThinkingSelect: (level) => {
-            setThinkingMenuOpen(false);
-            props.onThinkingSelect(level);
-          },
         }}
       />
 
