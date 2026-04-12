@@ -63,7 +63,7 @@ export type ComposerProps = {
     thinkingMenuOpen: boolean;
     thinkingMenuRef: React.RefObject<HTMLDivElement>;
     activeThinking: string;
-    thinkChoices: string[];
+    thinkChoices: readonly string[];
     sessionInfo: SessionInfo;
     models: ModelItem[];
     onCompact?: () => void;

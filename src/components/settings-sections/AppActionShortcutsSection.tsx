@@ -8,9 +8,6 @@ import type { AppActionShortcutId, ShortcutCombo } from "./shortcut-settings-uti
 
 type AppActionShortcutsSectionProps = {
   appActionShortcuts: AppActionShortcutEntry[];
-  models?: Array<{ id: string; name: string; provider: string }>;
-  newSessionPreferredModel?: string;
-  onNewSessionPreferredModelChange?: (model: string) => void;
   onChangeAppActionShortcut: (
     id: AppActionShortcutId,
     shortcut: {
@@ -58,29 +55,6 @@ export function AppActionShortcutsSection(props: AppActionShortcutsSectionProps)
                   <span className="field-label">
                     {entry.enabled ? entry.shortcutLabel : `${entry.shortcutLabel} (disabled)`}
                   </span>
-                  {entry.id === "newSession" && (
-                    <label className="field-block" style={{ marginTop: 8 }}>
-                      <span className="field-label">
-                        Bound model (auto-applied on shortcut create)
-                      </span>
-                      <select
-                        value={props.newSessionPreferredModel ?? ""}
-                        onChange={(e) => props.onNewSessionPreferredModelChange?.(e.target.value)}
-                        className="ui-input"
-                        aria-label="Select model for new session shortcut"
-                      >
-                        <option value="">System default</option>
-                        {(props.models ?? []).map((model) => {
-                          const full = `${model.provider}/${model.id}`;
-                          return (
-                            <option key={full} value={full}>
-                              {full}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </label>
-                  )}
                 </div>
               </div>
             );
