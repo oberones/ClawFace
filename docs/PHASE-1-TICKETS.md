@@ -3551,6 +3551,70 @@ Take the next `4.1` product-facing cut around presentation:
 - either introduce a more coherent current-session runtime control cluster in-thread
 - or explicitly decide that model and thinking should stay split, but with a clearer shared boundary and visual relationship
 
+## Ticket 4.1.3 — Introduce a compact current-session runtime control cluster
+### Goal
+Make the current interaction context easier to read and change by presenting model and thinking together as one coherent in-thread runtime control surface.
+
+### Why
+After `4.1.2`, the update logic was in much better shape, but the visible controls were still split:
+
+- model selection in the chat header
+- thinking selection in the composer footer
+
+That made the current session context feel fragmented even though the underlying runtime-control boundary was getting cleaner.
+
+The next product-facing move was to decide where the current session's runtime context should actually live.
+
+### Scope
+- introduce a grouped current-session runtime control cluster in-thread
+- colocate model and thinking controls in that cluster
+- remove the duplicated footer thinking picker
+- preserve slash-command parity and the existing patch/update behavior
+
+### Deliverable
+A more coherent visible runtime-control surface for the active session.
+
+### Done when
+- model and thinking controls are presented together in one current-session cluster
+- the composer footer no longer carries a duplicate thinking picker
+- the current interaction context is easier to scan
+- `make typecheck` and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- moved model and thinking controls into one grouped runtime cluster in the chat header
+- kept the existing model and thinking menu behavior, but colocated the controls in one surface
+- removed the old composer-footer thinking picker
+- preserved the shared patch/update seam introduced in `4.1.2`
+
+#### User-facing improvements landed
+- the current session's runtime context is now easier to answer at a glance:
+  - which model am I on?
+  - which thinking level am I on?
+- the composer footer is less overloaded and now focuses more cleanly on:
+  - composition
+  - attachment staging
+  - send/compact/context stats
+
+#### Why this is the right next 4.1 slice
+This is the first runtime-control change that is strongly visible to the user, but it still avoids a risky broader redesign.
+
+It resolves the most obvious presentation problem from the audit without yet forcing more speculative decisions about larger runtime-control information architecture.
+
+#### Validation status
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+Pause and use the product for a bit before taking another `4.1` layout pass.
+
+If follow-up work is still needed, the next likely cuts are:
+- extracting the header runtime cluster into its own component boundary, or
+- deciding whether more of the current-session context belongs near that same cluster
+
 ## Ticket 4.3.1 — Extract the low-risk settings sections from `SettingsModal`
 ### Goal
 Start Slice `4.3` by extracting the easiest standalone settings sections into dedicated components without changing behavior.

@@ -60,15 +60,9 @@ export type ComposerProps = {
     onSend: () => void;
   };
   footer: {
-    thinkingMenuOpen: boolean;
-    thinkingMenuRef: React.RefObject<HTMLDivElement>;
-    activeThinking: string;
-    thinkChoices: readonly string[];
     sessionInfo: SessionInfo;
     models: ModelItem[];
     onCompact?: () => void;
-    onThinkingMenuToggle: () => void;
-    onThinkingSelect: (value: string) => void;
   };
 };
 
@@ -234,38 +228,6 @@ export function Composer(props: ComposerProps) {
             <span>In: {formatCompactTokens(props.footer.sessionInfo.inputTokens)}</span>
             <span>Out: {formatCompactTokens(props.footer.sessionInfo.outputTokens)}</span>
             <span>Total: {formatCompactTokens(props.footer.sessionInfo.totalTokens)}</span>
-
-            <div className={`relative ${props.footer.thinkingMenuOpen ? "menu-open-ctx" : ""}`} ref={props.footer.thinkingMenuRef}>
-              <button
-                type="button"
-                onClick={props.footer.onThinkingMenuToggle}
-                className="ui-btn ui-btn-light"
-                style={{
-                  fontSize: `${props.uiSettings.footerStatsFontSize}px`,
-                  padding: `${Math.round(props.uiSettings.footerStatsFontSize * 0.45)}px ${Math.round(props.uiSettings.footerStatsFontSize * 0.8)}px`,
-                  minHeight: "auto",
-                }}
-              >
-                Thinking: {props.footer.activeThinking}
-              </button>
-              {props.footer.thinkingMenuOpen && (
-                <div className="thinking-menu">
-                  {props.footer.thinkChoices.map((level) => {
-                    const isActive = level === props.footer.activeThinking;
-                    return (
-                      <button
-                        key={level}
-                        type="button"
-                        onClick={() => props.footer.onThinkingSelect(level)}
-                        className={`thinking-item ${isActive ? "active" : ""}`}
-                      >
-                        {level}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
