@@ -3725,6 +3725,62 @@ Look at the next continuity-focused 4.2 cut:
 - clarify what happens to the current session surface when the gateway drops mid-flow
 - decide whether the app needs a more explicit reconnect/recovery banner beyond the composer notice
 
+## Ticket 4.2.2 — Make active-session recovery state visible during reconnects and disconnects
+### Goal
+Clarify what the selected session is doing when the gateway drops mid-flow so the thread stays legible instead of quietly looking idle.
+
+### Why
+After `4.2.1`, the composer had better recovery messaging, but the active session surface still had a gap:
+
+- the thread stayed visible, which was good
+- but the current-session runtime pill could still fall back toward an idle-looking state
+- and the user had to infer most recovery semantics from the composer notice alone
+
+That meant continuity was better than before, but still not explicit enough during reconnects or connection loss.
+
+### Scope
+- add a visible selected-session recovery banner for reconnect/disconnect/pairing states
+- make the current-session runtime pill reflect reconnect/disconnected recovery instead of a generic idle-looking state
+- preserve the existing thread visibility and recovery behavior
+- keep the recovery copy behind the shared connection-feedback seam
+
+### Deliverable
+A more explicit active-session recovery surface when the gateway drops during real work.
+
+### Done when
+- selected sessions show a clear recovery banner during reconnect/disconnect/pairing states
+- the current-session runtime pill no longer looks idle when the gateway is unavailable
+- helper-level validation covers the new session continuity banner mapping
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- extended `src/lib/connection-feedback.ts` to describe active-session recovery banners in addition to header/composer connection state
+- updated `ChatView` to render a recovery banner under the header when a selected session loses the gateway
+- updated the current-session runtime pill so reconnect/disconnected states are explicit instead of falling back to an idle-looking runtime status
+- added focused helper coverage for the new continuity-banner mapping
+
+#### User-facing improvements landed
+- when the gateway drops mid-session, the app now says what is happening without hiding the current thread
+- reconnecting sessions explicitly communicate that the thread is being kept visible while the gateway recovers
+- disconnected/error states make it clearer that sending and history refresh are paused, not lost
+
+#### Why this is the right next 4.2 slice
+It improves continuity in the exact place users are likely to feel confusion after a backend hiccup, while still avoiding a broader reconnect-state redesign.
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If more `4.2` work is needed, the next likely cut is a small reconnect policy pass:
+- define whether the app should expose a more explicit shell-level “recovered / refreshed” signal after reconnect
+- audit whether interrupted active runs need clearer post-reconnect messaging beyond the banner
+
 ## Ticket 4.3.1 — Extract the low-risk settings sections from `SettingsModal`
 ### Goal
 Start Slice `4.3` by extracting the easiest standalone settings sections into dedicated components without changing behavior.

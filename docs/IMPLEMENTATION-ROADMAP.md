@@ -409,6 +409,11 @@ The app feels resilient instead of brittle.
 - turn the composer's connection warning into a small recovery surface with an explicit action when settings are the right next step
 - add focused helper-level coverage for connection/recovery messaging so reconnect copy and actions do not drift
 
+#### Next continuity cut
+- make the active session surface explicitly show reconnect/disconnected state instead of falling back to a generic idle-looking runtime pill
+- add a visible continuity banner for selected-session recovery states so the user does not have to infer everything from the composer alone
+- keep the thread visible while being explicit about what is paused and what will resume automatically
+
 ---
 
 ### Slice 4.3 — Settings decomposition and cleanup

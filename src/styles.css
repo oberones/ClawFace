@@ -611,6 +611,14 @@ body::before {
   background: #64748b;
 }
 
+.session-runtime-dot.is-reconnecting {
+  background: #d97706;
+}
+
+.session-runtime-dot.is-disconnected {
+  background: #b45309;
+}
+
 .session-runtime-dot.is-thinking,
 .session-runtime-dot.is-streaming,
 .session-runtime-dot.is-working {
@@ -991,6 +999,55 @@ body::before {
   min-height: 0;
   height: 100%;
   flex: 1;
+}
+
+.session-recovery-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 22px 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, white);
+  background: rgba(250, 252, 255, 0.92);
+}
+
+.session-recovery-banner.is-info {
+  border-color: color-mix(in srgb, #93c5fd 54%, white);
+  background: color-mix(in srgb, #eff6ff 88%, white);
+}
+
+.session-recovery-banner.is-warning {
+  border-color: color-mix(in srgb, #f2b66c 56%, white);
+  background: color-mix(in srgb, #fff7ed 88%, white);
+}
+
+.session-recovery-banner-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.session-recovery-banner-title {
+  color: var(--claw-text);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.session-recovery-banner-detail {
+  color: var(--claw-text-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ui-btn.session-recovery-banner-action {
+  flex-shrink: 0;
+  min-height: auto;
+  padding: 5px 10px;
+  font-size: 12px;
 }
 
 /* ── Message navigation buttons ─────────────────────────── */
