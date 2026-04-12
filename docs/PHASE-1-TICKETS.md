@@ -3615,6 +3615,58 @@ If follow-up work is still needed, the next likely cuts are:
 - extracting the header runtime cluster into its own component boundary, or
 - deciding whether more of the current-session context belongs near that same cluster
 
+## Ticket 4.1.4 — Extract the header runtime cluster into its own component boundary
+### Goal
+Take the first structural follow-up after `4.1.3` by moving the new header runtime cluster out of `ChatView` without changing the user-facing model/thinking behavior.
+
+### Why
+`4.1.3` fixed the product problem, but it still left the newly grouped runtime surface fully inlined inside one of the repo's biggest hotspots.
+
+That meant `ChatView` was still carrying:
+- the header runtime cluster markup
+- the model/thinking menu state
+- the outside-click handling for those menus
+- the runtime menu scrim behavior
+
+This is a good next slice because it preserves the improved product surface while giving that surface an actual component boundary of its own.
+
+### Scope
+- extract the header runtime cluster into a dedicated component
+- move the cluster's local menu state, refs, and outside-click handling into that component
+- preserve the existing model/thinking selection behavior and header placement
+- keep `ChatView` as the higher-level orchestration surface
+
+### Deliverable
+A dedicated runtime-controls component that owns the header runtime cluster interaction details instead of keeping them inline in `ChatView`.
+
+### Done when
+- `ChatView` no longer inlines the header runtime cluster
+- model/thinking menu state and click-outside handling are owned by the extracted component
+- the visible runtime-control behavior is unchanged
+- `make typecheck` and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/components/SessionRuntimeControls.tsx` as the dedicated boundary for the header runtime cluster
+- moved the cluster's model/thinking menu state, refs, click-outside behavior, and scrim rendering into that component
+- simplified `ChatView` so it now treats the runtime cluster as a child surface instead of carrying its inline interaction details
+
+#### User-facing improvements landed
+- no intentional UX change; this was a structural cleanup cut meant to keep the new runtime cluster stable
+
+#### Why this is the right follow-up to 4.1.3
+It keeps the runtime-control cleanup moving in the same direction as the rest of the repo: smaller, clearer boundaries around product surfaces that have already proved their value in real use.
+
+#### Validation status
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+Move on from `4.1` unless real usage shows another concrete runtime-control problem worth solving.
+
 ## Ticket 4.3.1 — Extract the low-risk settings sections from `SettingsModal`
 ### Goal
 Start Slice `4.3` by extracting the easiest standalone settings sections into dedicated components without changing behavior.
