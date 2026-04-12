@@ -21,6 +21,7 @@ import {
 } from "../lib/message-image-source.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
+import { THINKING_LEVEL_CHOICES } from "../lib/runtime-controls.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
@@ -267,7 +268,7 @@ export default function ChatView(props: ChatViewProps) {
   }, [props.models]);
 
   const activeModel = props.sessionInfo.modelId || props.sessionInfo.modelLabel || "";
-  const thinkChoices = ["off", "minimal", "low", "medium", "high", "xhigh"];
+  const thinkChoices = THINKING_LEVEL_CHOICES;
   const activeThinking = (props.sessionInfo.thinkingLevel ?? "off").toLowerCase();
 
   useEffect(() => {
