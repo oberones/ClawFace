@@ -16,7 +16,6 @@ test("deriveConnectionFeedback keeps connected status quiet and busy status info
 
   const connected = deriveConnectionFeedback({
     connectionStatus: "connected",
-    connected: true,
     disabledReason: null,
     composerRuntimeState: "ready",
   });
@@ -26,7 +25,6 @@ test("deriveConnectionFeedback keeps connected status quiet and busy status info
 
   const busy = deriveConnectionFeedback({
     connectionStatus: "connected",
-    connected: true,
     disabledReason: null,
     composerRuntimeState: "busy",
   });
@@ -40,7 +38,6 @@ test("deriveConnectionFeedback offers settings recovery for disconnected and err
 
   const disconnected = deriveConnectionFeedback({
     connectionStatus: "disconnected",
-    connected: false,
     disabledReason: null,
     composerRuntimeState: "offline",
   });
@@ -50,7 +47,6 @@ test("deriveConnectionFeedback offers settings recovery for disconnected and err
 
   const errored = deriveConnectionFeedback({
     connectionStatus: "error",
-    connected: false,
     disabledReason: "Gateway refused the websocket handshake.",
     composerRuntimeState: "offline",
   });
@@ -64,7 +60,6 @@ test("deriveConnectionFeedback keeps pairing and connecting guidance non-actiona
 
   const connecting = deriveConnectionFeedback({
     connectionStatus: "connecting",
-    connected: false,
     disabledReason: null,
     composerRuntimeState: "offline",
   });
@@ -75,7 +70,6 @@ test("deriveConnectionFeedback keeps pairing and connecting guidance non-actiona
 
   const pairing = deriveConnectionFeedback({
     connectionStatus: "pairing-required",
-    connected: false,
     disabledReason: "Pairing required. Approve this device with openclaw devices approve.",
     composerRuntimeState: "offline",
   });

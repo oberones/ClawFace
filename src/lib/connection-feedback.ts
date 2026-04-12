@@ -16,7 +16,6 @@ export type ConnectionFeedback = {
 
 type ConnectionFeedbackParams = {
   connectionStatus: ConnectionStatus;
-  connected: boolean;
   disabledReason?: string | null;
   composerRuntimeState: ComposerRuntimeState;
 };
@@ -63,7 +62,7 @@ export function deriveConnectionFeedback(params: ConnectionFeedbackParams): Conn
               message: params.disabledReason || "Gateway connection error. Check settings and retry.",
               action: "open-settings" as const,
             }
-          : !params.connected || params.connectionStatus === "disconnected"
+          : params.connectionStatus === "disconnected"
             ? {
                 tone: "warning" as const,
                 message: params.disabledReason || "Gateway disconnected. Update settings to reconnect.",

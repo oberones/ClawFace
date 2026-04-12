@@ -3209,7 +3209,7 @@ body::before {
   gap: 10px;
 }
 
-.composer-warning-action {
+.ui-btn.composer-warning-action {
   flex-shrink: 0;
   min-height: auto;
   padding: 4px 9px;
