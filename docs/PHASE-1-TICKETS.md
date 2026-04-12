@@ -3781,6 +3781,69 @@ If more `4.2` work is needed, the next likely cut is a small reconnect policy pa
 - define whether the app should expose a more explicit shell-level “recovered / refreshed” signal after reconnect
 - audit whether interrupted active runs need clearer post-reconnect messaging beyond the banner
 
+## Ticket 4.2.3 — Add an explicit recovered/refreshed signal after reconnect
+### Goal
+Make recovery completion visible after reconnect so the app does not silently jump from “disconnected” back to “fine” with no acknowledgment.
+
+### Why
+After `4.2.2`, disruption was much clearer:
+
+- the composer explained what was blocked
+- the current-session banner explained what was paused
+- the runtime pill stopped looking idle during reconnects
+
+But there was still one missing moment in the recovery story:
+
+- the gateway could reconnect
+- the active session could refresh
+- and the UI would quietly return to its normal state without confirming that recovery had actually succeeded
+
+That made the reconnect path feel incomplete, especially after a visible interruption.
+
+### Scope
+- detect when a `hello` event represents a real recovery rather than the initial boot connection
+- show a short-lived shell-level notice when the gateway reconnects
+- show a follow-up short-lived notice when the selected session history finishes refreshing after reconnect
+- keep the copy behind a small shared recovery helper instead of adding more inline reconnect logic
+
+### Deliverable
+A lightweight recovered/refreshed signal that closes the loop after reconnect without adding another permanent banner.
+
+### Done when
+- the initial app connection does not show a recovery notice
+- reconnecting after a disconnect shows a short-lived “Gateway reconnected” notice
+- reconnecting with an active session shows a follow-up “Session refreshed” notice once the selected session reload completes
+- helper-level validation covers the recovery notice rules
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/connection-recovery.ts` to centralize recovery-announcement rules and copy
+- updated `src/app.tsx` to detect post-connect recoveries, announce gateway reconnects, and announce active-session refresh completion only for the still-selected session
+- updated `ChatView` to render a short-lived shell-level recovery notice in addition to the persistent continuity banner
+- added focused helper coverage for the reconnect/recovery notice rules
+
+#### User-facing improvements landed
+- reconnects now close with an explicit acknowledgement instead of silently returning to normal
+- selected-session recovery feels more trustworthy because the app confirms when the session refresh actually finishes
+- first app load still stays quiet, so the new notice reads as recovery rather than startup noise
+
+#### Why this is the right 4.2 follow-through
+It completes the reconnect story without escalating to a larger recovery-state redesign.
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If more `4.2` work is needed, the next likely cut is focused post-reconnect cleanup:
+- clarify what the app should communicate when an active run was interrupted by the disconnect
+- decide whether interrupted runs need a more explicit “resume/retry/manual refresh” follow-up state
+
 ## Ticket 4.3.1 — Extract the low-risk settings sections from `SettingsModal`
 ### Goal
 Start Slice `4.3` by extracting the easiest standalone settings sections into dedicated components without changing behavior.

@@ -25,6 +25,7 @@ import {
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { deriveConnectionFeedback } from "../lib/connection-feedback.ts";
+import type { ConnectionRecoveryNotice } from "../lib/connection-recovery.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
@@ -44,6 +45,7 @@ type ChatViewProps = {
   canAbort: boolean;
   connected: boolean;
   connectionStatus?: ConnectionStatus;
+  connectionRecoveryNotice?: ConnectionRecoveryNotice | null;
   disabledReason?: string | null;
   sessionInfo: SessionInfo;
   models: ModelListItem[];
@@ -1212,6 +1214,17 @@ export default function ChatView(props: ChatViewProps) {
               Open Settings
             </button>
           )}
+        </div>
+      )}
+
+      {props.connectionRecoveryNotice && (
+        <div
+          className={`session-recovery-flash${props.connectionRecoveryNotice.tone === "success" ? " is-success" : " is-info"}`}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="session-recovery-flash-title">{props.connectionRecoveryNotice.title}</div>
+          <div className="session-recovery-flash-detail">{props.connectionRecoveryNotice.message}</div>
         </div>
       )}
 

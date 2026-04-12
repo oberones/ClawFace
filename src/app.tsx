@@ -63,6 +63,11 @@ import {
 } from "./lib/final-assistant-message.ts";
 import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
+import {
+  buildConnectionRecoveryNotice,
+  shouldAnnounceConnectionRecovery,
+  type ConnectionRecoveryNotice,
+} from "./lib/connection-recovery.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 
 const STORAGE_KEYS = {
@@ -4067,8 +4072,13 @@ export default function App() {
   const [newSessionPreferredModel, setNewSessionPreferredModel] = useState<string>(
     () => loadStored(STORAGE_KEYS.newSessionPreferredModel, ""),
   );
+  const [connectionRecoveryNotice, setConnectionRecoveryNotice] = useState<ConnectionRecoveryNotice | null>(null);
 
   const clientRef = useRef<GatewayClient | null>(null);
+  const connectionStatusRef = useRef(connectionState.status);
+  const hasConnectedOnceRef = useRef(false);
+  const connectionRecoveryNoticeTimerRef = useRef<number | null>(null);
+  const connectionRecoveryNoticeSeqRef = useRef(0);
   const selectedSessionRef = useRef<string | null>(selectedSessionKey);
   const chatRunRef = useRef<string | null>(chatRunId);
   const thinkingRef = useRef<boolean>(thinking);
@@ -4103,6 +4113,10 @@ export default function App() {
   const sessionPreviewsRef = useRef<Record<string, SessionPreviewItem[]>>(sessionPreviews);
   const sessionPreviewFetchSeqRef = useRef(0);
   const sessionPreviewKeysSignatureRef = useRef("");
+
+  useEffect(() => {
+    connectionStatusRef.current = connectionState.status;
+  }, [connectionState.status]);
 
   useEffect(() => {
     if (loadingSessionKeyRef.current !== null && loadingSessionKeyRef.current !== selectedSessionKey) {
@@ -4169,6 +4183,29 @@ export default function App() {
       (existingTimerId) => existingTimerId !== timerId,
     );
   };
+
+  const clearConnectionRecoveryNotice = useCallback(() => {
+    if (connectionRecoveryNoticeTimerRef.current !== null) {
+      window.clearTimeout(connectionRecoveryNoticeTimerRef.current);
+      connectionRecoveryNoticeTimerRef.current = null;
+    }
+    setConnectionRecoveryNotice(null);
+  }, []);
+
+  const showConnectionRecoveryNotice = useCallback((notice: ConnectionRecoveryNotice, durationMs = 4200) => {
+    if (connectionRecoveryNoticeTimerRef.current !== null) {
+      window.clearTimeout(connectionRecoveryNoticeTimerRef.current);
+      connectionRecoveryNoticeTimerRef.current = null;
+    }
+    const noticeId = ++connectionRecoveryNoticeSeqRef.current;
+    setConnectionRecoveryNotice(notice);
+    connectionRecoveryNoticeTimerRef.current = window.setTimeout(() => {
+      setConnectionRecoveryNotice((current) =>
+        connectionRecoveryNoticeSeqRef.current === noticeId ? null : current,
+      );
+      connectionRecoveryNoticeTimerRef.current = null;
+    }, durationMs);
+  }, []);
 
   const switchView = useCallback((target: "chat" | "files") => {
     if (target === activeViewRef.current) return;
@@ -4743,7 +4780,10 @@ export default function App() {
     }
   };
 
-  const reloadActiveSessionHistory = async (clientOverride?: GatewayClient | null) => {
+  const reloadActiveSessionHistory = async (
+    clientOverride?: GatewayClient | null,
+    options?: { recoverySessionKey?: string | null },
+  ) => {
     const client = clientOverride ?? clientRef.current;
     if (!client) {
       return;
@@ -4755,6 +4795,15 @@ export default function App() {
     }
     await loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
     refreshSessionsWithFollowUp(client);
+    if (
+      options?.recoverySessionKey &&
+      sessionKeysMatch(options.recoverySessionKey, activeSessionKey) &&
+      selectedSessionRef.current &&
+      sessionKeysMatch(selectedSessionRef.current, activeSessionKey) &&
+      clientRef.current === client
+    ) {
+      showConnectionRecoveryNotice(buildConnectionRecoveryNotice({ stage: "session-refreshed" }));
+    }
   };
 
   const scheduleActiveHistoryHydration = (runId: string | null | undefined) => {
@@ -4959,6 +5008,7 @@ export default function App() {
     return () => {
       clearDeferredSessionRefreshTimers();
       clearDeferredHistoryHydrationTimers();
+      clearConnectionRecoveryNotice();
       if (streamFlushRafRef.current !== null) {
         window.cancelAnimationFrame(streamFlushRafRef.current);
         streamFlushRafRef.current = null;
@@ -5559,6 +5609,12 @@ export default function App() {
       clientName: "openclaw-control-ui",
       mode: "webchat",
       onHello: (hello) => {
+        const previousConnectionStatus = connectionStatusRef.current;
+        const isRecoveryHello = shouldAnnounceConnectionRecovery(
+          previousConnectionStatus,
+          hasConnectedOnceRef.current,
+        );
+        connectionStatusRef.current = "connected";
         setConnectionState({
           status: "connected",
           reason: null,
@@ -5582,20 +5638,33 @@ export default function App() {
         void loadModels(client);
         void refreshSessions(client);
         const activeSessionKey = selectedSessionRef.current;
+        if (isRecoveryHello) {
+          showConnectionRecoveryNotice(
+            buildConnectionRecoveryNotice({
+              stage: "gateway-reconnected",
+              hasActiveSession: Boolean(activeSessionKey),
+            }),
+          );
+        }
         if (activeSessionKey) {
           updateSessionActivity(activeSessionKey, { unread: false });
-          void reloadActiveSessionHistory(client);
+          void reloadActiveSessionHistory(client, {
+            recoverySessionKey: isRecoveryHello ? activeSessionKey : null,
+          });
         }
+        hasConnectedOnceRef.current = true;
       },
       onClose: (info) => {
         gatewayMethodsRef.current.clear();
         const activeSessionKey = selectedSessionRef.current;
+        clearConnectionRecoveryNotice();
         clearActiveStreamingState();
         if (activeSessionKey) {
           updateSessionActivity(activeSessionKey, { working: false, unread: false });
         }
         const reason = info.reason?.trim() ?? "";
         if (reason.toLowerCase().includes("pairing")) {
+          connectionStatusRef.current = "pairing-required";
           setConnectionState({
             status: "pairing-required",
             reason,
@@ -5607,6 +5676,7 @@ export default function App() {
               ? "Handshake failed. Check Gateway URL/path or Origin allowlist."
               : "";
           const nextStatus = !client.isClosed && info.code !== 1000 ? "connecting" : reason ? "error" : "disconnected";
+          connectionStatusRef.current = nextStatus;
           const baseNote = nextStatus === "connecting"
             ? "Connection lost. Reconnecting…"
             : reason
@@ -7798,6 +7868,7 @@ export default function App() {
             canAbort={Boolean(chatRunId)}
             connected={connected}
             connectionStatus={connectionState.status}
+            connectionRecoveryNotice={connectionRecoveryNotice}
             disabledReason={disabledReason}
             sessionInfo={sessionInfo}
             models={models}
