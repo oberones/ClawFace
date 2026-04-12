@@ -402,6 +402,40 @@ Settings are easier to understand without dominating the product.
 - settings are more maintainable
 - the app feels less like a giant preferences surface
 
+#### First safe cut
+- extract the lowest-risk standalone sections first:
+  - UI schemes
+  - gateway / connection settings
+  - path-prefix mapping settings
+- leave denser shortcut and notification-audio clusters for later passes once section boundaries are established
+
+#### Next safe cut
+- extract the appearance-oriented sections next:
+  - typography / layout
+  - color system
+  - markdown readability
+- centralize reusable field controls so later settings-section extraction does not duplicate form primitives
+
+#### Next heavier cut
+- extract the chat-controls cluster once section boundaries are stable:
+  - in-thread behavior toggles
+  - sizing/display controls
+  - reply-done sound settings
+- leave shortcut groups as the final heavier settings cleanup pass
+
+#### Final major settings cut
+- extract the remaining shortcut clusters:
+  - app action shortcuts
+  - model shortcut schemes
+  - agent session shortcuts
+- centralize shared shortcut editor controls so the modal stops carrying repeated keyboard-combo UI logic
+
+#### Validation follow-through
+- helper-level regression coverage now exists for the settings behaviors most likely to drift during future cleanup:
+  - shortcut key normalization and thinking-label formatting
+  - reply-done audio file validation and audio data URL normalization
+- run `make test-unit` alongside `make typecheck` and `make build` when touching those seams
+
 ---
 
 # Phase 5 — OpenClaw-native expansion surfaces
