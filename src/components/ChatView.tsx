@@ -1281,7 +1281,10 @@ export default function ChatView(props: ChatViewProps) {
               </button>
 
               {thinkingMenuOpen && (
-                <div className="floating-menu session-runtime-menu session-runtime-thinking-menu">
+                <div
+                  className="floating-menu session-runtime-menu session-runtime-thinking-menu"
+                  style={{ fontSize: modelBadgeFontSize }}
+                >
                   {thinkChoices.map((level) => {
                     const isActive = level === activeThinking;
                     return (

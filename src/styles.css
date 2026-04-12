@@ -675,7 +675,7 @@ body::before {
   right: 0;
 }
 
-.session-runtime-thinking-menu {
+.floating-menu.session-runtime-thinking-menu {
   width: 168px;
 }
 
