@@ -1,3 +1,5 @@
+import { THINKING_LEVEL_COMMAND_USAGE } from "./runtime-controls.ts";
+
 export type SlashCommand = {
   name: string;
   description: string;
@@ -22,7 +24,11 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { name: "model", description: "Set model for this session", usage: "/model provider/model" },
   { name: "queue", description: "Adjust queue settings", usage: "/queue <mode> [debounce] [cap] [drop]" },
   { name: "exec", description: "Set exec defaults", usage: "/exec host=... security=... ask=... node=..." },
-  { name: "think", description: "Set thinking level", usage: "/think off|low|medium|high" },
+  {
+    name: "think",
+    description: "Set thinking level",
+    usage: `/think ${THINKING_LEVEL_COMMAND_USAGE}`,
+  },
   { name: "thinking", description: "Alias of /think" },
   { name: "t", description: "Alias of /think" },
   { name: "verbose", description: "Toggle verbose mode", usage: "/verbose on|off" },

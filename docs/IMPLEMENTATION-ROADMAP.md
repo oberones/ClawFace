@@ -364,6 +364,20 @@ The user can control the interaction context without falling into settings hell.
 #### Done when
 - model/thinking controls feel intentional, not bolted on
 
+#### First cut
+- audit the current runtime-control surface before moving controls around:
+  - active-session model selection
+  - active-session thinking selection
+  - new-session model defaults
+  - slash-command overlap
+- use that audit to choose the first implementation cut instead of guessing at control placement
+
+#### First implementation cut
+- centralize session model/thinking patch behavior behind one app-level seam
+- move remembered new-session model defaults out of shortcut editing and into an explicit defaults surface
+- align runtime-control vocabulary between the visible UI and slash-command help before making a larger layout change
+- helper-level regression coverage now exists for the runtime patch decision seam and shared thinking vocabulary
+
 ---
 
 ### Slice 4.2 — Error, reconnect, and recovery polish
