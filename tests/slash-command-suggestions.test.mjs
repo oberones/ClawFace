@@ -67,3 +67,21 @@ test("getSlashCommandSuggestions keeps model suggestions working while showing p
     },
   ]);
 });
+
+test("getSlashCommandSuggestions keeps thinking suggestions working for aliases and detail rendering", () => {
+  const { getSlashCommandSuggestions } = loadSlashCommandSuggestionsModule();
+
+  const suggestions = getSlashCommandSuggestions({
+    draft: "/thinking h",
+    models: [],
+  });
+
+  assert.deepEqual(suggestions, [
+    {
+      name: "thinking",
+      description: "Thinking level",
+      detail: "high",
+      value: "high",
+    },
+  ]);
+});

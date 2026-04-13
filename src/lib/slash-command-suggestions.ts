@@ -1,4 +1,6 @@
 import { BASE_COMMANDS, type SlashCommand } from "./slash-commands.ts";
+import { THINKING_LEVEL_CHOICES } from "./runtime-controls.ts";
+import { SUBAGENT_ACTIONS } from "./subagent-slash-commands.ts";
 
 export type SlashCommandSuggestion = SlashCommand & {
   value?: string;
@@ -16,39 +18,49 @@ type GetSlashCommandSuggestionsParams = {
   models: ModelItem[];
 };
 
-const THINK_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+export type ParsedSlashDraft = {
+  showSlashMenu: boolean;
+  commandQuery: string;
+  tokens: string[];
+  commandName: string;
+  commandNameLower: string;
+  commandArgs: string;
+  commandArgsLower: string;
+};
 
-const SUBAGENT_ACTIONS: Array<{
-  action: string;
-  description: string;
-  usage: string;
-}> = [
-  { action: "list", description: "Show active subagent runs", usage: "/subagents list" },
-  { action: "kill", description: "Stop one or more subagent runs", usage: "/subagents kill <id|#|all>" },
-  { action: "log", description: "Show recent output from a subagent run", usage: "/subagents log <id|#> [limit]" },
-  { action: "info", description: "Show detailed status for a subagent run", usage: "/subagents info <id|#>" },
-  { action: "send", description: "Send a follow-up message to a subagent run", usage: "/subagents send <id|#> <message>" },
-  { action: "steer", description: "Steer a subagent run with a corrective message", usage: "/subagents steer <id|#> <message>" },
-  { action: "spawn", description: "Spawn a new subagent for this session", usage: "/subagents spawn <agentId> <task>" },
-];
+export function parseSlashDraft(draft: string): ParsedSlashDraft {
+  const trimmedDraft = draft.trim();
+  const showSlashMenu = trimmedDraft.startsWith("/");
+  const commandQuery = showSlashMenu ? trimmedDraft.replace(/^\//, "") : "";
+  const tokens = commandQuery.split(/\s+/).filter(Boolean);
+  const commandName = tokens[0] ?? "";
+  const commandArgs = tokens.slice(1).join(" ");
+  return {
+    showSlashMenu,
+    commandQuery,
+    tokens,
+    commandName,
+    commandNameLower: commandName.toLowerCase(),
+    commandArgs,
+    commandArgsLower: commandArgs.toLowerCase(),
+  };
+}
 
 export function getSlashCommandSuggestions(
   params: GetSlashCommandSuggestionsParams,
 ): SlashCommandSuggestion[] {
-  const showSlashMenu = params.draft.trim().startsWith("/");
-  if (!showSlashMenu) {
+  const parsed = parseSlashDraft(params.draft);
+  if (!parsed.showSlashMenu) {
     return [];
   }
+  const thinkCommand =
+    parsed.commandNameLower === "think" ||
+    parsed.commandNameLower === "thinking" ||
+    parsed.commandNameLower === "t";
 
-  const commandQuery = params.draft.trim().replace(/^\//, "");
-  const tokens = commandQuery.split(/\s+/).filter(Boolean);
-  const commandName = tokens[0] ?? "";
-  const commandArgs = tokens.slice(1).join(" ");
-  const thinkCommand = commandName === "think" || commandName === "thinking" || commandName === "t";
-
-  if (commandName === "model") {
+  if (parsed.commandNameLower === "model") {
     return params.models
-      .filter((model) => `${model.provider}/${model.id}`.toLowerCase().includes(commandArgs.toLowerCase()))
+      .filter((model) => `${model.provider}/${model.id}`.toLowerCase().includes(parsed.commandArgsLower))
       .slice(0, 8)
       .map((model) => ({
         name: "model",
@@ -59,18 +71,18 @@ export function getSlashCommandSuggestions(
   }
 
   if (thinkCommand) {
-    return THINK_LEVELS
-      .filter((level) => level.startsWith(commandArgs.toLowerCase()))
+    return THINKING_LEVEL_CHOICES
+      .filter((level) => level.startsWith(parsed.commandArgsLower))
       .map((level) => ({
-        name: commandName,
+        name: parsed.commandName,
         description: "Thinking level",
         detail: level,
         value: level,
       }));
   }
 
-  if (commandName === "subagents") {
-    const subagentQuery = commandArgs.trim().toLowerCase().split(/\s+/)[0] ?? "";
+  if (parsed.commandNameLower === "subagents") {
+    const subagentQuery = parsed.commandArgsLower.split(/\s+/)[0] ?? "";
     return SUBAGENT_ACTIONS
       .filter((item) => item.action.startsWith(subagentQuery))
       .map((item) => ({
@@ -81,5 +93,5 @@ export function getSlashCommandSuggestions(
       }));
   }
 
-  return BASE_COMMANDS.filter((cmd) => cmd.name.toLowerCase().startsWith(commandName.toLowerCase()));
+  return BASE_COMMANDS.filter((cmd) => cmd.name.toLowerCase().startsWith(parsed.commandNameLower));
 }
