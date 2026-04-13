@@ -85,6 +85,7 @@ import {
   type InterruptedRunSessionBanner,
   type InterruptedRunSnapshot,
 } from "./lib/connection-recovery.ts";
+import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 
 const STORAGE_KEYS = {
@@ -7408,6 +7409,7 @@ export default function App() {
     const queueMode = resolveQueueMode(configSnapshot);
     const version = serverInfo.version?.trim() || "dev";
     const commit = serverInfo.commit?.trim() || null;
+    const { subagentsLine, taskLine } = extractStatusBackgroundVisibility(statusPayload);
 
     return [
       `🦞 OpenClaw ${version}${commit ? ` (${commit})` : ""}`,
@@ -7418,9 +7420,11 @@ export default function App() {
       }/${Number.isFinite(contextLimit) ? formatCompactTokens(contextLimit) : "?"}${contextPercent !== null ? ` (${contextPercent}%)` : ""
       } · 🧹 Compactions: ${compactions}`,
       `🧵 Session: ${sessionKeyForLine} • updated ${formatAgeFromTimestamp(updatedAt)}`,
+      subagentsLine,
+      taskLine,
       `⚙️ Runtime: ${runtime} · Think: ${thinkLabel}${verboseLabel ? ` · ${verboseLabel}` : ""}`,
       `🪢 Queue: ${queueMode} (depth ${queueDepth})`,
-    ].join("\n");
+    ].filter(Boolean).join("\n");
   }
 
   async function handleSend() {
@@ -7434,7 +7438,7 @@ export default function App() {
     const trimmed = draft.trim();
     if (trimmed.startsWith("/")) {
       const cmd = trimmed.replace(/^\//, "").trim().split(/\s+/)[0]?.toLowerCase() ?? "";
-      const gatewayCommands = new Set([
+      const locallyHandledSlashCommands = new Set([
         "status",
         "models",
         "compact",
@@ -7447,11 +7451,11 @@ export default function App() {
         "new",
         "reset",
       ]);
-      if (gatewayCommands.has(cmd)) {
+      if (locallyHandledSlashCommands.has(cmd)) {
         await handleSlashCommand(trimmed);
         return;
       }
-      // unknown slash commands should go to the model
+      // Let OpenClaw handle slash commands that the desktop app does not intercept locally.
     }
 
     if (!trimmed && attachments.length === 0) {

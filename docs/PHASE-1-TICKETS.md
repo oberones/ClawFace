@@ -4342,3 +4342,56 @@ The approval layer is now in a good Milestone 1 pause state.
 If approval work continues later, the next slice should probably choose between:
 - showing more than the first pending approval in the selected session
 - or building a broader approval tray/history surface
+
+## Ticket 5.2.1 — Expose background-task and subagent status through existing command surfaces
+### Goal
+Make OpenClaw background work more visible without jumping straight to a dedicated task or subagent dashboard.
+
+### Why
+The roadmap is clear that Milestone 1 should not build a full task/subagent dashboard yet, but the product brief still expects the user to understand when background work exists.
+
+OpenClaw already exposes two strong existing seams:
+- `/tasks` for the current session
+- `/status` lines such as `subagentsLine` and `taskLine`
+
+This ticket is about making those existing seams visible in ClawFace instead of inventing a bigger surface too early.
+
+### Scope
+- add `/tasks` to the slash-command suggestions
+- surface OpenClaw-provided background task / subagent summary lines in the local `/status` card
+- keep this slice text-first and narrow
+- add focused helper coverage for background-status extraction
+
+### Deliverable
+A first background-work visibility pass that improves discoverability and status awareness without adding a dashboard.
+
+### Done when
+- `/tasks` is discoverable from the slash-command menu
+- the local `/status` card shows background task / subagent summary lines when the gateway provides them
+- helper-level tests lock in the background-status extraction seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-13)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/status-background-visibility.ts` to normalize `subagentsLine` / `taskLine` extraction from status payloads
+- updated `src/app.tsx` so the local `/status` card includes those background-work lines when present
+- added `/tasks` to `src/lib/slash-commands.ts` so background-task inspection is discoverable from the composer slash menu
+- added focused helper coverage in `tests/status-background-visibility.test.mjs`
+
+#### User-facing improvements landed
+- users can now discover `/tasks` directly from the slash-command suggestions
+- `/status` in ClawFace surfaces the backend's existing summary of background tasks and subagents instead of silently dropping it
+- background work becomes more legible without overcommitting to a dashboard the milestone does not yet want
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If `5.2` continues, the next slice should still stay narrow:
+- either improve the shell-level visibility of active background work
+- or make `/subagents` slightly more discoverable/trustworthy before designing any broader task surface
