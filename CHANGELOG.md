@@ -8,6 +8,25 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.6.0 (2026-04-12)
+
+### Feat
+
+- clarify interrupted runs after reconnect
+- add reconnect recovery notices
+
+### Fix
+
+- preserve history run ids for reconnect recovery
+- avoid recovery notices on intentional reconnects
+- address PR feedback
+- address PR feedback
+
+### Refactor
+
+- improve active session recovery state
+- centralize connection recovery feedback and add composer notice
+
 ## v0.5.2 (2026-04-12)
 
 ### Fix
