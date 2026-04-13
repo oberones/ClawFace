@@ -8,6 +8,7 @@ import { GatewayClient } from "./lib/gateway.ts";
 import { extractImages, extractMessageRunId, extractText, isToolMessage } from "./lib/message-extract.ts";
 import {
   type AgentsListResult,
+  type ApprovalDecision,
   type Attachment,
   type ChatMessage,
   type ChatHistoryResult,
@@ -15,6 +16,7 @@ import {
   type GatewayConfig,
   type GatewaySessionRow,
   type ModelsListResult,
+  type PendingApproval,
   type SessionPreviewItem,
   type SessionState,
   type SessionsListResult,
@@ -64,6 +66,13 @@ import {
 import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
 import { PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
+import {
+  extractApprovalResolutionFromGatewayEvent,
+  extractPendingApprovalFromGatewayEvent,
+  pickApprovalResolveMethod,
+  removeResolvedApprovalBySession,
+  upsertPendingApprovalBySession,
+} from "./lib/approval-events.ts";
 import {
   buildConnectionRecoveryNotice,
   buildInterruptedRunSessionBanner,
@@ -4083,6 +4092,8 @@ export default function App() {
   const [connectionRecoveryNotice, setConnectionRecoveryNotice] = useState<ConnectionRecoveryNotice | null>(null);
   const [interruptedRunsBySession, setInterruptedRunsBySession] = useState<Record<string, InterruptedRunSnapshot>>({});
   const [visibleInterruptedRunsBySession, setVisibleInterruptedRunsBySession] = useState<Record<string, true>>({});
+  const [pendingApprovalsBySession, setPendingApprovalsBySession] = useState<Record<string, PendingApproval[]>>({});
+  const [resolvingApprovalIds, setResolvingApprovalIds] = useState<Record<string, ApprovalDecision>>({});
 
   const clientRef = useRef<GatewayClient | null>(null);
   const connectionStatusRef = useRef(connectionState.status);
@@ -4124,6 +4135,7 @@ export default function App() {
   const sessionPreviewFetchSeqRef = useRef(0);
   const sessionPreviewKeysSignatureRef = useRef("");
   const interruptedRunsBySessionRef = useRef<Record<string, InterruptedRunSnapshot>>(interruptedRunsBySession);
+  const pendingApprovalsBySessionRef = useRef<Record<string, PendingApproval[]>>(pendingApprovalsBySession);
 
   useEffect(() => {
     connectionStatusRef.current = connectionState.status;
@@ -4132,6 +4144,10 @@ export default function App() {
   useEffect(() => {
     interruptedRunsBySessionRef.current = interruptedRunsBySession;
   }, [interruptedRunsBySession]);
+
+  useEffect(() => {
+    pendingApprovalsBySessionRef.current = pendingApprovalsBySession;
+  }, [pendingApprovalsBySession]);
 
   useEffect(() => {
     if (loadingSessionKeyRef.current !== null && loadingSessionKeyRef.current !== selectedSessionKey) {
@@ -5815,6 +5831,17 @@ export default function App() {
         }
       },
       onEvent: (evt) => {
+        if (evt.event === "exec.approval.requested" || evt.event === "plugin.approval.requested") {
+          const approval = extractPendingApprovalFromGatewayEvent(evt.event, evt.payload);
+          if (approval) {
+            handleRequestedApproval(approval);
+          }
+          return;
+        }
+        if (evt.event === "exec.approval.resolved" || evt.event === "plugin.approval.resolved") {
+          handleResolvedApproval(evt.event, evt.payload);
+          return;
+        }
         if (isEventVariant(evt.event, "chat")) {
           handleChatEvent(evt.payload, evt.event);
         }
@@ -7003,6 +7030,68 @@ export default function App() {
     }
   }
 
+  function handleRequestedApproval(approval: PendingApproval) {
+    setPendingApprovalsBySession((prev) => upsertPendingApprovalBySession(prev, approval));
+  }
+
+  function handleResolvedApproval(eventName: string, payload: unknown) {
+    const resolution = extractApprovalResolutionFromGatewayEvent(eventName, payload);
+    if (!resolution) {
+      return;
+    }
+    setPendingApprovalsBySession((prev) => removeResolvedApprovalBySession(prev, resolution));
+    setResolvingApprovalIds((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, resolution.id)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[resolution.id];
+      return next;
+    });
+  }
+
+  async function handleResolvePendingApproval(
+    approval: PendingApproval,
+    decision: ApprovalDecision,
+  ) {
+    const client = clientRef.current;
+    if (!client) {
+      return;
+    }
+    const method = pickApprovalResolveMethod(gatewayMethodsRef.current, approval.kind);
+    if (!method) {
+      pushSystemMessage(`Approval resolve is not available for ${approval.kind} approvals on this gateway.`);
+      return;
+    }
+    setResolvingApprovalIds((prev) => ({ ...prev, [approval.id]: decision }));
+    try {
+      await client.request(method, {
+        id: approval.id,
+        decision,
+      });
+      setPendingApprovalsBySession((prev) =>
+        removeResolvedApprovalBySession(prev, {
+          id: approval.id,
+          kind: approval.kind,
+          sessionKey: approval.sessionKey,
+          decision,
+        }),
+      );
+      pushSystemMessage(`Approval ${decision} submitted.`);
+    } catch (err) {
+      pushSystemMessage(`Approval failed: ${String(err)}`);
+    } finally {
+      setResolvingApprovalIds((prev) => {
+        if (!Object.prototype.hasOwnProperty.call(prev, approval.id)) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[approval.id];
+        return next;
+      });
+    }
+  }
+
   function pushSystemMessage(text: string) {
     setMessages((prev) => [
       ...prev,
@@ -7824,6 +7913,14 @@ export default function App() {
     });
     setSessionModelOverrides((prev) => clearOverride(prev, key));
     setSessionThinkingOverrides((prev) => clearOverride(prev, key));
+    setPendingApprovalsBySession((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, key)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
     if (wasSelected) {
       selectedSessionRef.current = nextSelectedKey;
       if (nextSelectedKey) {
@@ -7958,6 +8055,16 @@ export default function App() {
     return snapshot ? buildInterruptedRunSessionBanner(snapshot) : null;
   }, [connectionState.status, interruptedRunsBySession, selectedSessionKey, visibleInterruptedRunsBySession]);
 
+  const activePendingApproval = useMemo<PendingApproval | null>(() => {
+    if (!selectedSessionKey) {
+      return null;
+    }
+    const approvals = Object.entries(pendingApprovalsBySession).find(([key]) =>
+      sessionKeysMatch(key, selectedSessionKey)
+    )?.[1] ?? [];
+    return approvals[0] ?? null;
+  }, [pendingApprovalsBySession, selectedSessionKey]);
+
   return (
     <FileManagerProvider>
     <div className="app-shell">
@@ -8029,6 +8136,10 @@ export default function App() {
             connectionStatus={connectionState.status}
             connectionRecoveryNotice={connectionRecoveryNotice}
             interruptedRunBanner={activeInterruptedRunBanner}
+            pendingApproval={activePendingApproval}
+            resolvingApprovalDecision={
+              activePendingApproval ? (resolvingApprovalIds[activePendingApproval.id] ?? null) : null
+            }
             disabledReason={disabledReason}
             sessionInfo={sessionInfo}
             models={models}
@@ -8039,6 +8150,7 @@ export default function App() {
             sessionTransitionState={transitionState}
             onLoadOlder={() => void handleLoadOlderHistory()}
             onRefreshSession={() => void handleRefreshCurrentSession()}
+            onResolveApproval={(approval, decision) => void handleResolvePendingApproval(approval, decision)}
             onModelSelect={(model) => void handleSelectModel(model)}
             onThinkingSelect={(level) => void handleSelectThinking(level)}
             onCreateSession={() => setShowNewSession(true)}
