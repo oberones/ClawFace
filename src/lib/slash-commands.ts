@@ -1,4 +1,5 @@
 import { THINKING_LEVEL_COMMAND_USAGE } from "./runtime-controls.ts";
+import { SUBAGENT_COMMAND_DESCRIPTION, SUBAGENT_USAGE_SUMMARY } from "./subagent-slash-commands.ts";
 
 export type SlashCommand = {
   name: string;
@@ -17,8 +18,8 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { name: "skill", description: "Run a skill by name", usage: "/skill <name> [input]" },
   {
     name: "subagents",
-    description: "List, kill, log, spawn, or steer subagent runs",
-    usage: "/subagents list|kill|log|info|send|steer|spawn",
+    description: SUBAGENT_COMMAND_DESCRIPTION,
+    usage: SUBAGENT_USAGE_SUMMARY,
   },
   { name: "allowlist", description: "Manage allowlist entries", usage: "/allowlist [list|add|remove] ..." },
   { name: "config", description: "Show or update config", usage: "/config show|get|set|unset ..." },

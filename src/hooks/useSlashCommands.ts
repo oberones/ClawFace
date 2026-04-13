@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { BASE_COMMANDS } from "../lib/slash-commands.ts";
 import {
   getSlashCommandSuggestions,
+  parseSlashDraft,
   type SlashCommandSuggestion,
 } from "../lib/slash-command-suggestions.ts";
 
@@ -18,11 +19,10 @@ export type UseSlashCommandsOptions = {
 export function useSlashCommands(options: UseSlashCommandsOptions) {
   const [activeCommand, setActiveCommand] = useState(0);
 
-  const showSlashMenu = options.draft.trim().startsWith("/");
-  const commandQuery = options.draft.trim().replace(/^\//, "");
-  const tokens = commandQuery.split(/\s+/).filter(Boolean);
-  const commandName = tokens[0] ?? "";
-  const commandArgs = tokens.slice(1).join(" ");
+  const parsedDraft = useMemo(() => parseSlashDraft(options.draft), [options.draft]);
+  const showSlashMenu = parsedDraft.showSlashMenu;
+  const commandName = parsedDraft.commandName;
+  const commandArgs = parsedDraft.commandArgs;
 
   const commandSuggestions = useMemo<SlashCommandSuggestion[]>(() => {
     return getSlashCommandSuggestions({
@@ -38,8 +38,8 @@ export function useSlashCommands(options: UseSlashCommandsOptions) {
     commandName === "t";
 
   const exactCommand = useMemo(
-    () => BASE_COMMANDS.find((cmd) => cmd.name === commandName) ?? null,
-    [commandName],
+    () => BASE_COMMANDS.find((cmd) => cmd.name === parsedDraft.commandNameLower) ?? null,
+    [parsedDraft.commandNameLower],
   );
 
   const applySuggestion = useCallback((suggestion: SlashCommandSuggestion) => {
