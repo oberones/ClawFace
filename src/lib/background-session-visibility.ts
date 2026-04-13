@@ -1,4 +1,5 @@
 import type { GatewaySessionRow, SessionActivityState } from "./types.ts";
+import { sanitizeUserText } from "./message-extract.ts";
 
 export type BackgroundSessionNotice = {
   count: number;
@@ -14,7 +15,10 @@ type DeriveBackgroundSessionNoticeParams = {
 };
 
 function resolveSessionLabel(session: GatewaySessionRow | null, sessionKey: string): string {
-  const label = session?.label?.trim() || session?.derivedTitle?.trim() || session?.displayName?.trim();
+  const label =
+    sanitizeUserText(session?.label?.trim() || "").trim() ||
+    sanitizeUserText(session?.derivedTitle?.trim() || "").trim() ||
+    sanitizeUserText(session?.displayName?.trim() || "").trim();
   return label || sessionKey;
 }
 
@@ -35,12 +39,14 @@ export function deriveBackgroundSessionNotice(
     seen.add(session.key);
   }
 
-  for (const [sessionKey, activity] of Object.entries(params.sessionActivity)) {
-    if (sessionKey === params.selectedSessionKey || !activity?.working || seen.has(sessionKey)) {
-      continue;
-    }
-    workingSessionKeys.push(sessionKey);
-  }
+  const extraWorkingSessionKeys = Object.entries(params.sessionActivity)
+    .filter(([sessionKey, activity]) =>
+      sessionKey !== params.selectedSessionKey && activity?.working && !seen.has(sessionKey)
+    )
+    .map(([sessionKey]) => sessionKey)
+    .sort((a, b) => a.localeCompare(b));
+
+  workingSessionKeys.push(...extraWorkingSessionKeys);
 
   if (workingSessionKeys.length === 0) {
     return null;
