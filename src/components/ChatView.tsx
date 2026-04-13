@@ -1068,9 +1068,15 @@ export default function ChatView(props: ChatViewProps) {
     [connectionStatus, props.disabledReason, composerRuntimeState, props.interruptedRunBanner, props.sessionKey],
   );
 
-  const handleCopyPairingCommand = useCallback(() => {
-    void navigator.clipboard?.writeText(PAIRING_APPROVAL_COMMAND);
+  const writeClipboardText = useCallback((value: string) => {
+    void navigator.clipboard?.writeText(value)?.catch(() => {
+      // Ignore clipboard failures in insecure or denied contexts.
+    });
   }, []);
+
+  const handleCopyPairingCommand = useCallback(() => {
+    writeClipboardText(PAIRING_APPROVAL_COMMAND);
+  }, [writeClipboardText]);
 
   const currentSessionRuntime = useMemo<{
     status: SessionRuntimeStatus;
@@ -1390,7 +1396,7 @@ export default function ChatView(props: ChatViewProps) {
             if (!codeText) return;
 
             event.preventDefault();
-            void navigator.clipboard?.writeText(codeText);
+            writeClipboardText(codeText);
           }}
         />
       </div>
