@@ -5,6 +5,7 @@ import { AgentSessionShortcutsSection } from "./settings-sections/AgentSessionSh
 import { AppActionShortcutsSection } from "./settings-sections/AppActionShortcutsSection.tsx";
 import { ChatControlsSection } from "./settings-sections/ChatControlsSection.tsx";
 import { ColorSystemSection } from "./settings-sections/ColorSystemSection.tsx";
+import { DeviceVisibilitySection } from "./settings-sections/DeviceVisibilitySection.tsx";
 import { GatewaySettingsSection } from "./settings-sections/GatewaySettingsSection.tsx";
 import { MarkdownReadabilitySection } from "./settings-sections/MarkdownReadabilitySection.tsx";
 import { ModelShortcutSchemesSection } from "./settings-sections/ModelShortcutSchemesSection.tsx";
@@ -29,6 +30,8 @@ import {
   normalizeReplyDoneAudioFileName,
   validateReplyDoneAudioFile,
 } from "./settings-sections/reply-done-audio-utils.ts";
+import type { ConnectionStatus } from "../lib/types.ts";
+import type { DevicePairingVisibility } from "../lib/device-pairing-visibility.ts";
 
 type SettingsModalProps = {
   open: boolean;
@@ -62,6 +65,14 @@ type SettingsModalProps = {
   models?: Array<{ id: string; name: string; provider: string }>;
   newSessionPreferredModel?: string;
   onNewSessionPreferredModelChange?: (model: string) => void;
+  connectionStatus: ConnectionStatus;
+  currentDeviceId: string | null;
+  devicePairingVisibility: DevicePairingVisibility | null;
+  devicePairingSupported: boolean;
+  devicePairingLoading: boolean;
+  devicePairingError: string | null;
+  devicePairingLastUpdatedAt: number | null;
+  onRefreshDevicePairingVisibility: () => void;
   modelShortcutSchemes: ModelShortcutSchemeEntry[];
   currentModelForShortcut: string;
   currentThinkingForShortcut: string;
@@ -293,6 +304,17 @@ export default function SettingsModal(props: SettingsModalProps) {
               onTokenChange={props.onTokenChange}
               onPasswordChange={props.onPasswordChange}
               onFsServerUrlChange={props.onFsServerUrlChange}
+            />
+
+            <DeviceVisibilitySection
+              connectionStatus={props.connectionStatus}
+              currentDeviceId={props.currentDeviceId}
+              devicePairingVisibility={props.devicePairingVisibility}
+              devicePairingSupported={props.devicePairingSupported}
+              devicePairingLoading={props.devicePairingLoading}
+              devicePairingError={props.devicePairingError}
+              devicePairingLastUpdatedAt={props.devicePairingLastUpdatedAt}
+              onRefreshDevicePairingVisibility={props.onRefreshDevicePairingVisibility}
             />
 
             <PathPrefixMappingsSection
