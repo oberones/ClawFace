@@ -45,6 +45,21 @@ test("extractPendingApprovalFromGatewayEvent normalizes exec approvals", () => {
   });
 });
 
+test("extractPendingApprovalFromGatewayEvent falls back to exec-safe decisions when allowed decisions are absent", () => {
+  const { extractPendingApprovalFromGatewayEvent } = loadApprovalEventsModule();
+
+  const approval = extractPendingApprovalFromGatewayEvent("exec.approval.requested", {
+    id: "approval-missing-decisions",
+    request: {
+      sessionKey: "session-1",
+      commandPreview: "npm test",
+      allowedDecisions: [],
+    },
+  });
+
+  assert.deepEqual(approval?.allowedDecisions, ["allow-once", "deny"]);
+});
+
 test("extractPendingApprovalFromGatewayEvent defaults plugin approvals to the standard decision set", () => {
   const { extractPendingApprovalFromGatewayEvent } = loadApprovalEventsModule();
 
