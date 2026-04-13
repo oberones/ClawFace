@@ -547,6 +547,17 @@ The user can understand that OpenClaw is doing work beyond the currently visible
 - subagent visibility
 - long-running work surfaces
 
+#### First cut
+- reuse OpenClaw's existing status/task command surfaces before building any dashboard:
+  - make `/tasks` discoverable in the slash-command menu
+  - surface `subagentsLine` / `taskLine` when the user runs `/status`
+  - keep task/subagent visibility text-first until real usage proves a richer surface is needed
+
+#### First implementation cut follow-through
+- `/tasks` is now discoverable from the slash-command suggestions instead of being hidden behind backend-only knowledge
+- the local `/status` card now surfaces OpenClaw's existing background-task and subagent summary lines when the gateway provides them
+- helper-level regression coverage now locks in the background-status extraction seam so later status-card cleanup does not lose those lines
+
 ---
 
 ### Slice 5.3 — Node/device visibility
