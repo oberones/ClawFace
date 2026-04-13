@@ -2482,6 +2482,134 @@ body::before {
   gap: 8px;
 }
 
+.device-visibility-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.device-visibility-summary-card,
+.device-visibility-row,
+.device-visibility-note {
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, white);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.device-visibility-summary-card {
+  display: grid;
+  gap: 8px;
+  padding: 11px 12px;
+}
+
+.device-visibility-summary-top,
+.device-visibility-column-head,
+.device-visibility-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.device-visibility-count-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--claw-text);
+}
+
+.device-visibility-count-line strong {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.device-visibility-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.device-visibility-column {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.device-visibility-list {
+  display: grid;
+  gap: 8px;
+}
+
+.device-visibility-row {
+  display: grid;
+  gap: 5px;
+  padding: 10px 11px;
+}
+
+.device-visibility-row.is-current {
+  border-color: color-mix(in srgb, var(--claw-accent) 56%, white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--claw-accent) 24%, transparent);
+}
+
+.device-visibility-device-id {
+  display: block;
+  margin: 0;
+  padding: 7px 8px;
+  border-radius: 10px;
+  background: rgba(14, 23, 38, 0.06);
+  color: color-mix(in srgb, var(--claw-text) 90%, black);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.device-visibility-status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.device-visibility-status-chip.good {
+  background: color-mix(in srgb, #dff7eb 88%, white);
+  color: #1f6b46;
+}
+
+.device-visibility-status-chip.warning {
+  background: color-mix(in srgb, #fff0d2 88%, white);
+  color: #8b5c12;
+}
+
+.device-visibility-status-chip.neutral {
+  background: color-mix(in srgb, #e6edf7 88%, white);
+  color: #36506f;
+}
+
+.device-visibility-status-chip.muted {
+  background: rgba(118, 133, 156, 0.14);
+  color: var(--claw-text-soft);
+}
+
+.device-visibility-note {
+  padding: 10px 11px;
+  color: var(--claw-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.device-visibility-note.warning {
+  border-color: color-mix(in srgb, #d89b27 45%, white);
+  background: color-mix(in srgb, #fff4dc 88%, white);
+  color: #7f5714;
+}
+
 .path-mapping-textarea {
   min-height: 132px;
   resize: vertical;
@@ -2678,6 +2806,11 @@ body::before {
 
   .shortcut-scheme-top {
     width: 100%;
+  }
+
+  .device-visibility-summary-grid,
+  .device-visibility-columns {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -579,6 +579,18 @@ The user can see and eventually interact with OpenClaw’s paired nodes/devices 
 - capability summaries
 - groundwork for later device-action UX
 
+#### First cut
+- start with a read-only surface before building device actions:
+  - show the local device identity ClawFace uses for gateway pairing
+  - show whether that device is paired, pending approval, or not listed
+  - show the current gateway's pending and paired device summaries in Settings
+  - refresh the list from real `device.pair.requested` / `device.pair.resolved` events when the Settings surface is visible
+
+#### First implementation cut follow-through
+- Settings now includes a read-only `Devices & Pairing` section driven by OpenClaw's existing `device.pair.list` method
+- ClawFace now loads the local device identity, fetches the pairing index when supported, and refreshes it when pairing events arrive while Settings is open
+- helper-level regression coverage now locks in the device-pairing normalization seam so later device-surface cleanup does not quietly regress current-device status or list ordering
+
 ---
 
 ### Slice 5.4 — Browser/canvas/actionful specialist surfaces
