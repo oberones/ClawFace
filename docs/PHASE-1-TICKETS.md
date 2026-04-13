@@ -4444,3 +4444,53 @@ This ticket is now complete.
 If `5.2` continues, the next slice should still stay narrow:
 - either make `/subagents` slightly more discoverable/trustworthy
 - or add one more lightweight current-session summary for task/subagent-heavy runs before considering a broader dashboard
+
+## Ticket 5.2.3 — Make `/subagents` more discoverable and trustworthy in the slash menu
+### Goal
+Help users discover the real OpenClaw subagent actions from the composer without needing backend-specific command knowledge.
+
+### Why
+After `5.2.2`, background work is visible in the shell, but the slash menu still only exposes `/subagents` as a single generic command. Its usage text can also drift from OpenClaw if ClawFace hardcodes outdated action names.
+
+This ticket keeps the slice narrow: improve the existing slash-command surface rather than designing a new task/subagent UI.
+
+### Scope
+- align ClawFace’s `/subagents` description and usage text with OpenClaw’s current action set
+- add slash-menu suggestions for real `/subagents` actions like `list`, `kill`, `log`, `info`, `send`, `steer`, and `spawn`
+- keep the implementation helper-driven and testable
+- preserve existing model/thinking slash suggestion behavior
+
+### Deliverable
+A more trustworthy `/subagents` slash-menu flow that advertises real OpenClaw actions and helps users start the right command from the composer.
+
+### Done when
+- `/subagents` usage text matches OpenClaw’s current action set
+- typing `/subagents` in the composer shows actionable subcommand suggestions
+- helper-level tests cover the subagent suggestion mapping and preserve the existing model suggestion flow
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-13)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/slash-command-suggestions.ts` to centralize slash suggestion derivation in a pure helper
+- updated `src/hooks/useSlashCommands.ts` to delegate suggestion generation through that helper
+- updated `src/lib/slash-commands.ts` so `/subagents` matches OpenClaw’s current `list|kill|log|info|send|steer|spawn` action set
+- updated `src/components/Composer.tsx` so slash suggestions can display a separate detail string from the inserted value
+- added focused helper coverage in `tests/slash-command-suggestions.test.mjs`
+
+#### User-facing improvements landed
+- typing `/subagents` in the composer now shows real actionable subcommand suggestions instead of a single generic entry
+- ClawFace’s `/subagents` help text now matches OpenClaw’s current actions, making the command surface more trustworthy
+- the slash menu stays lightweight while becoming much more useful for subagent-heavy sessions
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If `5.2` continues, the next slice should still stay narrow:
+- either expose a little more current-session subagent/task summary in the shell
+- or pause `5.2` here and move to `5.3` now that the command-level background-work surface is in a good place

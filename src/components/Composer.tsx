@@ -16,6 +16,7 @@ type CommandSuggestion = {
   name: string;
   description: string;
   value?: string;
+  detail?: string;
 };
 
 export type ComposerProps = {
@@ -133,13 +134,13 @@ export function Composer(props: ComposerProps) {
             <div className="slash-menu" style={{ fontSize: "var(--claw-font-size)" }}>
               {props.slash.commandSuggestions.map((cmd, idx) => (
                 <button
-                  key={`${cmd.name}-${cmd.value ?? cmd.description}`}
+                  key={`${cmd.name}-${cmd.value ?? cmd.detail ?? cmd.description}`}
                   type="button"
                   onClick={() => props.slash.onApplySuggestion(cmd)}
                   className={`slash-item ${idx === props.slash.activeCommand ? "active" : ""}`}
                 >
                   <span className="slash-name">/{cmd.name}</span>
-                  <span className="slash-detail">{cmd.value ?? cmd.description}</span>
+                  <span className="slash-detail">{cmd.detail ?? cmd.value ?? cmd.description}</span>
                 </button>
               ))}
             </div>

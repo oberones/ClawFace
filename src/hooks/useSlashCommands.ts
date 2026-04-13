@@ -1,23 +1,19 @@
 import { useCallback, useMemo, useState } from "react";
-import { BASE_COMMANDS, type SlashCommand } from "../lib/slash-commands.ts";
-
-type ModelItem = {
-  id: string;
-  name: string;
-  provider: string;
-};
-
-export type SlashCommandSuggestion = SlashCommand & {
-  value?: string;
-};
+import { BASE_COMMANDS } from "../lib/slash-commands.ts";
+import {
+  getSlashCommandSuggestions,
+  type SlashCommandSuggestion,
+} from "../lib/slash-command-suggestions.ts";
 
 export type UseSlashCommandsOptions = {
   draft: string;
-  models: ModelItem[];
+  models: Array<{
+    id: string;
+    name: string;
+    provider: string;
+  }>;
   onDraftChange: (value: string) => void;
 };
-
-const THINK_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
 
 export function useSlashCommands(options: UseSlashCommandsOptions) {
   const [activeCommand, setActiveCommand] = useState(0);
@@ -29,27 +25,11 @@ export function useSlashCommands(options: UseSlashCommandsOptions) {
   const commandArgs = tokens.slice(1).join(" ");
 
   const commandSuggestions = useMemo<SlashCommandSuggestion[]>(() => {
-    if (!showSlashMenu) {
-      return [];
-    }
-    const thinkCommand = commandName === "think" || commandName === "thinking" || commandName === "t";
-    if (commandName && (commandName === "model" || thinkCommand)) {
-      if (commandName === "model") {
-        return options.models
-          .filter((model) => `${model.provider}/${model.id}`.toLowerCase().includes(commandArgs.toLowerCase()))
-          .slice(0, 8)
-          .map((model) => ({
-            name: "model",
-            description: model.name,
-            value: `${model.provider}/${model.id}`,
-          }));
-      }
-      return THINK_LEVELS
-        .filter((level) => level.startsWith(commandArgs.toLowerCase()))
-        .map((level) => ({ name: commandName, description: "Thinking level", value: level }));
-    }
-    return BASE_COMMANDS.filter((cmd) => cmd.name.toLowerCase().startsWith(commandName.toLowerCase()));
-  }, [showSlashMenu, commandName, commandArgs, options.models]);
+    return getSlashCommandSuggestions({
+      draft: options.draft,
+      models: options.models,
+    });
+  }, [options.draft, options.models]);
 
   const requiresArgs =
     commandName === "model" ||
