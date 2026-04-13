@@ -4395,3 +4395,52 @@ This ticket is now complete.
 If `5.2` continues, the next slice should still stay narrow:
 - either improve the shell-level visibility of active background work
 - or make `/subagents` slightly more discoverable/trustworthy before designing any broader task surface
+
+## Ticket 5.2.2 — Surface active background work in the chat shell
+### Goal
+Make background work visible even when the user is focused on a different session.
+
+### Why
+After `5.2.1`, users can discover `/tasks` and see richer `/status` output, but those remain explicit command surfaces. The shell still does not proactively tell the user that other sessions are actively running in the background.
+
+ClawFace already tracks per-session working state for the sidebar. This ticket is about reusing that state in the chat shell instead of inventing a dashboard.
+
+### Scope
+- add a small shell-level background-work notice when non-selected sessions are still working
+- reuse the existing per-session working state instead of introducing a new task model
+- keep the message informational and lightweight
+- add focused helper coverage for the background-work summary seam
+
+### Deliverable
+A narrow shell-level notice that tells the user when one or more other sessions are still working and points them back to the sidebar.
+
+### Done when
+- the chat shell surfaces a background-work notice when other sessions are still marked `working`
+- the notice stays quiet when only the current session is active
+- helper-level tests lock in the summary text and prioritization
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-13)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/background-session-visibility.ts` to summarize non-selected working sessions into a lightweight shell notice
+- updated `src/app.tsx` to derive the background-session notice from existing `sessionActivity` and `sessions` state
+- updated `src/components/ChatView.tsx` to render a low-severity info banner when other sessions are still working
+- added focused helper coverage in `tests/background-session-visibility.test.mjs`
+
+#### User-facing improvements landed
+- users can now tell from the main chat shell when other sessions are still running in the background
+- the app points the user back to the sidebar instead of hiding background work behind a different session tab
+- ClawFace improves background-work visibility without overcommitting to a dedicated tasks dashboard
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If `5.2` continues, the next slice should still stay narrow:
+- either make `/subagents` slightly more discoverable/trustworthy
+- or add one more lightweight current-session summary for task/subagent-heavy runs before considering a broader dashboard
