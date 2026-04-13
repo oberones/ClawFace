@@ -314,9 +314,21 @@ body::before {
   animation: session-card-breathe 2.4s ease-in-out infinite;
 }
 
+.session-card.is-approval {
+  border-color: color-mix(in srgb, #d97706 30%, var(--claw-border));
+  box-shadow:
+    inset var(--claw-session-indicator-w, 3px) 0 0 #d97706,
+    0 0 10px rgba(217, 119, 6, 0.08);
+  background: color-mix(in srgb, #fff7ed 22%, rgba(249, 252, 255, 0.8));
+}
+
 .session-dot.is-working {
   background: #5b9bf6;
   animation: session-dot-breathe 2.4s ease-in-out infinite;
+}
+
+.session-dot.is-approval {
+  background: #d97706;
 }
 
 @keyframes session-card-breathe {
@@ -399,6 +411,12 @@ body::before {
   color: #2f5f9c;
   background: color-mix(in srgb, #eef5ff 82%, white);
   border-color: color-mix(in srgb, #5b9bf6 46%, white);
+}
+
+.session-activity-badge.is-approval {
+  color: #9a3412;
+  background: color-mix(in srgb, #fff7ed 86%, white);
+  border-color: color-mix(in srgb, #f59e0b 48%, white);
 }
 
 .session-activity-badge.is-unread {

@@ -531,6 +531,11 @@ The user can clearly see and act on approval-requiring operations.
 - the first in-app approval actions now submit through the advertised `exec.approval.resolve` / `plugin.approval.resolve` gateway methods
 - helper-level regression coverage now locks in approval event parsing, state upsert/removal, and resolve-method selection
 
+#### Third implementation cut follow-through
+- pending approvals now stay visible for non-selected sessions through the existing sidebar activity surface
+- approval-needed session visibility still stays narrow: the selected session owns the full approval banner, while background sessions get a compact approval badge
+- helper-level regression coverage now locks in the sidebar activity-priority rules so approval visibility does not get buried behind generic unread/working states
+
 ---
 
 ### Slice 5.2 — Background tasks and subagents
