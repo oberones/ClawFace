@@ -10,6 +10,7 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { name: "help", description: "Show available commands" },
   { name: "commands", description: "List all slash commands" },
   { name: "status", description: "Show gateway status summary" },
+  { name: "tasks", description: "List background tasks for this session" },
   { name: "context", description: "Explain context usage and limits" },
   { name: "whoami", description: "Show your sender id" },
   { name: "id", description: "Alias of /whoami" },
