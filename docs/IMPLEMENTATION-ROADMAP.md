@@ -563,6 +563,11 @@ The user can understand that OpenClaw is doing work beyond the currently visible
 - this reuses existing per-session activity state instead of introducing a separate task model too early
 - helper-level regression coverage now locks in the background-session summary seam so later shell cleanup does not hide active background work again
 
+#### Third implementation cut follow-through
+- the composer slash menu now suggests real `/subagents` actions like `list`, `kill`, `log`, `info`, `send`, `steer`, and `spawn`
+- ClawFace’s `/subagents` usage text now matches OpenClaw’s current action set instead of drifting behind the backend
+- helper-level regression coverage now locks in the slash suggestion mapping so future slash-menu cleanup does not quietly regress subagent discoverability
+
 ---
 
 ### Slice 5.3 — Node/device visibility
