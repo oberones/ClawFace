@@ -8,6 +8,19 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.8.0 (2026-04-13)
+
+### Feat
+
+- improve subagent slash command suggestions
+- surface background sessions in the chat shell
+- surface background work in status and slash commands
+
+### Fix
+
+- share slash command suggestion metadata
+- stabilize background session notice copy
+
 ## v0.7.0 (2026-04-13)
 
 ### Feat
