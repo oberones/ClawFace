@@ -4231,3 +4231,61 @@ It also keeps the messaging model cleaner:
 If approval work continues, the next likely cut should be a contract/normalization slice rather than more banner chrome:
 - identify whether OpenClaw exposes approval-request events or approval-related methods that can be normalized into app state
 - only then decide whether ClawFace should add richer in-app approval actions beyond pairing guidance
+
+## Ticket 5.1.3 — Normalize approval request events and add the first in-app approval action
+### Goal
+Turn real OpenClaw approval-request events into session-scoped app state, then expose the narrowest truthful in-app approval action for the selected session.
+
+### Why
+After `5.1.2`, ClawFace could clearly show device pairing approval problems, but generic OpenClaw approvals were still invisible in the product even though the backend already emits approval request and resolution events.
+
+This ticket is about using the real gateway contract that already exists:
+- `exec.approval.requested` / `exec.approval.resolved`
+- `plugin.approval.requested` / `plugin.approval.resolved`
+- `exec.approval.resolve` / `plugin.approval.resolve`
+
+That makes it possible to add a real Milestone-1 approval path without inventing a fake approvals center.
+
+### Scope
+- normalize approval-request and approval-resolution gateway events into a shared frontend seam
+- store pending approvals by session so the selected session can surface them clearly
+- add the first selected-session approval request banner with in-app approval actions
+- keep the surface narrow: one pending approval at a time for the selected session is enough for now
+- add focused helper coverage for approval event extraction, state updates, and method selection
+
+### Deliverable
+An approval-request flow that can surface real pending exec/plugin approvals in the current session and submit the supported approval decision back through the gateway.
+
+### Done when
+- approval-request gateway events become session-scoped app state
+- the selected session shows a visible approval request banner when one is pending
+- supported decisions can be submitted in-app through the advertised approval resolve methods
+- helper-level tests lock in the event parsing and pending-approval state helpers
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/approval-events.ts` to normalize OpenClaw approval request/resolution events and approval resolve method selection
+- added a new `PendingApproval` app type in `src/lib/types.ts`
+- updated `src/app.tsx` to track pending approvals by session, resolve approval actions through the advertised gateway methods, and clear pending approvals when resolution events arrive
+- updated `src/components/ChatView.tsx` to surface the first selected-session approval banner with `Allow Once`, `Allow Always`, and `Deny` actions when supported
+- added banner styling for approval decision actions in `src/styles.css`
+- added focused helper coverage in `tests/approval-events.test.mjs`
+
+#### User-facing improvements landed
+- real OpenClaw approval requests are now visible in the selected session instead of being silently hidden
+- the app can submit the first supported in-app approval decisions for exec and plugin approvals
+- pairing approval, reconnect/recovery, and generic pending approvals now stay separated as different shell/session states instead of getting collapsed into one overloaded warning path
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If approval work continues, the next likely slice should stay narrow:
+- decide whether the selected session should show more than the first pending approval
+- only then consider a broader approval tray or history surface

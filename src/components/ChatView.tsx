@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal, flushSync } from "react-dom";
 import type {
   Attachment,
+  ApprovalDecision,
   ChatMessage,
   ConnectionStatus,
   ModelListItem,
+  PendingApproval,
   SessionInfo,
   SessionRuntimeStatus,
   SessionTransitionState,
@@ -25,6 +27,7 @@ import {
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { deriveConnectionFeedback, PAIRING_APPROVAL_COMMAND } from "../lib/connection-feedback.ts";
+import { formatApprovalDecisionLabel } from "../lib/approval-events.ts";
 import type { ConnectionRecoveryNotice, InterruptedRunSessionBanner } from "../lib/connection-recovery.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
@@ -47,6 +50,8 @@ type ChatViewProps = {
   connectionStatus?: ConnectionStatus;
   connectionRecoveryNotice?: ConnectionRecoveryNotice | null;
   interruptedRunBanner?: InterruptedRunSessionBanner | null;
+  pendingApproval?: PendingApproval | null;
+  resolvingApprovalDecision?: ApprovalDecision | null;
   disabledReason?: string | null;
   sessionInfo: SessionInfo;
   models: ModelListItem[];
@@ -57,6 +62,7 @@ type ChatViewProps = {
   sessionTransitionState?: SessionTransitionState;
   onLoadOlder: () => void;
   onRefreshSession: () => void;
+  onResolveApproval: (approval: PendingApproval, decision: ApprovalDecision) => void;
   onModelSelect: (model: string) => void;
   onThinkingSelect: (level: string) => void;
   onCreateSession: () => void;
@@ -1092,6 +1098,14 @@ export default function ChatView(props: ChatViewProps) {
         tone: "warning",
       };
     }
+    if (props.pendingApproval) {
+      return {
+        status: "working",
+        label: props.pendingApproval.title,
+        detail: props.pendingApproval.description,
+        tone: "warning",
+      };
+    }
     if (connectionFeedback.sessionBanner) {
       return {
         status: connectionStatus === "connecting" ? "reconnecting" : "disconnected",
@@ -1155,6 +1169,7 @@ export default function ChatView(props: ChatViewProps) {
     isSessionSwitching,
     props.canAbort,
     props.isCurrentSessionLoading,
+    props.pendingApproval,
     props.sessionKey,
     props.streamText,
     props.thinking,
@@ -1234,6 +1249,28 @@ export default function ChatView(props: ChatViewProps) {
               Copy Command
             </button>
           )}
+        </div>
+      )}
+
+      {props.pendingApproval && (
+        <div className="session-recovery-banner approval-request-banner is-warning">
+          <div className="session-recovery-banner-copy">
+            <div className="session-recovery-banner-title">{props.pendingApproval.title}</div>
+            <div className="session-recovery-banner-detail">{props.pendingApproval.description}</div>
+          </div>
+          <div className="approval-request-actions">
+            {props.pendingApproval.allowedDecisions.map((decision) => (
+              <button
+                key={`${props.pendingApproval!.id}:${decision}`}
+                type="button"
+                className={`ui-btn ui-btn-light session-recovery-banner-action${decision === "deny" ? " is-danger" : ""}`}
+                disabled={props.resolvingApprovalDecision !== null}
+                onClick={() => props.onResolveApproval(props.pendingApproval!, decision)}
+              >
+                {props.resolvingApprovalDecision === decision ? "Submitting..." : formatApprovalDecisionLabel(decision)}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

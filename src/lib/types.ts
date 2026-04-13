@@ -153,6 +153,27 @@ export type ToolItem = {
   updatedAt: number;
 };
 
+export type ApprovalKind = "exec" | "plugin";
+
+export type ApprovalDecision = "allow-once" | "allow-always" | "deny";
+
+export type PendingApproval = {
+  id: string;
+  kind: ApprovalKind;
+  sessionKey: string | null;
+  runId?: string | null;
+  approvalSlug?: string | null;
+  title: string;
+  description: string;
+  command?: string | null;
+  host?: string | null;
+  agentId?: string | null;
+  toolCallId?: string | null;
+  allowedDecisions: ApprovalDecision[];
+  createdAtMs?: number | null;
+  expiresAtMs?: number | null;
+};
+
 export type Attachment = {
   id: string;
   name: string;
