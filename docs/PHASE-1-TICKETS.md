@@ -3844,6 +3844,70 @@ If more `4.2` work is needed, the next likely cut is focused post-reconnect clea
 - clarify what the app should communicate when an active run was interrupted by the disconnect
 - decide whether interrupted runs need a more explicit “resume/retry/manual refresh” follow-up state
 
+## Ticket 4.2.4 — Clarify interrupted active runs after reconnect
+### Goal
+Make interrupted active runs legible after reconnect so the user can tell the difference between “the gateway recovered” and “the previous run actually finished.”
+
+### Why
+After `4.2.3`, reconnect recovery was much clearer:
+
+- the shell acknowledged when the gateway came back
+- the shell acknowledged when the selected session history finished refreshing
+
+But there was still one ambiguous path:
+
+- a run could be active when the gateway dropped
+- reconnect could succeed
+- session refresh could succeed
+- and the user could still be left wondering whether the previous run quietly completed, resumed, or was simply cut off
+
+That ambiguity matters most in the exact moment when the app otherwise looks healthy again.
+
+### Scope
+- detect when a selected-session run was in flight at disconnect time
+- re-check that run after reconnect and session refresh
+- if the refreshed session still does not contain a terminal result for that run, show a session-level interrupted-run banner
+- give one explicit next step (`Refresh Now`) instead of implying auto-resume
+- keep the decision logic behind focused recovery helpers instead of scattering run-interruption heuristics through `app.tsx`
+
+### Deliverable
+A clearer post-reconnect outcome for in-flight runs that were interrupted and did not automatically resume.
+
+### Done when
+- reconnecting after an in-flight run no longer leaves the outcome ambiguous
+- completed runs do not show a false interrupted-run banner after reconnect
+- unresolved interrupted runs show a session-level warning with a refresh action
+- helper-level validation covers interrupted-run capture, resolution, and banner mapping
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- extended `src/lib/connection-recovery.ts` with interrupted-run capture, resolution, and banner-copy helpers
+- updated `src/app.tsx` to capture active-run snapshots on disconnect, reconcile them after active-session history refresh, and keep interrupted-run banners session-scoped
+- updated `src/lib/connection-feedback.ts` and `ChatView` so connected sessions can show a post-reconnect interrupted-run banner with a `Refresh Now` action
+- added focused helper coverage for interrupted-run capture, resolution, and the connected-session banner mapping
+
+#### User-facing improvements landed
+- after reconnect, the app now distinguishes “gateway/session recovered” from “the previous run actually finished”
+- interrupted runs no longer silently disappear behind a healthy-looking connected state
+- the next step is explicit: refresh again if late output is expected, or resend the prompt
+
+#### Why this is the right 4.2 follow-through
+It closes the last obvious ambiguity in the reconnect story without claiming background run resume support that the app cannot guarantee.
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If more `4.2` work is needed, the next likely cut is lightweight rather than structural:
+- decide whether interrupted runs should eventually expose a richer retry/resend affordance
+- otherwise, treat the core reconnect/recovery slice as complete and move to the next milestone hotspot
+
 ## Ticket 4.3.1 — Extract the low-risk settings sections from `SettingsModal`
 ### Goal
 Start Slice `4.3` by extracting the easiest standalone settings sections into dedicated components without changing behavior.
