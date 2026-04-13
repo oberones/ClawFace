@@ -4494,3 +4494,58 @@ This ticket is now complete.
 If `5.2` continues, the next slice should still stay narrow:
 - either expose a little more current-session subagent/task summary in the shell
 - or pause `5.2` here and move to `5.3` now that the command-level background-work surface is in a good place
+
+## Ticket 5.3.1 — Add the first read-only device visibility surface
+
+### Why
+OpenClaw already exposes a real `device.pair.list` method, but ClawFace still leaves device identity and pairing state mostly invisible. The first `5.3` cut should make the current device and gateway pairing index legible without jumping all the way to a device manager.
+
+### Scope
+- load the local device identity already used by gateway pairing
+- fetch and normalize `device.pair.list` when the gateway supports it
+- add a read-only Settings surface for:
+  - the current device id
+  - current device pairing state
+  - pending pairing requests
+  - paired devices
+- refresh that surface when pairing events arrive while Settings is open
+
+### Deliverable
+A lightweight Settings card that helps the user answer:
+- “Which device am I using?”
+- “Is this device paired yet?”
+- “What other devices are pending or paired on this gateway?”
+
+### Done when
+- Settings shows a read-only device/pairing summary when connected to a gateway that supports `device.pair.list`
+- the current device state is clearly labeled as paired, pending, unlisted, or unavailable
+- helper-level tests cover device-pairing payload normalization and current-device status derivation
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-13)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/device-pairing-visibility.ts` to normalize `device.pair.list` payloads into a read-only UI shape
+- added `src/components/settings-sections/DeviceVisibilitySection.tsx` for the first device/pairing visibility surface in Settings
+- updated `src/app.tsx` to:
+  - load the local device identity when Settings opens
+  - fetch `device.pair.list` when the gateway supports it
+  - refresh the snapshot when pairing events arrive while Settings is open
+- added focused helper coverage in `tests/device-pairing-visibility.test.mjs`
+
+#### User-facing improvements landed
+- Settings now shows the current device id and whether that device is paired, pending approval, unlisted, or unavailable
+- the gateway pairing index is visible without leaving ClawFace or dropping into CLI commands
+- pending and paired device lists stay read-only and intentionally narrow, which gives users useful visibility without turning Milestone 1 into a full device-management surface
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If `5.3` continues, the next slice should stay narrow too:
+- either surface lightweight per-device capability summaries
+- or add the first safe device action only after real usage proves which one matters most
