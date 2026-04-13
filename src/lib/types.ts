@@ -174,6 +174,11 @@ export type PendingApproval = {
   expiresAtMs?: number | null;
 };
 
+export type SessionActivityState = {
+  working: boolean;
+  unread: boolean;
+};
+
 export type Attachment = {
   id: string;
   name: string;

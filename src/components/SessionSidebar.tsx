@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { GatewaySessionRow, SessionPreviewItem } from "../lib/types.ts";
+import type { GatewaySessionRow, SessionActivityState, SessionPreviewItem } from "../lib/types.ts";
 import { formatTime } from "../lib/format.ts";
 import { sanitizeUserText } from "../lib/message-extract.ts";
 import { useCardTilt } from "../hooks/useCardTilt.ts";
+import { deriveSessionSidebarActivityState } from "../lib/session-sidebar-activity.ts";
 
 const CONTENT_SNIPPET_LEAD = 20;
 const CONTENT_SNIPPET_TAIL = 30;
@@ -15,7 +16,8 @@ type SessionSidebarResult = {
 export type SessionSidebarProps = {
   sessions: GatewaySessionRow[];
   selectedKey: string | null;
-  sessionActivity: Record<string, { working: boolean; unread: boolean }>;
+  sessionActivity: Record<string, SessionActivityState>;
+  pendingApprovalCounts: Record<string, number>;
   collapsed: boolean;
   sidebarWidth: number;
   deletingKeys: Set<string>;
@@ -428,24 +430,16 @@ export default function SessionSidebar(props: SessionSidebarProps) {
           const isActive = props.selectedKey === session.key;
           const isDeleting = props.deletingKeys.has(session.key);
           const activity = props.sessionActivity[session.key];
+          const pendingApprovalCount = props.pendingApprovalCounts[session.key] ?? 0;
           const rawTitle = session.label || session.derivedTitle || session.key;
           const title = rawTitle ? sanitizeUserText(rawTitle) || rawTitle : session.key;
           const preview = session.lastMessagePreview ? sanitizeUserText(session.lastMessagePreview) : "";
           const contentSnippet = result.contentSnippet;
-          const activityLabel = isActive
-            ? "Current"
-            : activity?.unread
-              ? "New activity"
-              : activity?.working
-                ? "Working"
-                : null;
-          const activityClass = isActive
-            ? "is-active"
-            : activity?.unread
-              ? "is-unread"
-              : activity?.working
-                ? "is-working"
-                : "";
+          const { activityLabel, activityClass } = deriveSessionSidebarActivityState({
+            isActive,
+            pendingApprovalCount,
+            activity,
+          });
           return (
             <article
               key={session.key}

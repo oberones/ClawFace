@@ -4289,3 +4289,56 @@ This ticket is now complete.
 If approval work continues, the next likely slice should stay narrow:
 - decide whether the selected session should show more than the first pending approval
 - only then consider a broader approval tray or history surface
+
+## Ticket 5.1.4 — Add non-selected session approval visibility
+### Goal
+Keep pending approvals visible even when they belong to a different session than the one currently open.
+
+### Why
+After `5.1.3`, the selected session could show and resolve the first pending approval in-app, but approvals in background sessions were still easy to miss until the user manually clicked into the right thread.
+
+This ticket is about making approval-needed state visible at the session-navigation level without escalating into a broader approvals tray.
+
+### Scope
+- surface pending approvals for non-selected sessions through the existing sidebar activity affordance
+- keep the selected session behavior unchanged: full approval banner in-thread, compact signal in the sidebar
+- define a simple priority rule between current session, approval-needed, unread, and working badges
+- add focused helper coverage for the sidebar activity-priority logic
+
+### Deliverable
+A sidebar-level approval indicator that makes background session approvals visible without adding a new approval center.
+
+### Done when
+- sessions with pending approvals show a visible approval indicator in the sidebar
+- approval-needed visibility does not get buried behind generic unread or working badges
+- the selected session still prefers `Current` in the sidebar while showing the full approval banner in-thread
+- helper-level coverage locks in the sidebar activity-priority rules
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/session-sidebar-activity.ts` to centralize sidebar activity-priority rules
+- added `SessionActivityState` to `src/lib/types.ts` so session activity typing is shared instead of re-declared
+- updated `SessionSidebar` to show approval-needed badges for non-selected sessions through the existing activity-badge path
+- updated `src/app.tsx` to derive pending approval counts by session and pass them into the sidebar
+- added approval-specific sidebar styling in `src/styles.css`
+- added focused helper coverage in `tests/session-sidebar-activity.test.mjs`
+
+#### User-facing improvements landed
+- pending approvals in background sessions are now visible without opening each session one by one
+- approval-needed state has higher visibility than generic unread or working status in the session list
+- the selected session still reads as `Current` in the sidebar while surfacing the full approval actions in-thread
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+The approval layer is now in a good Milestone 1 pause state.
+If approval work continues later, the next slice should probably choose between:
+- showing more than the first pending approval in the selected session
+- or building a broader approval tray/history surface
