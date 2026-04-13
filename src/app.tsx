@@ -86,6 +86,7 @@ import {
   type InterruptedRunSnapshot,
 } from "./lib/connection-recovery.ts";
 import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
+import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 
 const STORAGE_KEYS = {
@@ -8089,6 +8090,17 @@ export default function App() {
     return counts;
   }, [pendingApprovalsBySession, sessions]);
 
+  const backgroundSessionNotice = useMemo(() => {
+    if (connectionState.status !== "connected") {
+      return null;
+    }
+    return deriveBackgroundSessionNotice({
+      selectedSessionKey,
+      sessions,
+      sessionActivity,
+    });
+  }, [connectionState.status, selectedSessionKey, sessionActivity, sessions]);
+
   return (
     <FileManagerProvider>
     <div className="app-shell">
@@ -8161,6 +8173,7 @@ export default function App() {
             connectionStatus={connectionState.status}
             connectionRecoveryNotice={connectionRecoveryNotice}
             interruptedRunBanner={activeInterruptedRunBanner}
+            backgroundSessionNotice={backgroundSessionNotice}
             pendingApproval={activePendingApproval}
             resolvingApprovalDecision={
               activePendingApproval ? (resolvingApprovalIds[activePendingApproval.id] ?? null) : null

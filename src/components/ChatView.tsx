@@ -13,6 +13,7 @@ import type {
   ToolItem,
 } from "../lib/types.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
+import type { BackgroundSessionNotice } from "../lib/background-session-visibility.ts";
 import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
 import { ToolActivityPanel } from "./ToolActivityPanel.tsx";
 import { Composer } from "./Composer.tsx";
@@ -50,6 +51,7 @@ type ChatViewProps = {
   connectionStatus?: ConnectionStatus;
   connectionRecoveryNotice?: ConnectionRecoveryNotice | null;
   interruptedRunBanner?: InterruptedRunSessionBanner | null;
+  backgroundSessionNotice?: BackgroundSessionNotice | null;
   pendingApproval?: PendingApproval | null;
   resolvingApprovalDecision?: ApprovalDecision | null;
   disabledReason?: string | null;
@@ -1270,6 +1272,15 @@ export default function ChatView(props: ChatViewProps) {
                 {props.resolvingApprovalDecision === decision ? "Submitting..." : formatApprovalDecisionLabel(decision)}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {props.backgroundSessionNotice && (
+        <div className="session-recovery-banner background-session-banner is-info">
+          <div className="session-recovery-banner-copy">
+            <div className="session-recovery-banner-title">{props.backgroundSessionNotice.title}</div>
+            <div className="session-recovery-banner-detail">{props.backgroundSessionNotice.detail}</div>
           </div>
         </div>
       )}
