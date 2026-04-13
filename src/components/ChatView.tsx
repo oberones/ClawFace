@@ -24,7 +24,7 @@ import {
 } from "../lib/message-image-source.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
-import { deriveConnectionFeedback } from "../lib/connection-feedback.ts";
+import { deriveConnectionFeedback, PAIRING_APPROVAL_COMMAND } from "../lib/connection-feedback.ts";
 import type { ConnectionRecoveryNotice, InterruptedRunSessionBanner } from "../lib/connection-recovery.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
@@ -1068,12 +1068,24 @@ export default function ChatView(props: ChatViewProps) {
     [connectionStatus, props.disabledReason, composerRuntimeState, props.interruptedRunBanner, props.sessionKey],
   );
 
+  const handleCopyPairingCommand = useCallback(() => {
+    void navigator.clipboard?.writeText(PAIRING_APPROVAL_COMMAND);
+  }, []);
+
   const currentSessionRuntime = useMemo<{
     status: SessionRuntimeStatus;
     label: string;
     detail: string;
     tone: "neutral" | "active" | "warning";
   }>(() => {
+    if (connectionFeedback.approvalBanner) {
+      return {
+        status: "disconnected",
+        label: connectionFeedback.approvalBanner.title,
+        detail: connectionFeedback.approvalBanner.message,
+        tone: "warning",
+      };
+    }
     if (connectionFeedback.sessionBanner) {
       return {
         status: connectionStatus === "connecting" ? "reconnecting" : "disconnected",
@@ -1131,6 +1143,7 @@ export default function ChatView(props: ChatViewProps) {
       tone: "neutral",
     };
   }, [
+    connectionFeedback.approvalBanner,
     connectionFeedback.sessionBanner,
     connectionStatus,
     isSessionSwitching,
@@ -1199,6 +1212,24 @@ export default function ChatView(props: ChatViewProps) {
           </button>
         </div>
       </header>
+
+      {connectionFeedback.approvalBanner && (
+        <div className="session-recovery-banner approval-needed-banner is-warning">
+          <div className="session-recovery-banner-copy">
+            <div className="session-recovery-banner-title">{connectionFeedback.approvalBanner.title}</div>
+            <div className="session-recovery-banner-detail">{connectionFeedback.approvalBanner.message}</div>
+          </div>
+          {connectionFeedback.approvalBanner.action === "copy-pairing-command" && (
+            <button
+              type="button"
+              className="ui-btn ui-btn-light session-recovery-banner-action"
+              onClick={handleCopyPairingCommand}
+            >
+              Copy Command
+            </button>
+          )}
+        </div>
+      )}
 
       {connectionFeedback.sessionBanner && (
         <div
@@ -1398,9 +1429,17 @@ export default function ChatView(props: ChatViewProps) {
                 tone: connectionFeedback.composerNotice.tone,
                 message: connectionFeedback.composerNotice.message,
                 actionLabel:
-                  connectionFeedback.composerNotice.action === "open-settings" ? "Open Settings" : undefined,
+                  connectionFeedback.composerNotice.action === "open-settings"
+                    ? "Open Settings"
+                    : connectionFeedback.composerNotice.action === "copy-pairing-command"
+                      ? "Copy Command"
+                      : undefined,
                 onAction:
-                  connectionFeedback.composerNotice.action === "open-settings" ? props.onOpenSettings : undefined,
+                  connectionFeedback.composerNotice.action === "open-settings"
+                    ? props.onOpenSettings
+                    : connectionFeedback.composerNotice.action === "copy-pairing-command"
+                      ? handleCopyPairingCommand
+                      : undefined,
               }
             : null
         }
