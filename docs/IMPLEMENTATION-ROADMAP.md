@@ -558,6 +558,11 @@ The user can understand that OpenClaw is doing work beyond the currently visible
 - the local `/status` card now surfaces OpenClaw's existing background-task and subagent summary lines when the gateway provides them
 - helper-level regression coverage now locks in the background-status extraction seam so later status-card cleanup does not lose those lines
 
+#### Second implementation cut follow-through
+- the main chat shell now shows a lightweight info banner when other sessions are still marked `working`
+- this reuses existing per-session activity state instead of introducing a separate task model too early
+- helper-level regression coverage now locks in the background-session summary seam so later shell cleanup does not hide active background work again
+
 ---
 
 ### Slice 5.3 — Node/device visibility
