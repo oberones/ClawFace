@@ -1,4 +1,5 @@
 import { THINKING_LEVEL_COMMAND_USAGE } from "./runtime-controls.ts";
+import { SUBAGENT_COMMAND_DESCRIPTION, SUBAGENT_USAGE_SUMMARY } from "./subagent-slash-commands.ts";
 
 export type SlashCommand = {
   name: string;
@@ -15,7 +16,11 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { name: "whoami", description: "Show your sender id" },
   { name: "id", description: "Alias of /whoami" },
   { name: "skill", description: "Run a skill by name", usage: "/skill <name> [input]" },
-  { name: "subagents", description: "List/stop/log subagent runs", usage: "/subagents list|stop|log|info|send ..." },
+  {
+    name: "subagents",
+    description: SUBAGENT_COMMAND_DESCRIPTION,
+    usage: SUBAGENT_USAGE_SUMMARY,
+  },
   { name: "allowlist", description: "Manage allowlist entries", usage: "/allowlist [list|add|remove] ..." },
   { name: "config", description: "Show or update config", usage: "/config show|get|set|unset ..." },
   { name: "tts", description: "Control text-to-speech", usage: "/tts on|off|status|provider|limit|summary|audio" },
