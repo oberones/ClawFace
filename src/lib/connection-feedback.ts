@@ -1,4 +1,5 @@
 import type { ConnectionStatus } from "./types.ts";
+import type { InterruptedRunSessionBanner } from "./connection-recovery.ts";
 
 export type ComposerRuntimeState = "offline" | "busy" | "ready";
 
@@ -12,7 +13,7 @@ export type SessionRecoveryBanner = {
   tone: "warning" | "info";
   title: string;
   message: string;
-  action: "open-settings" | null;
+  action: "open-settings" | "refresh-session" | null;
 };
 
 export type ConnectionFeedback = {
@@ -27,6 +28,7 @@ type ConnectionFeedbackParams = {
   hasActiveSession: boolean;
   disabledReason?: string | null;
   composerRuntimeState: ComposerRuntimeState;
+  interruptedRunBanner?: InterruptedRunSessionBanner | null;
 };
 
 export function deriveConnectionFeedback(params: ConnectionFeedbackParams): ConnectionFeedback {
@@ -89,6 +91,9 @@ export function deriveConnectionFeedback(params: ConnectionFeedbackParams): Conn
   let sessionBanner: SessionRecoveryBanner | null = null;
   if (params.hasActiveSession) {
     switch (params.connectionStatus) {
+      case "connected":
+        sessionBanner = params.interruptedRunBanner ?? null;
+        break;
       case "connecting":
         sessionBanner = {
           tone: "info",
