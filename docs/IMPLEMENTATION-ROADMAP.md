@@ -419,6 +419,12 @@ The app feels resilient instead of brittle.
 - add a short-lived “Session refreshed” signal once the selected session history reload completes after reconnect
 - keep the new recovery copy behind a small shared helper so reconnect messaging does not drift across the shell
 
+#### Interrupted-run follow-through
+- capture active runs that were in flight when the gateway disconnected
+- reconcile those runs after reconnect and selected-session refresh instead of assuming refresh success means run success
+- show a session-level interrupted-run warning with an explicit refresh action when the run did not automatically resume
+- keep the interrupted-run decision logic behind focused helpers with unit coverage
+
 ---
 
 ### Slice 4.3 — Settings decomposition and cleanup

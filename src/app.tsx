@@ -65,8 +65,13 @@ import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
 import {
   buildConnectionRecoveryNotice,
+  buildInterruptedRunSessionBanner,
+  buildInterruptedRunSnapshot,
+  hasInterruptedRunResolved,
   shouldAnnounceConnectionRecovery,
   type ConnectionRecoveryNotice,
+  type InterruptedRunSessionBanner,
+  type InterruptedRunSnapshot,
 } from "./lib/connection-recovery.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 
@@ -4073,6 +4078,8 @@ export default function App() {
     () => loadStored(STORAGE_KEYS.newSessionPreferredModel, ""),
   );
   const [connectionRecoveryNotice, setConnectionRecoveryNotice] = useState<ConnectionRecoveryNotice | null>(null);
+  const [interruptedRunsBySession, setInterruptedRunsBySession] = useState<Record<string, InterruptedRunSnapshot>>({});
+  const [visibleInterruptedRunsBySession, setVisibleInterruptedRunsBySession] = useState<Record<string, true>>({});
 
   const clientRef = useRef<GatewayClient | null>(null);
   const connectionStatusRef = useRef(connectionState.status);
@@ -4113,10 +4120,15 @@ export default function App() {
   const sessionPreviewsRef = useRef<Record<string, SessionPreviewItem[]>>(sessionPreviews);
   const sessionPreviewFetchSeqRef = useRef(0);
   const sessionPreviewKeysSignatureRef = useRef("");
+  const interruptedRunsBySessionRef = useRef<Record<string, InterruptedRunSnapshot>>(interruptedRunsBySession);
 
   useEffect(() => {
     connectionStatusRef.current = connectionState.status;
   }, [connectionState.status]);
+
+  useEffect(() => {
+    interruptedRunsBySessionRef.current = interruptedRunsBySession;
+  }, [interruptedRunsBySession]);
 
   useEffect(() => {
     if (loadingSessionKeyRef.current !== null && loadingSessionKeyRef.current !== selectedSessionKey) {
@@ -4206,6 +4218,104 @@ export default function App() {
       connectionRecoveryNoticeTimerRef.current = null;
     }, durationMs);
   }, []);
+
+  const resolveInterruptedRunSessionKey = useCallback((sessionKey: string | null | undefined): string | null => {
+    const normalizedKey = sessionKey?.trim();
+    if (!normalizedKey) {
+      return null;
+    }
+    for (const existingKey of Object.keys(interruptedRunsBySessionRef.current)) {
+      if (sessionKeysMatch(existingKey, normalizedKey)) {
+        return existingKey;
+      }
+    }
+    return null;
+  }, []);
+
+  const getInterruptedRunSnapshot = useCallback((sessionKey: string | null | undefined): InterruptedRunSnapshot | null => {
+    const resolvedKey = resolveInterruptedRunSessionKey(sessionKey);
+    return resolvedKey ? interruptedRunsBySessionRef.current[resolvedKey] ?? null : null;
+  }, [resolveInterruptedRunSessionKey]);
+
+  const setInterruptedRunSnapshot = useCallback((snapshot: InterruptedRunSnapshot | null) => {
+    if (!snapshot) {
+      return;
+    }
+    setInterruptedRunsBySession((prev) => ({
+      ...prev,
+      [snapshot.sessionKey]: snapshot,
+    }));
+  }, []);
+
+  const clearInterruptedRunSnapshot = useCallback((sessionKey?: string | null) => {
+    if (!sessionKey) {
+      setInterruptedRunsBySession({});
+      setVisibleInterruptedRunsBySession({});
+      return;
+    }
+    setInterruptedRunsBySession((prev) => {
+      const resolvedKey = Object.keys(prev).find((existingKey) => sessionKeysMatch(existingKey, sessionKey));
+      if (!resolvedKey) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[resolvedKey];
+      return next;
+    });
+    setVisibleInterruptedRunsBySession((prev) => {
+      const resolvedKey = Object.keys(prev).find((existingKey) => sessionKeysMatch(existingKey, sessionKey));
+      if (!resolvedKey) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[resolvedKey];
+      return next;
+    });
+  }, []);
+
+  const markInterruptedRunVisible = useCallback((sessionKey: string) => {
+    setVisibleInterruptedRunsBySession((prev) => {
+      const resolvedKey = Object.keys(interruptedRunsBySessionRef.current).find((existingKey) =>
+        sessionKeysMatch(existingKey, sessionKey)
+      );
+      const nextKey = resolvedKey ?? sessionKey;
+      if (prev[nextKey]) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [nextKey]: true,
+      };
+    });
+  }, []);
+
+  const reconcileInterruptedRunSnapshotForSession = useCallback((sessionKey: string, nextState: SessionViewState) => {
+    const snapshot = getInterruptedRunSnapshot(sessionKey);
+    if (!snapshot) {
+      return;
+    }
+    if (hasInterruptedRunResolved({
+      snapshot,
+      messages: nextState.messages,
+      toolItems: nextState.toolItems,
+    })) {
+      clearInterruptedRunSnapshot(sessionKey);
+      return;
+    }
+    markInterruptedRunVisible(sessionKey);
+  }, [clearInterruptedRunSnapshot, getInterruptedRunSnapshot, markInterruptedRunVisible]);
+
+  const clearInterruptedRunSnapshotForRun = useCallback((
+    sessionKey: string | null | undefined,
+    runId: string | null | undefined,
+  ) => {
+    const snapshot = getInterruptedRunSnapshot(sessionKey);
+    const normalizedRunId = runId?.trim();
+    if (!snapshot || !normalizedRunId || snapshot.runId !== normalizedRunId) {
+      return;
+    }
+    clearInterruptedRunSnapshot(sessionKey);
+  }, [clearInterruptedRunSnapshot, getInterruptedRunSnapshot]);
 
   const switchView = useCallback((target: "chat" | "files") => {
     if (target === activeViewRef.current) return;
@@ -4794,6 +4904,10 @@ export default function App() {
       return;
     }
     await loadHistory(client, activeSessionKey, getHistoryLimit(activeSessionKey));
+    const refreshedSessionState = sessionCacheRef.current.get(activeSessionKey);
+    if (refreshedSessionState) {
+      reconcileInterruptedRunSnapshotForSession(activeSessionKey, refreshedSessionState);
+    }
     refreshSessionsWithFollowUp(client);
     if (
       options?.recoverySessionKey &&
@@ -5657,6 +5771,14 @@ export default function App() {
       onClose: (info) => {
         gatewayMethodsRef.current.clear();
         const activeSessionKey = selectedSessionRef.current;
+        const interruptedRunSnapshot = buildInterruptedRunSnapshot({
+          sessionKey: activeSessionKey,
+          runId: chatRunRef.current,
+          streamText: pendingStreamTextRef.current ?? streamTextRef.current,
+          thinking: thinkingRef.current,
+          toolItems: toolItemsRef.current,
+        });
+        setInterruptedRunSnapshot(interruptedRunSnapshot);
         clearConnectionRecoveryNotice();
         clearActiveStreamingState();
         if (activeSessionKey) {
@@ -6460,6 +6582,7 @@ export default function App() {
     payload: unknown,
   ) => {
     clearAgentFinalizeTimer(parsed.runId);
+    clearInterruptedRunSnapshotForRun(selectedSessionRef.current, parsed.runId);
     const pendingAssistantReply = getAssistantReplyForRun(parsed.runId);
     const activeRun = chatRunRef.current;
     if (activeRun && parsed.runId && parsed.runId !== activeRun) {
@@ -6546,6 +6669,7 @@ export default function App() {
 
   const handleActiveTerminalChatEvent = (parsed: NormalizedChatEvent) => {
     clearAgentFinalizeTimer(parsed.runId);
+    clearInterruptedRunSnapshotForRun(selectedSessionRef.current, parsed.runId);
     clearActiveRunTransientState(parsed.runId, { clearScheduledHydration: true });
     if (parsed.state === "error") {
       attachLifecycleErrorToActiveTools({
@@ -6650,6 +6774,9 @@ export default function App() {
     if (updates.length === 0) {
       return;
     }
+    for (const update of updates) {
+      clearInterruptedRunSnapshotForRun(selectedSessionRef.current, update.runId);
+    }
     const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(updates);
     setToolItems((prev) => mergeToolItems(prev, updates));
     if (toolAttachmentMessagesFromUpdates.length > 0) {
@@ -6662,6 +6789,7 @@ export default function App() {
     payload: Record<string, unknown>,
     runId: string | null,
   ) => {
+    clearInterruptedRunSnapshotForRun(selectedSessionRef.current, runId);
     const assistantReply = coerceAssistantReplyMessage(isRecord(payload.data) ? payload.data : payload);
     commitAssistantReplyAttachmentProjection(
       buildAssistantReplyAttachmentProjection(assistantReply, runId),
@@ -6691,6 +6819,7 @@ export default function App() {
     activeSessionKey: string | null,
     runId: string | null,
   ) => {
+    clearInterruptedRunSnapshotForRun(activeSessionKey, runId);
     if (!isRecord(payload.data)) {
       return;
     }
@@ -6749,6 +6878,7 @@ export default function App() {
   };
 
   const handleActiveDeltaChatEvent = (parsed: NormalizedChatEvent) => {
+    clearInterruptedRunSnapshotForRun(selectedSessionRef.current, parsed.runId);
     if (chatRunRef.current && parsed.runId && parsed.runId !== chatRunRef.current) {
       if (!thinkingRef.current) {
         return;
@@ -7250,6 +7380,7 @@ export default function App() {
       await ensureVerboseToolEvents(client, selectedSessionKey);
     }
 
+    clearInterruptedRunSnapshot(selectedSessionKey);
     const runId = generateUUID();
     const maxFrameBytes = Math.max(32 * 1024, maxPayloadBytes - WS_PAYLOAD_SAFETY_BYTES);
     const draftBeforeSend = draft;
@@ -7447,6 +7578,7 @@ export default function App() {
         case "compact": {
           const normalizedArgs = args.trim();
           const commandText = normalizedArgs ? `/compact ${normalizedArgs}` : "/compact";
+          clearInterruptedRunSnapshot(selectedSessionKey);
           const runId = generateUUID();
           chatRunRef.current = runId;
           setChatRunId(runId);
@@ -7632,6 +7764,14 @@ export default function App() {
     await loadHistory(client, key, nextLimit);
   }
 
+  async function handleRefreshCurrentSession() {
+    const client = clientRef.current;
+    if (!client || !selectedSessionRef.current) {
+      return;
+    }
+    await reloadActiveSessionHistory(client);
+  }
+
   async function handleDeleteSession(
     key: string,
     options?: { skipConfirm?: boolean },
@@ -7799,6 +7939,22 @@ export default function App() {
     ? "Pairing required. Approve this device with openclaw devices approve."
     : [protocolWarning, connectionState.note].filter(Boolean).join(" ");
 
+  const activeInterruptedRunBanner = useMemo<InterruptedRunSessionBanner | null>(() => {
+    if (connectionState.status !== "connected" || !selectedSessionKey) {
+      return null;
+    }
+    const isVisible = Object.keys(visibleInterruptedRunsBySession).some((key) =>
+      sessionKeysMatch(key, selectedSessionKey)
+    );
+    if (!isVisible) {
+      return null;
+    }
+    const snapshot = Object.entries(interruptedRunsBySession).find(([key]) =>
+      sessionKeysMatch(key, selectedSessionKey)
+    )?.[1] ?? null;
+    return snapshot ? buildInterruptedRunSessionBanner(snapshot) : null;
+  }, [connectionState.status, interruptedRunsBySession, selectedSessionKey, visibleInterruptedRunsBySession]);
+
   return (
     <FileManagerProvider>
     <div className="app-shell">
@@ -7869,6 +8025,7 @@ export default function App() {
             connected={connected}
             connectionStatus={connectionState.status}
             connectionRecoveryNotice={connectionRecoveryNotice}
+            interruptedRunBanner={activeInterruptedRunBanner}
             disabledReason={disabledReason}
             sessionInfo={sessionInfo}
             models={models}
@@ -7878,6 +8035,7 @@ export default function App() {
             isCurrentSessionLoading={isCurrentSessionLoading}
             sessionTransitionState={transitionState}
             onLoadOlder={() => void handleLoadOlderHistory()}
+            onRefreshSession={() => void handleRefreshCurrentSession()}
             onModelSelect={(model) => void handleSelectModel(model)}
             onThinkingSelect={(level) => void handleSelectThinking(level)}
             onCreateSession={() => setShowNewSession(true)}
