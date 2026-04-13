@@ -5,7 +5,7 @@ import SessionSidebar from "./components/SessionSidebar.tsx";
 import SettingsModal from "./components/SettingsModal.tsx";
 import NewSessionModal from "./components/NewSessionModal.tsx";
 import { GatewayClient } from "./lib/gateway.ts";
-import { extractImages, extractText, isToolMessage } from "./lib/message-extract.ts";
+import { extractImages, extractMessageRunId, extractText, isToolMessage } from "./lib/message-extract.ts";
 import {
   type AgentsListResult,
   type Attachment,
@@ -3817,6 +3817,7 @@ function toChatMessage(raw: unknown, fallbackTimestamp?: number): ChatMessage | 
   }
   const roleRaw = (raw as Record<string, unknown>)?.role;
   const timestampRaw = (raw as Record<string, unknown>)?.timestamp;
+  const runIdRaw = extractMessageRunId(raw) ?? undefined;
   const role = toolMessage
     ? "assistant"
     : roleRaw === "user"
@@ -3833,6 +3834,7 @@ function toChatMessage(raw: unknown, fallbackTimestamp?: number): ChatMessage | 
         ? timestampRaw
         : fallbackTimestamp ?? Date.now(),
     attachments: attachments.length > 0 ? attachments : undefined,
+    runId: runIdRaw,
     raw,
   };
 }
