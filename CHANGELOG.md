@@ -8,6 +8,23 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.7.0 (2026-04-13)
+
+### Feat
+
+- surface background session approvals
+- add in-app approval request handling
+- add the first approval-needed shell surface
+
+### Fix
+
+- tighten approval action defaults and copy
+- handle clipboard copy failures in chat view
+
+### Perf
+
+- streamline sidebar approval counts
+
 ## v0.6.0 (2026-04-12)
 
 ### Feat
