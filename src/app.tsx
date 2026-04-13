@@ -8062,13 +8062,25 @@ export default function App() {
 
   const pendingApprovalCountsBySession = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
-    for (const session of sessions) {
-      const count = Object.entries(pendingApprovalsBySession).reduce((total, [approvalSessionKey, approvals]) => {
-        return sessionKeysMatch(approvalSessionKey, session.key) ? total + approvals.length : total;
-      }, 0);
-      if (count > 0) {
-        counts[session.key] = count;
+    const exactSessionKeys = new Set(sessions.map((session) => session.key));
+    const matchedSessionKeyByApprovalSessionKey = new Map<string, string | null>();
+
+    for (const [approvalSessionKey, approvals] of Object.entries(pendingApprovalsBySession)) {
+      let matchedSessionKey: string | null;
+      if (exactSessionKeys.has(approvalSessionKey)) {
+        matchedSessionKey = approvalSessionKey;
+      } else if (matchedSessionKeyByApprovalSessionKey.has(approvalSessionKey)) {
+        matchedSessionKey = matchedSessionKeyByApprovalSessionKey.get(approvalSessionKey) ?? null;
+      } else {
+        matchedSessionKey =
+          sessions.find((session) => sessionKeysMatch(approvalSessionKey, session.key))?.key ?? null;
+        matchedSessionKeyByApprovalSessionKey.set(approvalSessionKey, matchedSessionKey);
       }
+
+      if (!matchedSessionKey) {
+        continue;
+      }
+      counts[matchedSessionKey] = (counts[matchedSessionKey] ?? 0) + approvals.length;
     }
     return counts;
   }, [pendingApprovalsBySession, sessions]);
