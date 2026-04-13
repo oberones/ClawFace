@@ -81,8 +81,8 @@ test("deriveConnectionFeedback offers settings recovery for disconnected and err
   assert.equal(errored.sessionBanner?.title, "Session paused");
 });
 
-test("deriveConnectionFeedback keeps pairing and connecting guidance non-actionable", () => {
-  const { deriveConnectionFeedback } = loadConnectionFeedbackModule();
+test("deriveConnectionFeedback keeps connecting guidance quiet and pairing guidance actionable", () => {
+  const { deriveConnectionFeedback, PAIRING_APPROVAL_COMMAND } = loadConnectionFeedbackModule();
 
   const connecting = deriveConnectionFeedback({
     connectionStatus: "connecting",
@@ -106,10 +106,12 @@ test("deriveConnectionFeedback keeps pairing and connecting guidance non-actiona
   });
   assert.equal(pairing.statusDotClass, "warning");
   assert.equal(pairing.composerNotice?.tone, "warning");
-  assert.equal(pairing.composerNotice?.action, null);
+  assert.equal(pairing.composerNotice?.action, "copy-pairing-command");
   assert.match(pairing.composerNotice?.message ?? "", /approve this device/i);
-  assert.equal(pairing.sessionBanner?.action, null);
-  assert.match(pairing.sessionBanner?.title ?? "", /Pairing required/i);
+  assert.equal(pairing.approvalBanner?.action, "copy-pairing-command");
+  assert.match(pairing.approvalBanner?.title ?? "", /Pairing approval required/i);
+  assert.match(pairing.approvalBanner?.message ?? "", new RegExp(PAIRING_APPROVAL_COMMAND));
+  assert.equal(pairing.sessionBanner, null);
 });
 
 test("deriveConnectionFeedback only shows the continuity banner when there is an active session", () => {
@@ -124,4 +126,15 @@ test("deriveConnectionFeedback only shows the continuity banner when there is an
 
   assert.equal(disconnectedWithoutSession.composerNotice?.action, "open-settings");
   assert.equal(disconnectedWithoutSession.sessionBanner, null);
+
+  const pairingWithoutSession = deriveConnectionFeedback({
+    connectionStatus: "pairing-required",
+    hasActiveSession: false,
+    disabledReason: null,
+    composerRuntimeState: "offline",
+  });
+
+  assert.equal(pairingWithoutSession.sessionBanner, null);
+  assert.equal(pairingWithoutSession.approvalBanner?.action, "copy-pairing-command");
+  assert.match(pairingWithoutSession.approvalBanner?.message ?? "", /openclaw devices approve/i);
 });

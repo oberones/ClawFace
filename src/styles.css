@@ -1023,6 +1023,10 @@ body::before {
   background: color-mix(in srgb, #fff7ed 88%, white);
 }
 
+.approval-needed-banner {
+  box-shadow: 0 10px 28px rgba(180, 83, 9, 0.08);
+}
+
 .session-recovery-banner-copy {
   display: flex;
   flex-direction: column;

@@ -63,6 +63,7 @@ import {
 } from "./lib/final-assistant-message.ts";
 import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
+import { PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
 import {
   buildConnectionRecoveryNotice,
   buildInterruptedRunSessionBanner,
@@ -7938,7 +7939,7 @@ export default function App() {
       : null;
 
   const disabledReason = connectionState.status === "pairing-required"
-    ? "Pairing required. Approve this device with openclaw devices approve."
+    ? `Pairing required. Approve this device with ${PAIRING_APPROVAL_COMMAND}.`
     : [protocolWarning, connectionState.note].filter(Boolean).join(" ");
 
   const activeInterruptedRunBanner = useMemo<InterruptedRunSessionBanner | null>(() => {
