@@ -35,6 +35,22 @@ test("deriveConnectionFeedback keeps connected status quiet and busy status info
   assert.equal(busy.composerNotice?.action, null);
   assert.match(busy.composerNotice?.message ?? "", /already in progress/i);
   assert.equal(busy.sessionBanner, null);
+
+  const interrupted = deriveConnectionFeedback({
+    connectionStatus: "connected",
+    hasActiveSession: true,
+    disabledReason: null,
+    composerRuntimeState: "ready",
+    interruptedRunBanner: {
+      tone: "warning",
+      title: "Previous run interrupted",
+      message: "Refresh again if you expect delayed output, or resend the prompt.",
+      action: "refresh-session",
+    },
+  });
+  assert.equal(interrupted.composerNotice, null);
+  assert.equal(interrupted.sessionBanner?.action, "refresh-session");
+  assert.equal(interrupted.sessionBanner?.title, "Previous run interrupted");
 });
 
 test("deriveConnectionFeedback offers settings recovery for disconnected and error states", () => {

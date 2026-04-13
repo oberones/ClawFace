@@ -25,7 +25,7 @@ import {
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { deriveConnectionFeedback } from "../lib/connection-feedback.ts";
-import type { ConnectionRecoveryNotice } from "../lib/connection-recovery.ts";
+import type { ConnectionRecoveryNotice, InterruptedRunSessionBanner } from "../lib/connection-recovery.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
@@ -46,6 +46,7 @@ type ChatViewProps = {
   connected: boolean;
   connectionStatus?: ConnectionStatus;
   connectionRecoveryNotice?: ConnectionRecoveryNotice | null;
+  interruptedRunBanner?: InterruptedRunSessionBanner | null;
   disabledReason?: string | null;
   sessionInfo: SessionInfo;
   models: ModelListItem[];
@@ -55,6 +56,7 @@ type ChatViewProps = {
   isCurrentSessionLoading?: boolean;
   sessionTransitionState?: SessionTransitionState;
   onLoadOlder: () => void;
+  onRefreshSession: () => void;
   onModelSelect: (model: string) => void;
   onThinkingSelect: (level: string) => void;
   onCreateSession: () => void;
@@ -1061,8 +1063,9 @@ export default function ChatView(props: ChatViewProps) {
         hasActiveSession: Boolean(props.sessionKey),
         disabledReason: props.disabledReason,
         composerRuntimeState,
+        interruptedRunBanner: props.interruptedRunBanner,
       }),
-    [connectionStatus, props.disabledReason, composerRuntimeState, props.sessionKey],
+    [connectionStatus, props.disabledReason, composerRuntimeState, props.interruptedRunBanner, props.sessionKey],
   );
 
   const currentSessionRuntime = useMemo<{
@@ -1212,6 +1215,15 @@ export default function ChatView(props: ChatViewProps) {
               onClick={props.onOpenSettings}
             >
               Open Settings
+            </button>
+          )}
+          {connectionFeedback.sessionBanner.action === "refresh-session" && (
+            <button
+              type="button"
+              className="ui-btn ui-btn-light session-recovery-banner-action"
+              onClick={props.onRefreshSession}
+            >
+              Refresh Now
             </button>
           )}
         </div>

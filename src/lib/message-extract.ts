@@ -84,6 +84,16 @@ export function extractText(message: unknown): string | null {
   return null;
 }
 
+export function extractMessageRunId(message: unknown): string | null {
+  if (!isRecord(message)) {
+    return null;
+  }
+  return (
+    pickString(message, ["runId", "run_id"]) ??
+    (isRecord(message.data) ? pickString(message.data, ["runId", "run_id"]) : null)
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
