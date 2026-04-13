@@ -4100,3 +4100,134 @@ Pause the current `4.3` cleanup track here unless real usage shows further setti
 If we continue later, the next work should probably be:
 - smaller cleanup inside the remaining state-owning modal container, or
 - broader settings information architecture decisions rather than more extraction for extraction’s sake
+
+## Ticket 5.1.1 — Audit approval event flow and define the first blocked-action surface
+### Goal
+Start Slice `5.1` by mapping the real approval-related seams in ClawFace and using that audit to choose the smallest honest approval UI cut.
+
+### Why
+Approval UX is part of the product direction, but the repo is not ready for a full approvals center yet.
+
+Right now the codebase gives mixed signals:
+- the gateway client requests approval-related scopes
+- connection-state copy already references pairing approval
+- slash-command help advertises `/approve`
+- but there is no normalized approval event model or first-class approval surface in the app
+
+That means the right first move is not to guess at UI chrome. It is to audit what the frontend actually knows today and make the first implementation cut match that reality.
+
+### Scope
+- inspect gateway connect scopes and advertised method/event inventory relevant to approvals
+- inspect existing connection/recovery UI for approval-adjacent blocked states
+- inspect slash-command affordances for approval actions
+- identify the smallest truthful approval-needed surface that fits Milestone 1
+- document the first implementation cut instead of jumping to a full approvals center
+
+### Deliverable
+An approval-surface audit captured in the ticket notes, with a concrete follow-up ticket for the first blocked-action/approval-needed UI cut.
+
+### Done when
+- the current approval-related seams are documented
+- misleading or incomplete current affordances are called out explicitly
+- the first implementation cut for `5.1` is identified and scoped
+- future agents can start approval UX work from the ticket notes instead of rediscovering the same gaps
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- audited the current approval-related seams across `src/lib/gateway.ts`, `src/app.tsx`, `src/lib/connection-feedback.ts`, and `src/lib/slash-commands.ts`
+- confirmed the app already requests `operator.approvals` and `operator.pairing` scopes and records advertised gateway methods from hello
+- confirmed pairing-required is currently the only approval-adjacent state surfaced in product UI, mostly through connection/disabled copy
+- confirmed `/approve` is advertised in slash-command help but is not implemented in `handleSlashCommand`
+- confirmed there is no normalized approval event/state model yet in app types or state ownership
+
+#### Audit findings
+- current approval UX is strongest for device-pairing failure states and weakest for generic approval-needed operations
+- the app has the beginnings of an approval capability story, but not yet a first-class approval surface
+- a full approvals center would overshoot Milestone 1, but a narrow blocked-action shell surface fits the roadmap well
+- the existing `/approve` affordance should not remain in limbo for long, because it implies local approval handling that does not yet exist
+
+#### Why this is the right first 5.1 slice
+It establishes what the app can truthfully communicate today before adding UI that pretends richer approval workflows already exist.
+
+It also gives the next implementation cut a much smaller target than “build approvals UX”:
+- normalize one approval-needed state
+- surface it clearly
+- make one action path obvious
+
+#### Validation status
+- docs-only audit slice; no code validation rerun
+
+#### Recommended next step
+Take a narrow first implementation cut:
+- `Ticket 5.1.2 — Introduce the first approval-needed shell surface`
+
+That ticket should likely:
+- decide whether to remove or wire `/approve`
+- normalize the first approval-needed state behind a small shared seam
+- show one actionable shell/thread-level approval notice for pairing or blocked approval states before attempting broader approval workflows
+
+## Ticket 5.1.2 — Introduce the first approval-needed shell surface
+### Goal
+Land the first real approval-needed UI in ClawFace without pretending the app already has a full approvals workflow.
+
+### Why
+After the `5.1.1` audit, the right first implementation cut was clear:
+- pairing-required is the one approval-adjacent state the app can already identify honestly
+- `/approve` was being advertised before it existed
+- the app needed one visible blocked-action surface before any broader approval work
+
+This ticket is about making that first approval state explicit and actionable in a narrow, Milestone-1-appropriate way.
+
+### Scope
+- stop advertising `/approve` until it is real
+- separate approval-needed shell messaging from reconnect/session continuity banners
+- show a shell-level approval-needed banner for pairing-required states, even when no session is selected
+- keep the first action honest by copying the external approval command instead of implying local approval handling
+- add focused helper coverage for the new approval-needed mapping
+
+### Deliverable
+The first approval-needed shell surface for pairing-required states, plus removal of the misleading nonfunctional `/approve` affordance.
+
+### Done when
+- `/approve` is no longer advertised as available unless it is implemented
+- pairing-required is visible as a shell-level approval-needed state, not just disabled composer copy
+- the approval-needed surface stays visible without depending on an active session
+- helper-level coverage locks in the approval banner and action mapping
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-12)
+
+This ticket is now complete.
+
+#### What changed
+- removed the nonfunctional `/approve` entry from `src/lib/slash-commands.ts`
+- extended `src/lib/connection-feedback.ts` with a dedicated approval-needed banner model and a shared `openclaw devices approve` command constant
+- updated `ChatView` to render a shell-level approval banner for pairing-required states and expose a `Copy Command` action
+- kept pairing-required visible in the composer notice as well, but separated that from session continuity banners so reconnect/recovery copy does not get overloaded
+- added helper coverage in `tests/connection-feedback.test.mjs` for the new approval-needed mapping and the “no active session” case
+
+#### User-facing improvements landed
+- pairing-required is now clearly visible as an approval-needed state even before a session is selected
+- the app no longer advertises a local `/approve` command that it cannot actually handle
+- the first approval action is explicit and honest: copy the external `openclaw devices approve` command
+
+#### Why this is the right first 5.1 implementation cut
+It gives the app one real approval-needed surface without overshooting into a fake approvals center or pretending OpenClaw approval actions are already fully wired through the frontend.
+
+It also keeps the messaging model cleaner:
+- approval-needed shell state
+- session continuity/reconnect state
+- composer blocked-state guidance
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If approval work continues, the next likely cut should be a contract/normalization slice rather than more banner chrome:
+- identify whether OpenClaw exposes approval-request events or approval-related methods that can be normalized into app state
+- only then decide whether ClawFace should add richer in-app approval actions beyond pairing guidance
