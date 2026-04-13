@@ -525,6 +525,12 @@ The user can clearly see and act on approval-requiring operations.
 - the first actionable approval path is intentionally narrow and honest: copy the external `openclaw devices approve` command rather than implying in-app approval handling that does not yet exist
 - helper-level regression coverage now locks in pairing-required approval banner behavior and the split between approval-needed vs session-continuity banners
 
+#### Second implementation cut follow-through
+- approval request and resolution events are now normalized behind `src/lib/approval-events.ts`
+- pending approvals are tracked by session in app state and surfaced in the selected session shell
+- the first in-app approval actions now submit through the advertised `exec.approval.resolve` / `plugin.approval.resolve` gateway methods
+- helper-level regression coverage now locks in approval event parsing, state upsert/removal, and resolve-method selection
+
 ---
 
 ### Slice 5.2 — Background tasks and subagents
