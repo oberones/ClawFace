@@ -2,11 +2,12 @@ import type { ConnectionStatus } from "./types.ts";
 import type { InterruptedRunSessionBanner } from "./connection-recovery.ts";
 
 export type ComposerRuntimeState = "offline" | "busy" | "ready";
+export const PAIRING_APPROVAL_COMMAND = "openclaw devices approve";
 
 export type ComposerConnectionNotice = {
   tone: "warning" | "info";
   message: string;
-  action: "open-settings" | null;
+  action: "open-settings" | "copy-pairing-command" | null;
 };
 
 export type SessionRecoveryBanner = {
@@ -16,10 +17,18 @@ export type SessionRecoveryBanner = {
   action: "open-settings" | "refresh-session" | null;
 };
 
+export type ApprovalShellBanner = {
+  tone: "warning";
+  title: string;
+  message: string;
+  action: "copy-pairing-command" | null;
+};
+
 export type ConnectionFeedback = {
   statusLabel: string;
   statusDotClass: "connected" | "connecting" | "warning" | "disconnected";
   composerNotice: ComposerConnectionNotice | null;
+  approvalBanner: ApprovalShellBanner | null;
   sessionBanner: SessionRecoveryBanner | null;
 };
 
@@ -32,6 +41,9 @@ type ConnectionFeedbackParams = {
 };
 
 export function deriveConnectionFeedback(params: ConnectionFeedbackParams): ConnectionFeedback {
+  const pairingMessage =
+    params.disabledReason || `Pairing required. Approve this device with ${PAIRING_APPROVAL_COMMAND}.`;
+
   const statusLabel =
     params.connectionStatus === "connected"
       ? "Gateway connected"
@@ -64,8 +76,8 @@ export function deriveConnectionFeedback(params: ConnectionFeedbackParams): Conn
       : params.connectionStatus === "pairing-required"
         ? {
             tone: "warning" as const,
-            message: params.disabledReason || "Pairing required before sending messages.",
-            action: null,
+            message: pairingMessage,
+            action: "copy-pairing-command" as const,
           }
         : params.connectionStatus === "error"
           ? {
@@ -88,6 +100,16 @@ export function deriveConnectionFeedback(params: ConnectionFeedbackParams): Conn
                 }
               : null;
 
+  const approvalBanner =
+    params.connectionStatus === "pairing-required"
+      ? {
+          tone: "warning" as const,
+          title: "Pairing approval required",
+          message: pairingMessage,
+          action: "copy-pairing-command" as const,
+        }
+      : null;
+
   let sessionBanner: SessionRecoveryBanner | null = null;
   if (params.hasActiveSession) {
     switch (params.connectionStatus) {
@@ -104,12 +126,7 @@ export function deriveConnectionFeedback(params: ConnectionFeedbackParams): Conn
         };
         break;
       case "pairing-required":
-        sessionBanner = {
-          tone: "warning",
-          title: "Pairing required",
-          message: params.disabledReason || "This session is paused until this device is approved by the gateway.",
-          action: null,
-        };
+        sessionBanner = null;
         break;
       case "error":
         sessionBanner = {
@@ -141,6 +158,7 @@ export function deriveConnectionFeedback(params: ConnectionFeedbackParams): Conn
     statusLabel,
     statusDotClass,
     composerNotice,
+    approvalBanner,
     sessionBanner,
   };
 }

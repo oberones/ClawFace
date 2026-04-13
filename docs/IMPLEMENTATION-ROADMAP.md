@@ -501,6 +501,30 @@ The user can clearly see and act on approval-requiring operations.
 - actionable approval UI
 - contextual visibility of blocked actions
 
+#### First cut
+- audit the current approval-related seams before designing UI:
+  - pairing-required connection state
+  - advertised gateway methods/events/capabilities related to approvals
+  - existing slash-command affordances
+  - blocked-action copy already shown in connection/recovery surfaces
+
+#### Audit findings
+- the app already requests `operator.approvals` and `operator.pairing` scopes and records advertised gateway methods on hello
+- pairing-required is the only approval-adjacent state currently surfaced as product UI; generic approval requests are not yet modeled as app state
+- `/approve` is currently advertised in slash-command help but not implemented in the local slash-command handler
+- the first approval UI cut should stay narrow and visible rather than jumping to a full approvals center
+
+#### First implementation cut
+- either remove or wire the nonfunctional `/approve` affordance
+- normalize one approval-needed state behind a small shared app-facing seam
+- introduce one shell- or thread-level approval-needed surface for pairing or blocked actions before building richer approval workflows
+
+#### First implementation cut follow-through
+- `/approve` is no longer advertised in slash-command help until a real local approval action path exists
+- pairing-required now maps to a dedicated approval-needed shell surface instead of relying only on disabled composer copy
+- the first actionable approval path is intentionally narrow and honest: copy the external `openclaw devices approve` command rather than implying in-app approval handling that does not yet exist
+- helper-level regression coverage now locks in pairing-required approval banner behavior and the split between approval-needed vs session-continuity banners
+
 ---
 
 ### Slice 5.2 — Background tasks and subagents

@@ -15,7 +15,6 @@ export const BASE_COMMANDS: SlashCommand[] = [
   { name: "id", description: "Alias of /whoami" },
   { name: "skill", description: "Run a skill by name", usage: "/skill <name> [input]" },
   { name: "subagents", description: "List/stop/log subagent runs", usage: "/subagents list|stop|log|info|send ..." },
-  { name: "approve", description: "Approve or deny exec requests", usage: "/approve <id> allow|deny" },
   { name: "allowlist", description: "Manage allowlist entries", usage: "/allowlist [list|add|remove] ..." },
   { name: "config", description: "Show or update config", usage: "/config show|get|set|unset ..." },
   { name: "tts", description: "Control text-to-speech", usage: "/tts on|off|status|provider|limit|summary|audio" },
