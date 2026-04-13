@@ -5,6 +5,10 @@ const DEFAULT_PLUGIN_APPROVAL_DECISIONS: ApprovalDecision[] = [
   "allow-always",
   "deny",
 ];
+const DEFAULT_EXEC_APPROVAL_DECISIONS: ApprovalDecision[] = [
+  "allow-once",
+  "deny",
+];
 
 type ApprovalResolution = {
   id: string;
@@ -104,6 +108,10 @@ export function extractPendingApprovalFromGatewayEvent(
             .filter((value): value is ApprovalDecision => value !== null),
         )
       : DEFAULT_PLUGIN_APPROVAL_DECISIONS;
+  const fallbackDecisions =
+    kind === "exec"
+      ? DEFAULT_EXEC_APPROVAL_DECISIONS
+      : DEFAULT_PLUGIN_APPROVAL_DECISIONS;
 
   return {
     id,
@@ -116,7 +124,7 @@ export function extractPendingApprovalFromGatewayEvent(
     host: kind === "exec" ? pickString(request, ["host"]) : null,
     agentId: pickString(request, ["agentId", "agent_id"]),
     toolCallId: pickString(request, ["toolCallId", "tool_call_id"]),
-    allowedDecisions: allowedDecisions.length > 0 ? allowedDecisions : DEFAULT_PLUGIN_APPROVAL_DECISIONS,
+    allowedDecisions: allowedDecisions.length > 0 ? allowedDecisions : fallbackDecisions,
     createdAtMs:
       typeof payload.createdAtMs === "number" && Number.isFinite(payload.createdAtMs)
         ? payload.createdAtMs

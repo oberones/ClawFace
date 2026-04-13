@@ -69,6 +69,7 @@ import { PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
 import {
   extractApprovalResolutionFromGatewayEvent,
   extractPendingApprovalFromGatewayEvent,
+  formatApprovalDecisionLabel,
   pickApprovalResolveMethod,
   removeResolvedApprovalBySession,
   upsertPendingApprovalBySession,
@@ -4135,7 +4136,6 @@ export default function App() {
   const sessionPreviewFetchSeqRef = useRef(0);
   const sessionPreviewKeysSignatureRef = useRef("");
   const interruptedRunsBySessionRef = useRef<Record<string, InterruptedRunSnapshot>>(interruptedRunsBySession);
-  const pendingApprovalsBySessionRef = useRef<Record<string, PendingApproval[]>>(pendingApprovalsBySession);
 
   useEffect(() => {
     connectionStatusRef.current = connectionState.status;
@@ -4144,10 +4144,6 @@ export default function App() {
   useEffect(() => {
     interruptedRunsBySessionRef.current = interruptedRunsBySession;
   }, [interruptedRunsBySession]);
-
-  useEffect(() => {
-    pendingApprovalsBySessionRef.current = pendingApprovalsBySession;
-  }, [pendingApprovalsBySession]);
 
   useEffect(() => {
     if (loadingSessionKeyRef.current !== null && loadingSessionKeyRef.current !== selectedSessionKey) {
@@ -7077,7 +7073,7 @@ export default function App() {
           decision,
         }),
       );
-      pushSystemMessage(`Approval ${decision} submitted.`);
+      pushSystemMessage(`Approval submitted: ${formatApprovalDecisionLabel(decision)}.`);
     } catch (err) {
       pushSystemMessage(`Approval failed: ${String(err)}`);
     } finally {
