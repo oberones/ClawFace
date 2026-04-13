@@ -17,6 +17,7 @@ import {
   type GatewaySessionRow,
   type ModelsListResult,
   type PendingApproval,
+  type SessionActivityState,
   type SessionPreviewItem,
   type SessionState,
   type SessionsListResult,
@@ -4079,9 +4080,7 @@ export default function App() {
   });
   const [maxPayloadBytes, setMaxPayloadBytes] = useState(DEFAULT_MAX_WS_PAYLOAD_BYTES);
   const [thinkingLevel, setThinkingLevel] = useState<string | null>(null);
-  const [sessionActivity, setSessionActivity] = useState<
-    Record<string, { working: boolean; unread: boolean }>
-  >({});
+  const [sessionActivity, setSessionActivity] = useState<Record<string, SessionActivityState>>({});
   const [sessionListLimit, setSessionListLimit] = useState(SESSION_LIST_INITIAL_LIMIT);
   const [canLoadMoreSessions, setCanLoadMoreSessions] = useState(false);
   const [canLoadMoreHistory, setCanLoadMoreHistory] = useState(false);
@@ -4444,7 +4443,7 @@ export default function App() {
 
   function updateSessionActivity(
     key: string,
-    update: Partial<{ working: boolean; unread: boolean }>,
+    update: Partial<SessionActivityState>,
   ) {
     if (!key) {
       return;
@@ -8061,6 +8060,19 @@ export default function App() {
     return approvals[0] ?? null;
   }, [pendingApprovalsBySession, selectedSessionKey]);
 
+  const pendingApprovalCountsBySession = useMemo<Record<string, number>>(() => {
+    const counts: Record<string, number> = {};
+    for (const session of sessions) {
+      const count = Object.entries(pendingApprovalsBySession).reduce((total, [approvalSessionKey, approvals]) => {
+        return sessionKeysMatch(approvalSessionKey, session.key) ? total + approvals.length : total;
+      }, 0);
+      if (count > 0) {
+        counts[session.key] = count;
+      }
+    }
+    return counts;
+  }, [pendingApprovalsBySession, sessions]);
+
   return (
     <FileManagerProvider>
     <div className="app-shell">
@@ -8073,6 +8085,7 @@ export default function App() {
               sessions={sessions}
               selectedKey={selectedSessionKey}
               sessionActivity={sessionActivity}
+              pendingApprovalCounts={pendingApprovalCountsBySession}
               collapsed={sidebarCollapsed}
               sidebarWidth={uiSettings.sidebarWidth}
               deletingKeys={deletingSessionKeys}
