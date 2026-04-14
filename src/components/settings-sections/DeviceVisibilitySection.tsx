@@ -1,6 +1,10 @@
 import React from "react";
 import type { ConnectionStatus } from "../../lib/types.ts";
 import type { DevicePairingVisibility } from "../../lib/device-pairing-visibility.ts";
+import {
+  summarizeDeviceCapabilities,
+  type DeviceCapabilitySummary,
+} from "../../lib/device-capability-summary.ts";
 
 type DeviceVisibilitySectionProps = {
   connectionStatus: ConnectionStatus;
@@ -83,6 +87,28 @@ function buildCurrentDeviceHint(props: DeviceVisibilitySectionProps): string {
   return "This device does not appear in the current gateway pairing index yet.";
 }
 
+function CapabilitySummaryDetails(props: { summary: DeviceCapabilitySummary }) {
+  return (
+    <>
+      <strong className="device-visibility-capability-headline">{props.summary.headline}</strong>
+      <div className="device-visibility-capability-list">
+        {props.summary.chips.map((chip) => (
+          <span
+            key={chip.key}
+            className={`device-visibility-status-chip ${chip.tone}`}
+            title={chip.label}
+          >
+            {chip.label}
+          </span>
+        ))}
+      </div>
+      {props.summary.detail ? (
+        <span className="field-hint">Extra scopes: {props.summary.detail}</span>
+      ) : null}
+    </>
+  );
+}
+
 export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
   const snapshot = props.devicePairingVisibility;
   const currentStatus = snapshot?.currentDeviceStatus ?? "unavailable";
@@ -91,6 +117,13 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
   const lastUpdatedLabel = formatLastUpdated(props.devicePairingLastUpdatedAt);
   const previewPending = snapshot?.pending.slice(0, PENDING_PREVIEW_LIMIT) ?? [];
   const previewPaired = snapshot?.paired.slice(0, PAIRED_PREVIEW_LIMIT) ?? [];
+  const currentCapabilitySource = snapshot?.currentDevicePendingRequest ?? snapshot?.currentDevicePairedRecord ?? null;
+  const currentCapabilitySummary = currentCapabilitySource
+    ? summarizeDeviceCapabilities({
+      roles: currentCapabilitySource.roles,
+      scopes: currentCapabilitySource.scopes,
+    })
+    : null;
 
   return (
     <section className="setting-card setting-card-wide">
@@ -128,6 +161,9 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
             <code className="device-visibility-device-id">
               {props.currentDeviceId ?? "Unavailable in this runtime"}
             </code>
+            {currentCapabilitySummary ? (
+              <CapabilitySummaryDetails summary={currentCapabilitySummary} />
+            ) : null}
             <span className="field-hint">{buildCurrentDeviceHint(props)}</span>
           </div>
 
@@ -167,20 +203,27 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
             {previewPending.length > 0 ? (
               <div className="device-visibility-list">
                 {previewPending.map((request) => (
-                  <article
-                    key={request.requestId}
-                    className={`device-visibility-row${request.deviceId === props.currentDeviceId ? " is-current" : ""}`}
-                  >
-                    <div className="device-visibility-row-top">
-                      <strong>{request.displayName}</strong>
-                      {request.isRepair ? (
-                        <span className="device-visibility-status-chip warning">Repair</span>
-                      ) : null}
-                    </div>
-                    <code className="device-visibility-device-id">{request.deviceId}</code>
-                    <span className="field-hint">Roles: {summarizeList(request.roles)}</span>
-                    <span className="field-hint">Scopes: {summarizeList(request.scopes)}</span>
-                  </article>
+                  (() => {
+                    const summary = summarizeDeviceCapabilities({
+                      roles: request.roles,
+                      scopes: request.scopes,
+                    });
+                    return (
+                      <article
+                        key={request.requestId}
+                        className={`device-visibility-row${request.deviceId === props.currentDeviceId ? " is-current" : ""}`}
+                      >
+                        <div className="device-visibility-row-top">
+                          <strong>{request.displayName}</strong>
+                          {request.isRepair ? (
+                            <span className="device-visibility-status-chip warning">Repair</span>
+                          ) : null}
+                        </div>
+                        <code className="device-visibility-device-id">{request.deviceId}</code>
+                        <CapabilitySummaryDetails summary={summary} />
+                      </article>
+                    );
+                  })()
                 ))}
                 {snapshot && snapshot.pending.length > previewPending.length ? (
                   <span className="field-hint">
@@ -201,20 +244,28 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
             {previewPaired.length > 0 ? (
               <div className="device-visibility-list">
                 {previewPaired.map((device) => (
-                  <article
-                    key={device.deviceId}
-                    className={`device-visibility-row${device.deviceId === props.currentDeviceId ? " is-current" : ""}`}
-                  >
-                    <div className="device-visibility-row-top">
-                      <strong>{device.displayName}</strong>
-                      {device.deviceId === props.currentDeviceId ? (
-                        <span className="device-visibility-status-chip good">This device</span>
-                      ) : null}
-                    </div>
-                    <code className="device-visibility-device-id">{device.deviceId}</code>
-                    <span className="field-hint">Roles: {summarizeList(device.roles)}</span>
-                    <span className="field-hint">Token roles: {summarizeList(device.tokenRoles)}</span>
-                  </article>
+                  (() => {
+                    const summary = summarizeDeviceCapabilities({
+                      roles: device.roles,
+                      scopes: device.scopes,
+                    });
+                    return (
+                      <article
+                        key={device.deviceId}
+                        className={`device-visibility-row${device.deviceId === props.currentDeviceId ? " is-current" : ""}`}
+                      >
+                        <div className="device-visibility-row-top">
+                          <strong>{device.displayName}</strong>
+                          {device.deviceId === props.currentDeviceId ? (
+                            <span className="device-visibility-status-chip good">This device</span>
+                          ) : null}
+                        </div>
+                        <code className="device-visibility-device-id">{device.deviceId}</code>
+                        <CapabilitySummaryDetails summary={summary} />
+                        <span className="field-hint">Token roles: {summarizeList(device.tokenRoles)}</span>
+                      </article>
+                    );
+                  })()
                 ))}
                 {snapshot && snapshot.paired.length > previewPaired.length ? (
                   <span className="field-hint">

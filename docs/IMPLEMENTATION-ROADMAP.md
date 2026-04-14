@@ -591,6 +591,11 @@ The user can see and eventually interact with OpenClaw’s paired nodes/devices 
 - ClawFace now loads the local device identity, fetches the pairing index when supported, and refreshes it when pairing events arrive while Settings is open
 - helper-level regression coverage now locks in the device-pairing normalization seam so later device-surface cleanup does not quietly regress current-device status or list ordering
 
+#### Second implementation cut follow-through
+- the device surface now derives human-friendly capability summaries from the existing roles/scopes payload instead of relying only on raw scope strings
+- current, pending, and paired device rows now surface readable capability headlines and chips like `Full operator control` and `Read-only visibility`
+- helper-level regression coverage now locks in the capability-summary seam so later device-surface cleanup does not regress scope implication or custom-scope handling
+
 ---
 
 ### Slice 5.4 — Browser/canvas/actionful specialist surfaces
