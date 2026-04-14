@@ -10,11 +10,15 @@ export type DevicePairingActionSupport = {
   canRejectPendingRequests: boolean;
 };
 
+function toDevicePairingMethodSet(methods: Iterable<string>): ReadonlySet<string> {
+  return methods instanceof Set ? methods : new Set(methods);
+}
+
 export function pickDevicePairingResolveMethod(
   methods: Iterable<string>,
   decision: DevicePairingPendingDecision,
 ): string | null {
-  const methodSet = new Set(Array.from(methods));
+  const methodSet = toDevicePairingMethodSet(methods);
   const method = DEVICE_PAIRING_METHOD_BY_DECISION[decision];
   return methodSet.has(method) ? method : null;
 }
@@ -22,8 +26,9 @@ export function pickDevicePairingResolveMethod(
 export function deriveDevicePairingActionSupport(
   methods: Iterable<string>,
 ): DevicePairingActionSupport {
+  const methodSet = toDevicePairingMethodSet(methods);
   return {
-    canApprovePendingRequests: pickDevicePairingResolveMethod(methods, "approve") !== null,
-    canRejectPendingRequests: pickDevicePairingResolveMethod(methods, "reject") !== null,
+    canApprovePendingRequests: pickDevicePairingResolveMethod(methodSet, "approve") !== null,
+    canRejectPendingRequests: pickDevicePairingResolveMethod(methodSet, "reject") !== null,
   };
 }
