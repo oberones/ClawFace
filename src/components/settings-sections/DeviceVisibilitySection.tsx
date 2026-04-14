@@ -1,7 +1,10 @@
 import React from "react";
 import type { ConnectionStatus } from "../../lib/types.ts";
 import type { DevicePairingVisibility } from "../../lib/device-pairing-visibility.ts";
-import { summarizeDeviceCapabilities } from "../../lib/device-capability-summary.ts";
+import {
+  summarizeDeviceCapabilities,
+  type DeviceCapabilitySummary,
+} from "../../lib/device-capability-summary.ts";
 
 type DeviceVisibilitySectionProps = {
   connectionStatus: ConnectionStatus;
@@ -84,6 +87,28 @@ function buildCurrentDeviceHint(props: DeviceVisibilitySectionProps): string {
   return "This device does not appear in the current gateway pairing index yet.";
 }
 
+function CapabilitySummaryDetails(props: { summary: DeviceCapabilitySummary }) {
+  return (
+    <>
+      <strong className="device-visibility-capability-headline">{props.summary.headline}</strong>
+      <div className="device-visibility-capability-list">
+        {props.summary.chips.map((chip) => (
+          <span
+            key={chip.key}
+            className={`device-visibility-status-chip ${chip.tone}`}
+            title={chip.label}
+          >
+            {chip.label}
+          </span>
+        ))}
+      </div>
+      {props.summary.detail ? (
+        <span className="field-hint">Extra scopes: {props.summary.detail}</span>
+      ) : null}
+    </>
+  );
+}
+
 export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
   const snapshot = props.devicePairingVisibility;
   const currentStatus = snapshot?.currentDeviceStatus ?? "unavailable";
@@ -137,27 +162,7 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
               {props.currentDeviceId ?? "Unavailable in this runtime"}
             </code>
             {currentCapabilitySummary ? (
-              <>
-                <strong className="device-visibility-capability-headline">
-                  {currentCapabilitySummary.headline}
-                </strong>
-                <div className="device-visibility-capability-list">
-                  {currentCapabilitySummary.chips.map((chip) => (
-                    <span
-                      key={chip.key}
-                      className={`device-visibility-status-chip ${chip.tone}`}
-                      title={chip.label}
-                    >
-                      {chip.label}
-                    </span>
-                  ))}
-                </div>
-                {currentCapabilitySummary.detail ? (
-                  <span className="field-hint">
-                    Extra scopes: {currentCapabilitySummary.detail}
-                  </span>
-                ) : null}
-              </>
+              <CapabilitySummaryDetails summary={currentCapabilitySummary} />
             ) : null}
             <span className="field-hint">{buildCurrentDeviceHint(props)}</span>
           </div>
@@ -215,17 +220,7 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
                           ) : null}
                         </div>
                         <code className="device-visibility-device-id">{request.deviceId}</code>
-                        <strong className="device-visibility-capability-headline">{summary.headline}</strong>
-                        <div className="device-visibility-capability-list">
-                          {summary.chips.map((chip) => (
-                            <span key={chip.key} className={`device-visibility-status-chip ${chip.tone}`}>
-                              {chip.label}
-                            </span>
-                          ))}
-                        </div>
-                        {summary.detail ? (
-                          <span className="field-hint">Extra scopes: {summary.detail}</span>
-                        ) : null}
+                        <CapabilitySummaryDetails summary={summary} />
                       </article>
                     );
                   })()
@@ -266,17 +261,7 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
                           ) : null}
                         </div>
                         <code className="device-visibility-device-id">{device.deviceId}</code>
-                        <strong className="device-visibility-capability-headline">{summary.headline}</strong>
-                        <div className="device-visibility-capability-list">
-                          {summary.chips.map((chip) => (
-                            <span key={chip.key} className={`device-visibility-status-chip ${chip.tone}`}>
-                              {chip.label}
-                            </span>
-                          ))}
-                        </div>
-                        {summary.detail ? (
-                          <span className="field-hint">Extra scopes: {summary.detail}</span>
-                        ) : null}
+                        <CapabilitySummaryDetails summary={summary} />
                         <span className="field-hint">Token roles: {summarizeList(device.tokenRoles)}</span>
                       </article>
                     );

@@ -23,8 +23,8 @@ const OPERATOR_CAPABILITY_ORDER = [
   "operator.pairing",
   "operator.write",
   "operator.read",
-  "operator.talk.secrets",
 ] as const;
+const KNOWN_OPERATOR_SCOPES = new Set<string>(OPERATOR_CAPABILITY_ORDER);
 
 function dedupeStrings(values: string[]): string[] {
   return values.filter((value, index, all) => all.indexOf(value) === index);
@@ -67,8 +67,6 @@ function formatScopeLabel(scope: string): string {
       return "Write access";
     case "operator.read":
       return "Read access";
-    case "operator.talk.secrets":
-      return "Secrets";
     default:
       return scope
         .split(".")
@@ -125,7 +123,6 @@ export function summarizeDeviceCapabilities(
 ): DeviceCapabilitySummary {
   const normalizedRoles = normalizeRoles(params.roles);
   const normalizedScopes = normalizeScopes(params.scopes);
-  const knownScopeSet = new Set<string>(OPERATOR_CAPABILITY_ORDER);
 
   const primaryChips = OPERATOR_CAPABILITY_ORDER
     .filter((scope) => normalizedScopes.includes(scope))
@@ -133,9 +130,9 @@ export function summarizeDeviceCapabilities(
       key: scope,
       label: formatScopeLabel(scope),
       tone: scopeChipTone(scope),
-    }));
+      }));
 
-  const customScopes = normalizedScopes.filter((scope) => !knownScopeSet.has(scope));
+  const customScopes = normalizedScopes.filter((scope) => !KNOWN_OPERATOR_SCOPES.has(scope));
   const roleChips = normalizedRoles
     .filter((role) => role !== "operator")
     .map((role) => ({

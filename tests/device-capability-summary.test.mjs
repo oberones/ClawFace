@@ -86,3 +86,64 @@ test("summarizeDeviceCapabilities falls back to read-only or custom access headl
     },
   );
 });
+
+test("summarizeDeviceCapabilities covers the remaining built-in headline branches", () => {
+  const { summarizeDeviceCapabilities } = loadDeviceCapabilitySummaryModule();
+
+  assert.deepEqual(
+    summarizeDeviceCapabilities({
+      roles: ["operator"],
+      scopes: ["operator.write", "operator.approvals", "operator.pairing"],
+    }),
+    {
+      headline: "Operator workspace control",
+      chips: [
+        { key: "operator.approvals", label: "Approvals", tone: "neutral" },
+        { key: "operator.pairing", label: "Pairing", tone: "neutral" },
+        { key: "operator.write", label: "Write access", tone: "neutral" },
+        { key: "operator.read", label: "Read access", tone: "muted" },
+      ],
+      detail: null,
+    },
+  );
+
+  assert.deepEqual(
+    summarizeDeviceCapabilities({
+      roles: ["operator"],
+      scopes: ["operator.pairing"],
+    }),
+    {
+      headline: "Limited control access",
+      chips: [
+        { key: "operator.pairing", label: "Pairing", tone: "neutral" },
+      ],
+      detail: null,
+    },
+  );
+
+  assert.deepEqual(
+    summarizeDeviceCapabilities({
+      roles: ["node"],
+      scopes: [],
+    }),
+    {
+      headline: "Node-linked device",
+      chips: [
+        { key: "role:node", label: "Node role", tone: "muted" },
+      ],
+      detail: null,
+    },
+  );
+
+  assert.deepEqual(
+    summarizeDeviceCapabilities({
+      roles: ["operator"],
+      scopes: [],
+    }),
+    {
+      headline: "Operator device",
+      chips: [],
+      detail: null,
+    },
+  );
+});
