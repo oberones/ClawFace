@@ -2559,6 +2559,13 @@ body::before {
   padding: 10px 11px;
 }
 
+.device-visibility-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .device-visibility-row.is-current {
   border-color: color-mix(in srgb, var(--claw-accent) 56%, white);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--claw-accent) 24%, transparent);
@@ -2620,6 +2627,23 @@ body::before {
   border-color: color-mix(in srgb, #d89b27 45%, white);
   background: color-mix(in srgb, #fff4dc 88%, white);
   color: #7f5714;
+}
+
+.ui-btn.device-visibility-action {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.ui-btn.device-visibility-action.is-danger {
+  border-color: color-mix(in srgb, #d37a7a 58%, white);
+  color: #8f3030;
+  background: color-mix(in srgb, #fff1f1 92%, white);
+}
+
+.ui-btn.device-visibility-action.is-danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #cc6262 68%, white);
+  background: color-mix(in srgb, #ffe3e3 90%, white);
 }
 
 .path-mapping-textarea {
