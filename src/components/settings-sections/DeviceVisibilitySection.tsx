@@ -1,6 +1,10 @@
 import React from "react";
 import type { ConnectionStatus } from "../../lib/types.ts";
 import type { DevicePairingVisibility } from "../../lib/device-pairing-visibility.ts";
+import type {
+  DevicePairingActionSupport,
+  DevicePairingPendingDecision,
+} from "../../lib/device-pairing-actions.ts";
 import {
   summarizeDeviceCapabilities,
   type DeviceCapabilitySummary,
@@ -11,13 +15,15 @@ type DeviceVisibilitySectionProps = {
   currentDeviceId: string | null;
   devicePairingVisibility: DevicePairingVisibility | null;
   devicePairingSupported: boolean;
+  devicePairingActionSupport: DevicePairingActionSupport;
   devicePairingLoading: boolean;
   devicePairingError: string | null;
   devicePairingLastUpdatedAt: number | null;
+  resolvingDevicePairRequestIds: Record<string, DevicePairingPendingDecision>;
   onRefreshDevicePairingVisibility: () => void;
+  onResolveDevicePairRequest: (requestId: string, decision: DevicePairingPendingDecision) => void;
 };
 
-const PENDING_PREVIEW_LIMIT = 3;
 const PAIRED_PREVIEW_LIMIT = 4;
 
 function formatDeviceStatusLabel(status: DevicePairingVisibility["currentDeviceStatus"]): string {
@@ -77,6 +83,14 @@ function buildCurrentDeviceHint(props: DeviceVisibilitySectionProps): string {
       : "Refresh to inspect the current gateway pairing index.";
   }
   if (snapshot.currentDeviceStatus === "pending") {
+    const hasActions =
+      props.devicePairingActionSupport.canApprovePendingRequests ||
+      props.devicePairingActionSupport.canRejectPendingRequests;
+    if (hasActions) {
+      return snapshot.currentDevicePendingRequest?.isRepair
+        ? "This device has a repair approval pending. Use the pending approvals list below to resolve it from ClawFace."
+        : "This device is waiting for pairing approval. Use the pending approvals list below to approve or reject it from ClawFace.";
+    }
     return snapshot.currentDevicePendingRequest?.isRepair
       ? "This device has a repair approval pending."
       : "This device is waiting for pairing approval.";
@@ -115,7 +129,7 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
   const currentStatusLabel = formatDeviceStatusLabel(currentStatus);
   const currentStatusTone = formatDeviceStatusTone(currentStatus);
   const lastUpdatedLabel = formatLastUpdated(props.devicePairingLastUpdatedAt);
-  const previewPending = snapshot?.pending.slice(0, PENDING_PREVIEW_LIMIT) ?? [];
+  const pendingRequests = snapshot?.pending ?? [];
   const previewPaired = snapshot?.paired.slice(0, PAIRED_PREVIEW_LIMIT) ?? [];
   const currentCapabilitySource = snapshot?.currentDevicePendingRequest ?? snapshot?.currentDevicePairedRecord ?? null;
   const currentCapabilitySummary = currentCapabilitySource
@@ -124,6 +138,10 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
       scopes: currentCapabilitySource.scopes,
     })
     : null;
+  const showsPendingActions =
+    props.connectionStatus === "connected" &&
+    (props.devicePairingActionSupport.canApprovePendingRequests ||
+      props.devicePairingActionSupport.canRejectPendingRequests);
 
   return (
     <section className="setting-card setting-card-wide">
@@ -142,11 +160,12 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
       <div className="setting-fields">
         <div className="field-block">
           <span className="field-label">
-            Read-only visibility into the current gateway's device pairing index.
+            Visibility into the current gateway's device pairing index, plus the first safe in-app action.
           </span>
           <span className="field-hint">
-            This first slice is intentionally lightweight: it shows the current device, pending approvals,
-            and paired devices without turning Settings into a full device manager.
+            This device surface stays intentionally narrow: it shows the current device, pending approvals,
+            and paired devices, and only adds approve/reject for pending requests instead of turning Settings
+            into a full device manager.
           </span>
         </div>
 
@@ -198,16 +217,25 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
           <div className="device-visibility-column">
             <div className="device-visibility-column-head">
               <span className="field-label">Pending approvals</span>
-              <span className="field-hint">{snapshot?.pending.length ?? 0} total</span>
+              <span className="field-hint">{pendingRequests.length} total</span>
             </div>
-            {previewPending.length > 0 ? (
+            {props.connectionStatus === "connected" &&
+            props.devicePairingSupported &&
+            !showsPendingActions &&
+            pendingRequests.length > 0 ? (
+              <div className="device-visibility-note">
+                This gateway exposes pairing visibility, but it does not advertise in-app approve/reject actions yet.
+              </div>
+            ) : null}
+            {pendingRequests.length > 0 ? (
               <div className="device-visibility-list">
-                {previewPending.map((request) => (
+                {pendingRequests.map((request) => (
                   (() => {
                     const summary = summarizeDeviceCapabilities({
                       roles: request.roles,
                       scopes: request.scopes,
                     });
+                    const resolvingDecision = props.resolvingDevicePairRequestIds[request.requestId] ?? null;
                     return (
                       <article
                         key={request.requestId}
@@ -221,15 +249,34 @@ export function DeviceVisibilitySection(props: DeviceVisibilitySectionProps) {
                         </div>
                         <code className="device-visibility-device-id">{request.deviceId}</code>
                         <CapabilitySummaryDetails summary={summary} />
+                        {showsPendingActions ? (
+                          <div className="device-visibility-action-row">
+                            {props.devicePairingActionSupport.canApprovePendingRequests ? (
+                              <button
+                                type="button"
+                                className="ui-btn ui-btn-primary device-visibility-action"
+                                onClick={() => props.onResolveDevicePairRequest(request.requestId, "approve")}
+                                disabled={Boolean(resolvingDecision)}
+                              >
+                                {resolvingDecision === "approve" ? "Approving…" : "Approve"}
+                              </button>
+                            ) : null}
+                            {props.devicePairingActionSupport.canRejectPendingRequests ? (
+                              <button
+                                type="button"
+                                className="ui-btn ui-btn-light device-visibility-action is-danger"
+                                onClick={() => props.onResolveDevicePairRequest(request.requestId, "reject")}
+                                disabled={Boolean(resolvingDecision)}
+                              >
+                                {resolvingDecision === "reject" ? "Rejecting…" : "Reject"}
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </article>
                     );
                   })()
                 ))}
-                {snapshot && snapshot.pending.length > previewPending.length ? (
-                  <span className="field-hint">
-                    Showing {previewPending.length} of {snapshot.pending.length} pending device requests.
-                  </span>
-                ) : null}
               </div>
             ) : (
               <div className="device-visibility-note">No pending device approvals.</div>

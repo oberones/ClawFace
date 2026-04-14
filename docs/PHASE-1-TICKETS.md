@@ -4597,3 +4597,54 @@ This ticket is now complete.
 
 #### Recommended next step
 If `5.3` continues after this, the next slice should probably be the first safe device action or capability-specific workflow entry point, but only if real usage shows which one matters most.
+
+## Ticket 5.3.3 — Add the first safe device pairing action
+
+### Why
+The device surface now makes pending requests and capabilities visible, but users still need to leave ClawFace to resolve a straightforward pairing request. The next slice should add the smallest safe action: approve or reject pending device requests that the gateway already exposes.
+
+### Scope
+- detect whether the gateway advertises `device.pair.approve` and `device.pair.reject`
+- add approve/reject actions for pending device requests in the existing `Devices & Pairing` Settings card
+- keep paired-device management and token rotation out of scope
+- refresh the pairing snapshot after a successful resolution
+
+### Deliverable
+A narrow in-app device action that answers:
+- “Can I approve this pending device from ClawFace?”
+- “Can I reject an obviously unwanted request without dropping into CLI?”
+
+### Done when
+- pending pairing requests can be approved or rejected from Settings when the gateway supports those methods
+- the action surface is method-gated and does not pretend unsupported actions exist
+- helper-level tests cover device-pairing action method selection/support derivation
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-14)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/device-pairing-actions.ts` to centralize pairing-action method selection and support derivation
+- updated `src/app.tsx` to:
+  - track approve/reject method availability from the advertised gateway method list
+  - resolve pending device requests through `device.pair.approve` / `device.pair.reject`
+  - clear per-request resolving state when pairing resolution events arrive
+  - refresh the device pairing snapshot after a successful in-app resolution
+- updated `src/components/settings-sections/DeviceVisibilitySection.tsx` so pending requests are fully actionable instead of preview-only
+- added focused helper coverage in `tests/device-pairing-actions.test.mjs`
+
+#### User-facing improvements landed
+- pending pairing requests can now be approved or rejected directly from the existing `Devices & Pairing` card in Settings
+- ClawFace only shows the actions the current gateway actually supports, so unsupported pairing methods stay honest instead of looking broken
+- pending requests are now fully visible in Settings when actions are available, which keeps the first device action end-to-end usable without expanding into a full device manager
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If `5.3` continues after this, the next slice should probably be:
+- a lightweight device-specific workflow entry point that real usage proves people actually need
+- or a pause, since the device surface now has visibility, capability summaries, and one safe action without overbuilding Milestone 1

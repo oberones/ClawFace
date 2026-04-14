@@ -57,6 +57,12 @@ import {
 import { loadOrCreateDeviceIdentity } from "./lib/device-identity.ts";
 import { normalizeDevicePairingVisibility } from "./lib/device-pairing-visibility.ts";
 import {
+  deriveDevicePairingActionSupport,
+  pickDevicePairingResolveMethod,
+  type DevicePairingActionSupport,
+  type DevicePairingPendingDecision,
+} from "./lib/device-pairing-actions.ts";
+import {
   applyModelRuntimeOverride,
   applyThinkingRuntimeOverride,
   buildSessionRuntimePatchDecision,
@@ -4101,9 +4107,16 @@ export default function App() {
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [devicePairingRaw, setDevicePairingRaw] = useState<unknown>(null);
   const [devicePairingSupported, setDevicePairingSupported] = useState(false);
+  const [devicePairingActionSupport, setDevicePairingActionSupport] = useState<DevicePairingActionSupport>({
+    canApprovePendingRequests: false,
+    canRejectPendingRequests: false,
+  });
   const [devicePairingLoading, setDevicePairingLoading] = useState(false);
   const [devicePairingError, setDevicePairingError] = useState<string | null>(null);
   const [devicePairingLastUpdatedAt, setDevicePairingLastUpdatedAt] = useState<number | null>(null);
+  const [resolvingDevicePairRequestIds, setResolvingDevicePairRequestIds] = useState<
+    Record<string, DevicePairingPendingDecision>
+  >({});
 
   const clientRef = useRef<GatewayClient | null>(null);
   const connectionStatusRef = useRef(connectionState.status);
@@ -5786,9 +5799,14 @@ export default function App() {
   useEffect(() => {
     setDevicePairingRaw(null);
     setDevicePairingSupported(false);
+    setDevicePairingActionSupport({
+      canApprovePendingRequests: false,
+      canRejectPendingRequests: false,
+    });
     setDevicePairingLoading(false);
     setDevicePairingError(null);
     setDevicePairingLastUpdatedAt(null);
+    setResolvingDevicePairRequestIds({});
   }, [gatewayUrl, token, password]);
 
   useEffect(() => {
@@ -5848,6 +5866,7 @@ export default function App() {
             : [],
         );
         const supportsDevicePairList = gatewayMethodsRef.current.has("device.pair.list");
+        setDevicePairingActionSupport(deriveDevicePairingActionSupport(gatewayMethodsRef.current));
         setDevicePairingSupported(supportsDevicePairList);
         if (!supportsDevicePairList) {
           setDevicePairingLoading(false);
@@ -5888,6 +5907,10 @@ export default function App() {
       },
       onClose: (info) => {
         gatewayMethodsRef.current.clear();
+        setDevicePairingActionSupport({
+          canApprovePendingRequests: false,
+          canRejectPendingRequests: false,
+        });
         setDevicePairingLoading(false);
         const activeSessionKey = selectedSessionRef.current;
         const interruptedRunSnapshot = buildInterruptedRunSnapshot({
@@ -5936,6 +5959,19 @@ export default function App() {
           settingsOpenRef.current
         ) {
           void refreshDevicePairingVisibility(client);
+        }
+        if (evt.event === "device.pair.resolved" && isRecord(evt.payload)) {
+          const requestId = getString(evt.payload, ["requestId", "request_id"]);
+          if (requestId) {
+            setResolvingDevicePairRequestIds((prev) => {
+              if (!Object.prototype.hasOwnProperty.call(prev, requestId)) {
+                return prev;
+              }
+              const next = { ...prev };
+              delete next[requestId];
+              return next;
+            });
+          }
         }
         if (evt.event === "exec.approval.requested" || evt.event === "plugin.approval.requested") {
           const approval = extractPendingApprovalFromGatewayEvent(evt.event, evt.payload);
@@ -7198,6 +7234,42 @@ export default function App() {
     }
   }
 
+  async function handleResolveDevicePairRequest(
+    requestId: string,
+    decision: DevicePairingPendingDecision,
+  ) {
+    const client = clientRef.current;
+    if (!client) {
+      return;
+    }
+    const method = pickDevicePairingResolveMethod(gatewayMethodsRef.current, decision);
+    if (!method) {
+      setDevicePairingError(
+        `This gateway does not advertise ${
+          decision === "approve" ? "device.pair.approve" : "device.pair.reject"
+        }.`,
+      );
+      return;
+    }
+    setDevicePairingError(null);
+    setResolvingDevicePairRequestIds((prev) => ({ ...prev, [requestId]: decision }));
+    try {
+      await client.request(method, { requestId }, { timeoutMs: 10_000 });
+      await refreshDevicePairingVisibility(client);
+    } catch (error) {
+      setDevicePairingError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setResolvingDevicePairRequestIds((prev) => {
+        if (!Object.prototype.hasOwnProperty.call(prev, requestId)) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[requestId];
+        return next;
+      });
+    }
+  }
+
   function pushSystemMessage(text: string) {
     setMessages((prev) => [
       ...prev,
@@ -8372,10 +8444,15 @@ export default function App() {
         currentDeviceId={currentDeviceId}
         devicePairingVisibility={devicePairingVisibility}
         devicePairingSupported={devicePairingSupported}
+        devicePairingActionSupport={devicePairingActionSupport}
         devicePairingLoading={devicePairingLoading}
         devicePairingError={devicePairingError}
         devicePairingLastUpdatedAt={devicePairingLastUpdatedAt}
+        resolvingDevicePairRequestIds={resolvingDevicePairRequestIds}
         onRefreshDevicePairingVisibility={() => void refreshDevicePairingVisibility()}
+        onResolveDevicePairRequest={(requestId, decision) =>
+          void handleResolveDevicePairRequest(requestId, decision)
+        }
       />
 
       <NewSessionModal
