@@ -2524,6 +2524,12 @@ body::before {
   line-height: 1;
 }
 
+.device-visibility-capability-headline {
+  color: var(--claw-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
 .device-visibility-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2539,6 +2545,12 @@ body::before {
 .device-visibility-list {
   display: grid;
   gap: 8px;
+}
+
+.device-visibility-capability-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .device-visibility-row {
