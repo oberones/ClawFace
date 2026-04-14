@@ -4549,3 +4549,51 @@ This ticket is now complete.
 If `5.3` continues, the next slice should stay narrow too:
 - either surface lightweight per-device capability summaries
 - or add the first safe device action only after real usage proves which one matters most
+
+## Ticket 5.3.2 — Add lightweight device capability summaries
+
+### Why
+The first device slice made pairing state visible, but the device list still leans on raw roles/scopes. The next step should translate those backend concepts into a more human-friendly capability summary so users can tell what a device can actually do at a glance.
+
+### Scope
+- derive friendly capability summaries from paired/pending device roles and scopes
+- show that summary for the current device, pending requests, and paired devices
+- keep the surface read-only
+- avoid introducing device actions or backend contract changes
+
+### Deliverable
+A clearer `Devices & Pairing` surface that answers:
+- “Does this device have full operator control or just read-only access?”
+- “Which pending request is asking for approvals/pairing/write access?”
+- “Which paired devices have the capabilities I care about?”
+
+### Done when
+- the current device card shows a human-friendly capability summary
+- pending and paired device rows surface readable capability chips instead of only raw scope strings
+- helper-level tests cover capability headline/chip derivation and scope implication rules
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-13)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/device-capability-summary.ts` to derive human-friendly capability headlines and chips from device roles/scopes
+- updated `src/components/settings-sections/DeviceVisibilitySection.tsx` to show capability summaries for:
+  - the current device
+  - pending pairing requests
+  - paired devices
+- added focused helper coverage in `tests/device-capability-summary.test.mjs`
+
+#### User-facing improvements landed
+- the device surface now communicates capability state in plain language like `Full operator control`, `Interactive operator access`, and `Read-only visibility`
+- scope-heavy rows are easier to scan because the important capabilities now show up as chips
+- custom/non-operator scopes still stay visible via the `Extra scopes` detail instead of being silently hidden
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If `5.3` continues after this, the next slice should probably be the first safe device action or capability-specific workflow entry point, but only if real usage shows which one matters most.
