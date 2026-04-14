@@ -43,3 +43,20 @@ test("deriveDevicePairingActionSupport exposes approve and reject availability i
     },
   );
 });
+
+test("deriveDevicePairingActionSupport supports generator iterables", () => {
+  const { deriveDevicePairingActionSupport } = loadDevicePairingActionsModule();
+
+  function* methods() {
+    yield "device.pair.reject";
+    yield "device.pair.approve";
+  }
+
+  assert.deepEqual(
+    deriveDevicePairingActionSupport(methods()),
+    {
+      canApprovePendingRequests: true,
+      canRejectPendingRequests: true,
+    },
+  );
+});
