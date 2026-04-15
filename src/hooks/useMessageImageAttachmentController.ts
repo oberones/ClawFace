@@ -139,7 +139,7 @@ export function useMessageImageAttachmentController(
     setAutoRetryAttempt(0);
     autoRetryDeadlineRef.current =
       Date.now() + (params.generationPending ? ACTIVE_GENERATION_RETRY_WINDOW_MS : SETTLE_RETRY_WINDOW_MS);
-  }, [attachmentSource, params.generationPending, preferredRenderableSrc]);
+  }, [attachmentSource, preferredRenderableSrc]);
 
   useEffect(() => {
     const extensionMs = params.generationPending ? ACTIVE_GENERATION_RETRY_WINDOW_MS : SETTLE_RETRY_WINDOW_MS;
