@@ -30,12 +30,7 @@ import {
   normalizeReplyDoneAudioFileName,
   validateReplyDoneAudioFile,
 } from "./settings-sections/reply-done-audio-utils.ts";
-import type { ConnectionStatus } from "../lib/types.ts";
-import type { DevicePairingVisibility } from "../lib/device-pairing-visibility.ts";
-import type {
-  DevicePairingActionSupport,
-  DevicePairingPendingDecision,
-} from "../lib/device-pairing-actions.ts";
+import type { DevicePairingSettingsModel } from "../hooks/useDevicePairingController.ts";
 
 type SettingsModalProps = {
   open: boolean;
@@ -69,20 +64,7 @@ type SettingsModalProps = {
   models?: Array<{ id: string; name: string; provider: string }>;
   newSessionPreferredModel?: string;
   onNewSessionPreferredModelChange?: (model: string) => void;
-  connectionStatus: ConnectionStatus;
-  currentDeviceId: string | null;
-  devicePairingVisibility: DevicePairingVisibility | null;
-  devicePairingSupported: boolean;
-  devicePairingActionSupport: DevicePairingActionSupport;
-  devicePairingLoading: boolean;
-  devicePairingError: string | null;
-  devicePairingLastUpdatedAt: number | null;
-  resolvingDevicePairRequestIds: Record<string, DevicePairingPendingDecision>;
-  onRefreshDevicePairingVisibility: () => void;
-  onResolveDevicePairRequest: (
-    requestId: string,
-    decision: DevicePairingPendingDecision,
-  ) => void;
+  devicePairing: DevicePairingSettingsModel;
   modelShortcutSchemes: ModelShortcutSchemeEntry[];
   currentModelForShortcut: string;
   currentThinkingForShortcut: string;
@@ -317,17 +299,7 @@ export default function SettingsModal(props: SettingsModalProps) {
             />
 
             <DeviceVisibilitySection
-              connectionStatus={props.connectionStatus}
-              currentDeviceId={props.currentDeviceId}
-              devicePairingVisibility={props.devicePairingVisibility}
-              devicePairingSupported={props.devicePairingSupported}
-              devicePairingActionSupport={props.devicePairingActionSupport}
-              devicePairingLoading={props.devicePairingLoading}
-              devicePairingError={props.devicePairingError}
-              devicePairingLastUpdatedAt={props.devicePairingLastUpdatedAt}
-              resolvingDevicePairRequestIds={props.resolvingDevicePairRequestIds}
-              onRefreshDevicePairingVisibility={props.onRefreshDevicePairingVisibility}
-              onResolveDevicePairRequest={props.onResolveDevicePairRequest}
+              {...props.devicePairing}
             />
 
             <PathPrefixMappingsSection
