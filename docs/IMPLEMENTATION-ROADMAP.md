@@ -601,6 +601,11 @@ The user can see and eventually interact with OpenClaw’s paired nodes/devices 
 - pending request rows are now fully actionable instead of preview-only, while paired-device management still stays intentionally out of scope for Milestone 1
 - helper-level regression coverage now locks in the pairing-action method-selection seam so later device-surface cleanup does not quietly regress gateway capability gating
 
+#### Fourth implementation cut follow-through
+- the device pairing subsystem now lives behind a dedicated controller hook instead of sitting inline in `app.tsx`
+- gateway `hello` / `close` / event reactions, pairing refresh, pending resolution state, and approve/reject actions now share one device-specific ownership boundary
+- the Settings surface now receives a grouped device-pairing model instead of a long device-specific prop chain, which keeps the app root closer to shell composition as Milestone 1 expands
+
 ---
 
 ### Slice 5.4 — Browser/canvas/actionful specialist surfaces
