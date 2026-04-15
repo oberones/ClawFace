@@ -596,6 +596,11 @@ The user can see and eventually interact with OpenClaw’s paired nodes/devices 
 - current, pending, and paired device rows now surface readable capability headlines and chips like `Full operator control` and `Read-only visibility`
 - helper-level regression coverage now locks in the capability-summary seam so later device-surface cleanup does not regress scope implication or custom-scope handling
 
+#### Third implementation cut follow-through
+- the existing `Devices & Pairing` Settings card now exposes the first safe in-app device action by approving or rejecting pending pairing requests when the gateway advertises those methods
+- pending request rows are now fully actionable instead of preview-only, while paired-device management still stays intentionally out of scope for Milestone 1
+- helper-level regression coverage now locks in the pairing-action method-selection seam so later device-surface cleanup does not quietly regress gateway capability gating
+
 ---
 
 ### Slice 5.4 — Browser/canvas/actionful specialist surfaces
