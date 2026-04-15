@@ -4758,3 +4758,56 @@ This ticket is now complete.
 If Track B continues, the next slice should probably extract one more media/platform seam that has similar coupling pressure:
 - either the shell-level remote image resolution path in `app.tsx`
 - or the desktop/web image-source mapping seam in `src/lib/message-image-source.ts`
+
+## Ticket B.2 — Extract the shell-level remote image resolver from `app.tsx`
+
+### Why
+Even after `MessageImageAttachment` moved its local runtime state behind a controller, the app root still owned the shell-level remote image transport path:
+- gateway RPC media-read probing
+- gateway HTTP fallback probing
+- remote image response decoding into renderable data URLs
+- remote image result caching
+
+That means `app.tsx` was still reasoning directly about media transport instead of just providing a resolver boundary to the chat shell.
+
+### Scope
+- move remote image resolution and transport fallback logic into a dedicated hook/controller seam
+- keep `app.tsx` responsible only for wiring gateway/client refs into that resolver
+- preserve the existing RPC-first, HTTP-fallback behavior and cache semantics
+- avoid changing the external `resolveRemoteImage(filePath)` contract used by image attachments
+
+### Deliverable
+A clearer media/platform boundary that answers:
+- “Where does remote image transport behavior actually live?”
+- “Can the app shell provide remote image resolution without inlining gateway media logic?”
+
+### Done when
+- `app.tsx` no longer inlines the remote image RPC/HTTP fallback stack
+- remote image caching and transport probing live behind a dedicated hook/controller seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-15)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/hooks/useRemoteImageResolver.ts` to own:
+  - remote image result caching
+  - gateway RPC media-read probing
+  - gateway HTTP fallback probing
+  - HTTP response decoding into renderable image data URLs
+- updated `src/app.tsx` to consume that hook instead of carrying the remote media transport stack inline
+- removed the duplicate local `inferImageMimeTypeFromPath(...)` implementation from `app.tsx` and reused the shared media helper instead
+
+#### Architectural improvements landed
+- the app root is back closer to shell composition for remote image resolution instead of also owning the transport/runtime stack
+- future remote media work now has a dedicated seam that is easier to extend without reopening `app.tsx`
+- the remote image transport logic now lives alongside other media/platform hooks instead of inside a giant root component
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track B continues after this, the next most natural slice is probably the desktop/web image-source mapping seam in `src/lib/message-image-source.ts`.
