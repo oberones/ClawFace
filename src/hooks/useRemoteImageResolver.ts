@@ -10,6 +10,7 @@ import {
 
 const REMOTE_IMAGE_CACHE_LIMIT = 5;
 const REMOTE_IMAGE_HTTP_FETCH_TIMEOUT_MS = 2000;
+const MAX_REMOTE_IMAGE_RESPONSE_BYTES = 12 * 1024 * 1024;
 
 type UseRemoteImageResolverParams = {
   connected: boolean;
@@ -17,6 +18,31 @@ type UseRemoteImageResolverParams = {
   clientRef: MutableRefObject<GatewayClient | null>;
   gatewayMethodsRef: MutableRefObject<Set<string>>;
 };
+
+export function buildRemoteMediaRequestDedupeKey(
+  method: string,
+  params: Record<string, unknown>,
+): string {
+  const sortedEntries = Object.entries(params).sort(([left], [right]) => left.localeCompare(right));
+  return `${method}:${JSON.stringify(sortedEntries)}`;
+}
+
+export function shouldAcceptRemoteImageResponseSize(
+  contentLengthHeader: string | null | undefined,
+  blobSize: number | null | undefined,
+): boolean {
+  const parsedContentLength =
+    typeof contentLengthHeader === "string" && contentLengthHeader.trim()
+      ? Number.parseInt(contentLengthHeader.trim(), 10)
+      : Number.NaN;
+  if (Number.isFinite(parsedContentLength) && parsedContentLength > MAX_REMOTE_IMAGE_RESPONSE_BYTES) {
+    return false;
+  }
+  if (typeof blobSize === "number" && Number.isFinite(blobSize) && blobSize > MAX_REMOTE_IMAGE_RESPONSE_BYTES) {
+    return false;
+  }
+  return true;
+}
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -40,6 +66,9 @@ async function extractImageDataUrlFromHttpResponse(
   response: Response,
   sourcePathHint: string,
 ): Promise<string | null> {
+  if (!shouldAcceptRemoteImageResponseSize(response.headers.get("content-length"), null)) {
+    return null;
+  }
   const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
   if (contentType.includes("json")) {
     try {
@@ -62,14 +91,14 @@ async function extractImageDataUrlFromHttpResponse(
     }
   }
   const blob = await response.blob();
-  if (!blob.size) {
+  if (!blob.size || !shouldAcceptRemoteImageResponseSize(null, blob.size)) {
     return null;
   }
   if (blob.type.toLowerCase().startsWith("image/")) {
     return blobToDataUrl(blob);
   }
   const inferredType = inferImageMimeTypeFromPath(sourcePathHint) ?? "image/png";
-  return blobToDataUrl(new Blob([blob], { type: inferredType }));
+  return blobToDataUrl(blob.slice(0, blob.size, inferredType));
 }
 
 export function useRemoteImageResolver(
@@ -163,7 +192,10 @@ export function useRemoteImageResolver(
     const seenParamKeys = new Set<string>();
     for (const method of methods) {
       for (const rpcParams of paramVariants) {
-        const dedupeKey = `${method}:${JSON.stringify(rpcParams)}`;
+        const dedupeKey = buildRemoteMediaRequestDedupeKey(
+          method,
+          rpcParams as Record<string, unknown>,
+        );
         if (seenParamKeys.has(dedupeKey)) {
           continue;
         }
