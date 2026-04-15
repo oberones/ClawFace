@@ -1,28 +1,12 @@
 import React from "react";
-import type { ConnectionStatus } from "../../lib/types.ts";
+import type { DevicePairingSettingsModel } from "../../hooks/useDevicePairingController.ts";
 import type { DevicePairingVisibility } from "../../lib/device-pairing-visibility.ts";
-import type {
-  DevicePairingActionSupport,
-  DevicePairingPendingDecision,
-} from "../../lib/device-pairing-actions.ts";
 import {
   summarizeDeviceCapabilities,
   type DeviceCapabilitySummary,
 } from "../../lib/device-capability-summary.ts";
 
-type DeviceVisibilitySectionProps = {
-  connectionStatus: ConnectionStatus;
-  currentDeviceId: string | null;
-  devicePairingVisibility: DevicePairingVisibility | null;
-  devicePairingSupported: boolean;
-  devicePairingActionSupport: DevicePairingActionSupport;
-  devicePairingLoading: boolean;
-  devicePairingError: string | null;
-  devicePairingLastUpdatedAt: number | null;
-  resolvingDevicePairRequestIds: Record<string, DevicePairingPendingDecision>;
-  onRefreshDevicePairingVisibility: () => void;
-  onResolveDevicePairRequest: (requestId: string, decision: DevicePairingPendingDecision) => void;
-};
+type DeviceVisibilitySectionProps = DevicePairingSettingsModel;
 
 const PAIRED_PREVIEW_LIMIT = 4;
 

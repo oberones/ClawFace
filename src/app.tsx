@@ -54,14 +54,6 @@ import {
   extractRenderableImageSourceFromUnknown,
   pickRemoteMediaReadMethods,
 } from "./lib/remote-media-resolution.ts";
-import { loadOrCreateDeviceIdentity } from "./lib/device-identity.ts";
-import { normalizeDevicePairingVisibility } from "./lib/device-pairing-visibility.ts";
-import {
-  deriveDevicePairingActionSupport,
-  pickDevicePairingResolveMethod,
-  type DevicePairingActionSupport,
-  type DevicePairingPendingDecision,
-} from "./lib/device-pairing-actions.ts";
 import {
   applyModelRuntimeOverride,
   applyThinkingRuntimeOverride,
@@ -95,6 +87,7 @@ import {
 } from "./lib/connection-recovery.ts";
 import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
+import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 
 const STORAGE_KEYS = {
@@ -4104,19 +4097,6 @@ export default function App() {
   const [visibleInterruptedRunsBySession, setVisibleInterruptedRunsBySession] = useState<Record<string, true>>({});
   const [pendingApprovalsBySession, setPendingApprovalsBySession] = useState<Record<string, PendingApproval[]>>({});
   const [resolvingApprovalIds, setResolvingApprovalIds] = useState<Record<string, ApprovalDecision>>({});
-  const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
-  const [devicePairingRaw, setDevicePairingRaw] = useState<unknown>(null);
-  const [devicePairingSupported, setDevicePairingSupported] = useState(false);
-  const [devicePairingActionSupport, setDevicePairingActionSupport] = useState<DevicePairingActionSupport>({
-    canApprovePendingRequests: false,
-    canRejectPendingRequests: false,
-  });
-  const [devicePairingLoading, setDevicePairingLoading] = useState(false);
-  const [devicePairingError, setDevicePairingError] = useState<string | null>(null);
-  const [devicePairingLastUpdatedAt, setDevicePairingLastUpdatedAt] = useState<number | null>(null);
-  const [resolvingDevicePairRequestIds, setResolvingDevicePairRequestIds] = useState<
-    Record<string, DevicePairingPendingDecision>
-  >({});
 
   const clientRef = useRef<GatewayClient | null>(null);
   const connectionStatusRef = useRef(connectionState.status);
@@ -4158,62 +4138,24 @@ export default function App() {
   const sessionPreviewFetchSeqRef = useRef(0);
   const sessionPreviewKeysSignatureRef = useRef("");
   const interruptedRunsBySessionRef = useRef<Record<string, InterruptedRunSnapshot>>(interruptedRunsBySession);
-  const settingsOpenRef = useRef(showSettings);
+
+  const devicePairingController = useDevicePairingController({
+    showSettings,
+    connectionStatus: connectionState.status,
+    gatewayUrl,
+    token,
+    password,
+    clientRef,
+    gatewayMethodsRef,
+  });
 
   useEffect(() => {
     connectionStatusRef.current = connectionState.status;
   }, [connectionState.status]);
 
   useEffect(() => {
-    settingsOpenRef.current = showSettings;
-  }, [showSettings]);
-
-  useEffect(() => {
     interruptedRunsBySessionRef.current = interruptedRunsBySession;
   }, [interruptedRunsBySession]);
-
-  const devicePairingVisibility = useMemo(
-    () =>
-      devicePairingRaw === null
-        ? null
-        : normalizeDevicePairingVisibility(devicePairingRaw, currentDeviceId),
-    [currentDeviceId, devicePairingRaw],
-  );
-
-  const refreshDevicePairingVisibility = useCallback(async (clientOverride?: GatewayClient | null) => {
-    const client = clientOverride ?? clientRef.current;
-    if (!client || !client.connected) {
-      return;
-    }
-    const supportsPairList = gatewayMethodsRef.current.has("device.pair.list");
-    setDevicePairingSupported(supportsPairList);
-    if (!supportsPairList) {
-      setDevicePairingLoading(false);
-      setDevicePairingError(null);
-      setDevicePairingRaw(null);
-      setDevicePairingLastUpdatedAt(null);
-      return;
-    }
-    setDevicePairingLoading(true);
-    try {
-      const response = await client.request("device.pair.list", {}, { timeoutMs: 10_000 });
-      if (clientRef.current !== client) {
-        return;
-      }
-      setDevicePairingRaw(response);
-      setDevicePairingError(null);
-      setDevicePairingLastUpdatedAt(Date.now());
-    } catch (error) {
-      if (clientRef.current !== client) {
-        return;
-      }
-      setDevicePairingError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (clientRef.current === client) {
-        setDevicePairingLoading(false);
-      }
-    }
-  }, []);
 
   useEffect(() => {
     if (loadingSessionKeyRef.current !== null && loadingSessionKeyRef.current !== selectedSessionKey) {
@@ -5797,47 +5739,6 @@ export default function App() {
   }, [selectedSessionKey]);
 
   useEffect(() => {
-    setDevicePairingRaw(null);
-    setDevicePairingSupported(false);
-    setDevicePairingActionSupport({
-      canApprovePendingRequests: false,
-      canRejectPendingRequests: false,
-    });
-    setDevicePairingLoading(false);
-    setDevicePairingError(null);
-    setDevicePairingLastUpdatedAt(null);
-    setResolvingDevicePairRequestIds({});
-  }, [gatewayUrl, token, password]);
-
-  useEffect(() => {
-    if (!showSettings) {
-      return;
-    }
-    let cancelled = false;
-    void loadOrCreateDeviceIdentity()
-      .then((identity) => {
-        if (!cancelled) {
-          setCurrentDeviceId(identity.deviceId);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCurrentDeviceId(null);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showSettings]);
-
-  useEffect(() => {
-    if (!showSettings || connectionState.status !== "connected") {
-      return;
-    }
-    void refreshDevicePairingVisibility();
-  }, [connectionState.status, refreshDevicePairingVisibility, showSettings]);
-
-  useEffect(() => {
     sessionPreviewFetchSeqRef.current += 1;
     sessionPreviewKeysSignatureRef.current = "";
     setSessionPreviews({});
@@ -5865,17 +5766,7 @@ export default function App() {
             ? hello.features.methods.filter((item): item is string => typeof item === "string")
             : [],
         );
-        const supportsDevicePairList = gatewayMethodsRef.current.has("device.pair.list");
-        setDevicePairingActionSupport(deriveDevicePairingActionSupport(gatewayMethodsRef.current));
-        setDevicePairingSupported(supportsDevicePairList);
-        if (!supportsDevicePairList) {
-          setDevicePairingLoading(false);
-          setDevicePairingError(null);
-          setDevicePairingRaw(null);
-          setDevicePairingLastUpdatedAt(null);
-        } else if (settingsOpenRef.current) {
-          void refreshDevicePairingVisibility(client);
-        }
+        devicePairingController.handleGatewayHello(client);
         setServerInfo({
           version: typeof hello.server?.version === "string" ? hello.server.version : null,
           commit: typeof hello.server?.commit === "string" ? hello.server.commit : null,
@@ -5907,11 +5798,7 @@ export default function App() {
       },
       onClose: (info) => {
         gatewayMethodsRef.current.clear();
-        setDevicePairingActionSupport({
-          canApprovePendingRequests: false,
-          canRejectPendingRequests: false,
-        });
-        setDevicePairingLoading(false);
+        devicePairingController.handleGatewayClose();
         const activeSessionKey = selectedSessionRef.current;
         const interruptedRunSnapshot = buildInterruptedRunSnapshot({
           sessionKey: activeSessionKey,
@@ -5954,25 +5841,7 @@ export default function App() {
         }
       },
       onEvent: (evt) => {
-        if (
-          (evt.event === "device.pair.requested" || evt.event === "device.pair.resolved") &&
-          settingsOpenRef.current
-        ) {
-          void refreshDevicePairingVisibility(client);
-        }
-        if (evt.event === "device.pair.resolved" && isRecord(evt.payload)) {
-          const requestId = getString(evt.payload, ["requestId", "request_id"]);
-          if (requestId) {
-            setResolvingDevicePairRequestIds((prev) => {
-              if (!Object.prototype.hasOwnProperty.call(prev, requestId)) {
-                return prev;
-              }
-              const next = { ...prev };
-              delete next[requestId];
-              return next;
-            });
-          }
-        }
+        devicePairingController.handleGatewayEvent(evt.event, evt.payload, client);
         if (evt.event === "exec.approval.requested" || evt.event === "plugin.approval.requested") {
           const approval = extractPendingApprovalFromGatewayEvent(evt.event, evt.payload);
           if (approval) {
@@ -7234,42 +7103,6 @@ export default function App() {
     }
   }
 
-  async function handleResolveDevicePairRequest(
-    requestId: string,
-    decision: DevicePairingPendingDecision,
-  ) {
-    const client = clientRef.current;
-    if (!client) {
-      return;
-    }
-    const method = pickDevicePairingResolveMethod(gatewayMethodsRef.current, decision);
-    if (!method) {
-      setDevicePairingError(
-        `This gateway does not advertise ${
-          decision === "approve" ? "device.pair.approve" : "device.pair.reject"
-        }.`,
-      );
-      return;
-    }
-    setDevicePairingError(null);
-    setResolvingDevicePairRequestIds((prev) => ({ ...prev, [requestId]: decision }));
-    try {
-      await client.request(method, { requestId }, { timeoutMs: 10_000 });
-      await refreshDevicePairingVisibility(client);
-    } catch (error) {
-      setDevicePairingError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setResolvingDevicePairRequestIds((prev) => {
-        if (!Object.prototype.hasOwnProperty.call(prev, requestId)) {
-          return prev;
-        }
-        const next = { ...prev };
-        delete next[requestId];
-        return next;
-      });
-    }
-  }
-
   function pushSystemMessage(text: string) {
     setMessages((prev) => [
       ...prev,
@@ -8440,19 +8273,7 @@ export default function App() {
         models={models}
         newSessionPreferredModel={newSessionPreferredModel}
         onNewSessionPreferredModelChange={setNewSessionPreferredModel}
-        connectionStatus={connectionState.status}
-        currentDeviceId={currentDeviceId}
-        devicePairingVisibility={devicePairingVisibility}
-        devicePairingSupported={devicePairingSupported}
-        devicePairingActionSupport={devicePairingActionSupport}
-        devicePairingLoading={devicePairingLoading}
-        devicePairingError={devicePairingError}
-        devicePairingLastUpdatedAt={devicePairingLastUpdatedAt}
-        resolvingDevicePairRequestIds={resolvingDevicePairRequestIds}
-        onRefreshDevicePairingVisibility={() => void refreshDevicePairingVisibility()}
-        onResolveDevicePairRequest={(requestId, decision) =>
-          void handleResolveDevicePairRequest(requestId, decision)
-        }
+        devicePairing={devicePairingController.settingsModel}
       />
 
       <NewSessionModal

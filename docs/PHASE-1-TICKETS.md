@@ -4648,3 +4648,55 @@ This ticket is now complete.
 If `5.3` continues after this, the next slice should probably be:
 - a lightweight device-specific workflow entry point that real usage proves people actually need
 - or a pause, since the device surface now has visibility, capability summaries, and one safe action without overbuilding Milestone 1
+
+## Ticket 5.3.4 — Extract device pairing control state out of `app.tsx`
+
+### Why
+The first three device slices proved the feature is worth keeping, but they also turned device pairing into a real subsystem. Leaving device identity loading, pairing snapshot state, refresh logic, gateway-event handling, and approve/reject orchestration inside `app.tsx` would make the app root a second gravity well instead of a shell.
+
+### Scope
+- extract device pairing state and orchestration into a dedicated controller seam
+- keep `SettingsModal` and `DeviceVisibilitySection` as presentation surfaces
+- preserve current user-facing pairing behavior
+- reduce device-specific prop sprawl from `app.tsx` into Settings
+
+### Deliverable
+A dedicated device pairing controller boundary that answers:
+- “Where does device pairing state actually live?”
+- “Can the shell consume the device surface without owning its runtime behavior inline?”
+
+### Done when
+- `app.tsx` no longer directly owns device identity loading, pairing snapshot state, refresh logic, and approve/reject orchestration
+- the gateway lifecycle delegates pairing-specific `hello` / `close` / event reactions into the extracted boundary
+- Settings receives a grouped device pairing model instead of a long list of device-specific props
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-15)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/hooks/useDevicePairingController.ts` to own:
+  - local device identity loading
+  - pairing snapshot state
+  - pairing method support derivation
+  - pending request resolve state
+  - refresh and approve/reject actions
+  - pairing-specific gateway `hello` / `close` / event reactions
+- updated `src/app.tsx` to delegate device pairing runtime behavior to that hook instead of carrying the subsystem inline
+- updated `src/components/SettingsModal.tsx` and `src/components/settings-sections/DeviceVisibilitySection.tsx` so the device surface is driven by one grouped model instead of a long device-specific prop chain
+
+#### Architectural improvements landed
+- `app.tsx` is back to shell composition for the device surface instead of also owning its state machine
+- the device pairing feature now has a clear ownership boundary, which makes future device work less likely to sprawl back into the app root
+- the settings surface now consumes a cohesive device-pairing model instead of a scattered set of individual state props and callbacks
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If `5.3` continues after this, the next slice should again be user-driven:
+- only add another device-specific workflow if real usage proves a concrete need
+- otherwise pause device work here and move on to another Milestone 1 hotspot
