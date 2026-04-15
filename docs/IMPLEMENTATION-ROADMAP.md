@@ -634,6 +634,11 @@ Goal:
 Primary goal:
 - isolate Electron/desktop file and image logic from presentation components
 
+#### First implementation cut follow-through
+- `MessageImageAttachment` no longer carries its image load/retry/desktop-bridge state machine inline
+- desktop local decode, scheme fallback, remote media fallback, generated-image retry timing, and preview decode recovery now live behind `useMessageImageAttachmentController`
+- the image attachment surface is now closer to a pure view component, which gives future media work a clearer seam than editing JSX-heavy runtime logic directly
+
 ## Track C — App-state formalization
 Primary goal:
 - define and enforce state ownership for connection, session, thread, tool, and UI domains

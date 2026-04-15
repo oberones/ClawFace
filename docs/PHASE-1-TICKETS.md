@@ -4700,3 +4700,61 @@ This ticket is now complete.
 If `5.3` continues after this, the next slice should again be user-driven:
 - only add another device-specific workflow if real usage proves a concrete need
 - otherwise pause device work here and move on to another Milestone 1 hotspot
+
+## Ticket B.1 — Extract the image attachment media controller from `MessageImageAttachment`
+
+### Why
+`MessageImageAttachment` has been carrying a large amount of platform-specific image behavior inline:
+- desktop local-file reads
+- desktop local-image scheme fallback
+- remote media fallback
+- generated-image retry windows
+- preview decode recovery
+- debug path exposure
+
+That makes a presentation component reason directly about desktop bridges and media transport concerns, which is exactly the kind of coupling Track B is meant to reduce.
+
+### Scope
+- move image attachment load/retry/recovery state into a dedicated hook/controller seam
+- keep `MessageImageAttachment` as the rendering surface
+- preserve current desktop/web/generated-image behavior
+- avoid changing the external attachment API
+
+### Deliverable
+A cleaner media/platform boundary that answers:
+- “Where does the image attachment runtime behavior actually live?”
+- “Can the view component render image state without also owning desktop/media orchestration?”
+
+### Done when
+- `MessageImageAttachment` no longer inlines the image load/retry/desktop-bridge state machine
+- desktop/web/remote fallback behavior lives behind a dedicated hook/controller seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-15)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/hooks/useMessageImageAttachmentController.ts` to own:
+  - local image decode attempts
+  - desktop local-image fallback
+  - remote media fallback
+  - generated-image retry timing
+  - preview decode recovery
+  - image debug path visibility state
+- updated `src/components/MessageImageAttachment.tsx` to become a thin rendering surface driven by the extracted controller
+
+#### Architectural improvements landed
+- the message image view no longer directly mixes platform/media runtime behavior with rendering markup
+- desktop file/image logic is now easier to reason about without reading through JSX branches
+- future media changes have a clearer seam that is less likely to sprawl back into the presentation component
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track B continues, the next slice should probably extract one more media/platform seam that has similar coupling pressure:
+- either the shell-level remote image resolution path in `app.tsx`
+- or the desktop/web image-source mapping seam in `src/lib/message-image-source.ts`
