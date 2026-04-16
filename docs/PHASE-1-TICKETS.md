@@ -4811,3 +4811,58 @@ This ticket is now complete.
 
 #### Recommended next step
 If Track B continues after this, the next most natural slice is probably the desktop/web image-source mapping seam in `src/lib/message-image-source.ts`.
+
+## Ticket B.3 — Extract the desktop/web image-source mapping seam
+
+### Why
+Even after `MessageImageAttachment` and the shell-level remote resolver moved behind dedicated controller seams, the renderer still had one important media/platform boundary split across two places:
+- `src/lib/message-image-source.ts` knew how to parse and translate attachment image sources
+- `src/app.tsx` still reimplemented runtime-specific image normalization when turning raw gateway payloads into attachments
+
+That duplication kept the attachment-building path and the image-rendering path from sharing one authoritative translation layer, which is exactly the kind of drift Track B is meant to reduce.
+
+### Scope
+- move runtime-specific image source normalization behind `src/lib/message-image-source.ts`
+- update `src/app.tsx` to consume that shared image-source boundary instead of carrying its own desktop/web mapping helpers inline
+- preserve current desktop local-image, web local-proxy, base64, and file-url behavior
+- add focused regression coverage for the shared normalization path
+
+### Deliverable
+A clearer media/platform boundary that answers:
+- “Where does attachment image-source translation actually live?”
+- “Can the app shell build image attachments without reimplementing desktop/web source mapping rules?”
+
+### Done when
+- `app.tsx` no longer inlines the image-source normalization path used when building attachments
+- `src/lib/message-image-source.ts` becomes the shared source of truth for runtime-specific image source translation
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- extended `src/lib/message-image-source.ts` with:
+  - `toRuntimeRenderableLocalPath(...)`
+  - `normalizeRuntimeImageSourceData(...)`
+  - the internal desktop local-image URL and web local-proxy parsing/mapping helpers needed by that shared normalization path
+- updated `src/app.tsx` to use the shared image-source normalization seam when building attachments from raw gateway image payloads
+- removed the overlapping desktop/web image-source translation helpers from `src/app.tsx`
+- added regression coverage in `tests/message-image-source.test.mjs` for:
+  - file-URL normalization through the shared runtime mapper
+  - desktop local-image URL normalization with active path-prefix mappings
+
+#### Architectural improvements landed
+- the attachment-building path and the image-rendering path now share one image-source translation boundary instead of maintaining parallel runtime mapping rules
+- `app.tsx` is closer to shell/domain composition for media concerns and less of a second home for desktop/web source translation logic
+- future image-path or runtime-source fixes now have one more obvious place to land before the renderer or shell need to know about them
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track B continues after this, the next natural slice is probably whichever remaining media seam still feels most coupled in real use:
+- either the image lightbox/runtime behavior path in `ChatView.tsx`
+- or the remaining app-side media directive / attachment extraction boundary if it still feels too shell-specific

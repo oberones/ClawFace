@@ -1,6 +1,51 @@
 import { applyPathPrefixMappings } from "./path-prefix-mappings.ts";
 
 export const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
+const WORKSPACE_MARKER = "/.openclaw/workspace";
+
+export type NormalizedRuntimeImageSourceData = {
+  dataUrl: string;
+  fromBase64: boolean;
+  sourcePath?: string;
+};
+
+function normalizeFsPath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
+function trimTrailingSlashes(value: string): string {
+  const normalized = normalizeFsPath(value).trim();
+  if (!normalized) {
+    return "";
+  }
+  return normalized.replace(/\/+$/g, "");
+}
+
+function getRuntimeHomeDir(): string {
+  return trimTrailingSlashes(window.desktopInfo?.homeDir ?? "");
+}
+
+function getRuntimeWorkspaceDir(): string {
+  const desktopWorkspaceDir = trimTrailingSlashes(window.desktopInfo?.workspaceDir ?? "");
+  if (desktopWorkspaceDir) {
+    return desktopWorkspaceDir;
+  }
+  const homeDir = getRuntimeHomeDir();
+  if (!homeDir) {
+    return "";
+  }
+  return `${homeDir}${WORKSPACE_MARKER}`;
+}
+
+function isAbsoluteFsPath(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("\\\\") ||
+    /^[A-Za-z]:[\\/]/.test(trimmed) ||
+    trimmed.startsWith("~/")
+  );
+}
 
 function filePathFromFileUrl(value: string): string | null {
   try {
@@ -416,15 +461,177 @@ function toFileUrl(value: string): string | null {
   return null;
 }
 
+function localPathFromDesktopLocalImageUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== `${DESKTOP_LOCAL_IMAGE_SCHEME}:`) {
+      return null;
+    }
+    const rawPath = parsed.searchParams.get("path");
+    if (rawPath) {
+      return decodeURIComponent(rawPath);
+    }
+    let pathname = decodeURIComponent(parsed.pathname || "");
+    if (/^\/[A-Za-z]:\//.test(pathname)) {
+      pathname = pathname.slice(1);
+    }
+    return pathname || null;
+  } catch {
+    return null;
+  }
+}
+
+function localPathFromWebLocalImageProxyUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (/^file:\/\/\/__claw\/local-image\?/i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      const rawPath = parsed.searchParams.get("path");
+      if (!rawPath) {
+        return null;
+      }
+      return decodeURIComponent(rawPath);
+    } catch {
+      return null;
+    }
+  }
+  const marker = "/__claw/local-image?";
+  const parsePath = (raw: string | null): string | null => {
+    if (!raw) {
+      return null;
+    }
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  };
+
+  if (trimmed.startsWith(marker)) {
+    return parsePath(new URLSearchParams(trimmed.slice(marker.length)).get("path"));
+  }
+
+  const markerIndex = trimmed.indexOf(marker);
+  if (markerIndex >= 0) {
+    return parsePath(new URLSearchParams(trimmed.slice(markerIndex + marker.length)).get("path"));
+  }
+
+  if (!trimmed.includes("/__claw/local-image")) {
+    return null;
+  }
+  try {
+    const parsed = new URL(trimmed, "http://127.0.0.1");
+    return parsePath(parsed.searchParams.get("path"));
+  } catch {
+    return null;
+  }
+}
+
+function resolveProxyLocalPath(value: string): string {
+  const mapped = applyPathPrefixMappings(value);
+  if (!mapped) {
+    return value;
+  }
+  if (isAbsoluteFsPath(mapped) || mapped.startsWith("~")) {
+    return mapped;
+  }
+  const workspaceDir = getRuntimeWorkspaceDir();
+  if (!workspaceDir) {
+    return mapped;
+  }
+  return `${workspaceDir}/${mapped.replace(/^\/+/, "")}`;
+}
+
+function deriveSourcePathHint(value: string): string | null {
+  const trimmed = stripPathDecorators(value);
+  if (!trimmed) {
+    return null;
+  }
+  const workspaceRelativePath = resolveWorkspaceRelativeLocalPath(trimmed);
+  if (workspaceRelativePath) {
+    return workspaceRelativePath;
+  }
+  return trimmed;
+}
+
+export function toRuntimeRenderableLocalPath(filePath: string): string {
+  if (isDesktopRuntime()) {
+    return buildDesktopLocalImageUrl(filePath);
+  }
+  return buildWebLocalImageProxyUrl(filePath) || toFileUrl(filePath) || filePath;
+}
+
 export function toRuntimeRenderableSrc(value: string): string {
   const path = filePathFromImageSource(value);
   if (!path) {
     return value;
   }
-  if (!isDesktopRuntime()) {
-    return buildWebLocalImageProxyUrl(path) || toFileUrl(path) || value;
+  return toRuntimeRenderableLocalPath(path);
+}
+
+export function normalizeRuntimeImageSourceData(
+  rawData: string,
+  mimeType: string,
+): NormalizedRuntimeImageSourceData {
+  const trimmed = rawData.trim();
+  if (!trimmed) {
+    return { dataUrl: "", fromBase64: false };
   }
-  return buildDesktopLocalImageUrl(path);
+  const normalizedDataUrl = normalizeDataImageUrl(trimmed);
+  if (normalizedDataUrl) {
+    return { dataUrl: normalizedDataUrl, fromBase64: false };
+  }
+  if (/^(https?:|blob:)/i.test(trimmed)) {
+    return { dataUrl: trimmed, fromBase64: false };
+  }
+
+  const fromDesktopLocalPath = localPathFromDesktopLocalImageUrl(trimmed);
+  if (fromDesktopLocalPath) {
+    const mappedLocalPath = applyPathPrefixMappings(fromDesktopLocalPath);
+    return {
+      dataUrl: toRuntimeRenderableLocalPath(mappedLocalPath),
+      fromBase64: false,
+      sourcePath: fromDesktopLocalPath,
+    };
+  }
+
+  const fromProxyPath = localPathFromWebLocalImageProxyUrl(trimmed);
+  if (fromProxyPath) {
+    const resolvedProxyPath = resolveProxyLocalPath(fromProxyPath);
+    return {
+      dataUrl: toRuntimeRenderableLocalPath(resolvedProxyPath),
+      fromBase64: false,
+      sourcePath: fromProxyPath,
+    };
+  }
+
+  if (/^file:/i.test(trimmed)) {
+    const asLocalPath = filePathFromFileUrl(trimmed);
+    if (asLocalPath) {
+      const mappedLocalPath = applyPathPrefixMappings(asLocalPath);
+      return {
+        dataUrl: toRuntimeRenderableLocalPath(mappedLocalPath),
+        fromBase64: false,
+        sourcePath: asLocalPath,
+      };
+    }
+    return { dataUrl: trimmed, fromBase64: false };
+  }
+
+  if (filePathFromImageSource(trimmed)) {
+    const sourcePathHint = deriveSourcePathHint(trimmed) ?? trimmed;
+    return {
+      dataUrl: toRuntimeRenderableSrc(trimmed),
+      fromBase64: false,
+      sourcePath: sourcePathHint,
+    };
+  }
+
+  return { dataUrl: `data:${mimeType};base64,${trimmed}`, fromBase64: true };
 }
 
 export function isLikelyLocalFileSource(value: string): boolean {
