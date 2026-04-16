@@ -4866,3 +4866,57 @@ This ticket is now complete.
 If Track B continues after this, the next natural slice is probably whichever remaining media seam still feels most coupled in real use:
 - either the image lightbox/runtime behavior path in `ChatView.tsx`
 - or the remaining app-side media directive / attachment extraction boundary if it still feels too shell-specific
+
+## Ticket B.4 — Extract the image lightbox runtime behavior from `ChatView`
+
+### Why
+Even after the image attachment controller and the shared image-source mapping seam were extracted, `ChatView` still owned a small but real image-runtime subsystem for the lightbox:
+- modal open/close state
+- escape-key dismissal and body scroll lock
+- desktop local-image scheme fallback
+- lightbox read-image recovery after preview failures
+- local-file blocking behavior for web runtimes
+
+That kept media/runtime behavior mixed into one of the biggest UI components in the repo, which is exactly the sort of coupling Track B is meant to shrink.
+
+### Scope
+- move image lightbox runtime state and recovery behavior behind a dedicated hook/controller seam
+- keep `ChatView` responsible for rendering the lightbox surface and wiring open/close callbacks
+- preserve current desktop recovery behavior and web local-file blocking behavior
+- avoid expanding the lightbox into a broader redesign or separate workflow
+
+### Deliverable
+A clearer media/platform boundary that answers:
+- “Where does the lightbox runtime behavior actually live?”
+- “Can `ChatView` render the image modal without also owning the desktop recovery state machine?”
+
+### Done when
+- `ChatView.tsx` no longer inlines the lightbox modal lifecycle and image-recovery behavior
+- the lightbox runtime path lives behind a dedicated hook/controller seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/hooks/useImageLightboxController.ts` to own:
+  - lightbox open/close state
+  - escape-key dismissal
+  - body scroll locking while the modal is open
+  - desktop local-image fallback and read-image recovery
+  - web local-file blocking state
+- updated `src/components/ChatView.tsx` to consume that hook instead of carrying the lightbox runtime behavior inline
+
+#### Architectural improvements landed
+- `ChatView` is closer to a rendering/composition surface instead of also owning another media-runtime state machine
+- lightbox-specific desktop recovery behavior now has a dedicated seam that can evolve without reopening the main chat component
+- Track B now covers the attachment preview, remote resolver, shared image-source mapping, and lightbox runtime layers with clearer boundaries between them
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track B continues after this, the next natural slice is probably the remaining app-side media directive / attachment extraction boundary, since that is the most obvious media-specific logic still living in the app shell.
