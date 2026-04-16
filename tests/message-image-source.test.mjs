@@ -221,3 +221,65 @@ test("normalizeRuntimeImageSourceData maps desktop local image URLs through acti
     sourcePath: "/home/node/.openclaw/media/monkey-gangster---uuid.png",
   });
 });
+
+test("normalizeRuntimeImageSourceData honors runtime path hints when desktopInfo is unavailable", () => {
+  const result = withWindow(
+    {
+      desktopInfo: {
+        homeDir: "",
+        isDesktop: false,
+        workspaceDir: "",
+      },
+      location: {
+        origin: "http://localhost:5173",
+        protocol: "http:",
+      },
+    },
+    () => {
+      const { imageSource } = loadImageModules();
+      imageSource.setImageSourceRuntimeHints({
+        homeDir: "/Users/oberon",
+        workspaceDir: "/Users/oberon/.openclaw/workspace",
+      });
+
+      return imageSource.normalizeRuntimeImageSourceData("monkey-gangster---uuid.png", "image/png");
+    },
+  );
+
+  assert.deepEqual(result, {
+    dataUrl:
+      "http://localhost:5173/__claw/local-image?path=%2FUsers%2Foberon%2F.openclaw%2Fmedia%2Fmonkey-gangster---uuid.png",
+    fromBase64: false,
+    sourcePath: "monkey-gangster---uuid.png",
+  });
+});
+
+test("normalizeRuntimeImageSourceData does not double-decode local image query paths", () => {
+  const result = withWindow(
+    {
+      desktopInfo: {
+        homeDir: "/Users/oberon",
+        isDesktop: true,
+        workspaceDir: "/Users/oberon/.openclaw/workspace",
+      },
+      location: {
+        origin: "file://",
+        protocol: "file:",
+      },
+    },
+    () => {
+      const { imageSource } = loadImageModules();
+      return imageSource.normalizeRuntimeImageSourceData(
+        "claw-local-image://open?path=%2FUsers%2Foberon%2F.openclaw%2Fmedia%2F100%25-real.png",
+        "image/png",
+      );
+    },
+  );
+
+  assert.deepEqual(result, {
+    dataUrl:
+      "claw-local-image://open?path=%2FUsers%2Foberon%2F.openclaw%2Fmedia%2F100%25-real.png",
+    fromBase64: false,
+    sourcePath: "/Users/oberon/.openclaw/media/100%-real.png",
+  });
+});
