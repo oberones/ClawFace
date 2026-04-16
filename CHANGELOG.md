@@ -8,6 +8,27 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.9.0 (2026-04-15)
+
+### Feat
+
+- add the first safe device pairing action
+- add device capability summaries
+- add the first device visibility surface
+
+### Fix
+
+- harden remote image resolver review follow-up
+- preserve image preview state across generation updates
+- support iterable pairing method inputs
+- tighten device capability summary review follow-up
+
+### Refactor
+
+- extract shell-level remote image resolver
+- extract message image attachment controller
+- extract device pairing controller from app root
+
 ## v0.8.0 (2026-04-13)
 
 ### Feat
