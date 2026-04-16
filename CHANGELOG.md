@@ -8,6 +8,16 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.9.1 (2026-04-15)
+
+### Fix
+
+- keep image generation tool activity scoped to its session
+
+### Perf
+
+- avoid eager session run ownership scans
+
 ## v0.9.0 (2026-04-15)
 
 ### Feat
