@@ -644,6 +644,11 @@ Primary goal:
 - gateway RPC probing, HTTP fallback probing, remote image response decoding, and remote image result caching now live behind `useRemoteImageResolver`
 - the app root is closer to shell composition for media concerns, and future remote-image work has a dedicated seam instead of reopening the root component
 
+#### Third implementation cut follow-through
+- runtime-specific attachment image-source normalization no longer lives in two places
+- `src/lib/message-image-source.ts` now owns the shared desktop/web image-source translation seam used by both image rendering and attachment construction
+- `src/app.tsx` no longer carries the overlapping desktop local-image URL, web local-proxy, and file-url mapping helpers inline when turning gateway payloads into attachments
+
 ## Track C — App-state formalization
 Primary goal:
 - define and enforce state ownership for connection, session, thread, tool, and UI domains

@@ -83,6 +83,11 @@ import {
 import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
 import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
+import {
+  isDesktopRuntime,
+  normalizeRuntimeImageSourceData,
+  toRuntimeRenderableLocalPath,
+} from "./lib/message-image-source.ts";
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
 import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
@@ -161,7 +166,6 @@ const MEDIA_PREFIX_RE = /\bmedia\s*:/i;
 const ATTACHMENT_FINGERPRINT_HEAD = 96;
 const ATTACHMENT_FINGERPRINT_TAIL = 64;
 const WORKSPACE_MARKER = "/.openclaw/workspace";
-const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 const runtimePathHints: { homeDir: string; workspaceDir: string } = {
   homeDir: "",
   workspaceDir: "",
@@ -3143,144 +3147,6 @@ function fileNameFromPath(value: string): string {
   return parts[parts.length - 1] ?? "image";
 }
 
-function toFileUrl(value: string): string | null {
-  const normalized = normalizeFsPath(value).trim();
-  if (!normalized) {
-    return null;
-  }
-  if (normalized.startsWith("~/")) {
-    const homeDir = getRuntimeHomeDir();
-    if (!homeDir) {
-      return null;
-    }
-    const expanded = `${homeDir}/${normalized.slice(2)}`;
-    return toFileUrl(expanded);
-  }
-  if (/^[A-Za-z]:\//.test(normalized)) {
-    return `file:///${encodeURI(normalized)}`;
-  }
-  if (normalized.startsWith("//")) {
-    return `file:${encodeURI(normalized)}`;
-  }
-  if (normalized.startsWith("/")) {
-    return `file://${encodeURI(normalized)}`;
-  }
-  return null;
-}
-
-function buildDesktopLocalImageUrl(localPath: string): string {
-  return `${DESKTOP_LOCAL_IMAGE_SCHEME}://open?path=${encodeURIComponent(localPath)}`;
-}
-
-function localPathFromDesktopLocalImageUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== `${DESKTOP_LOCAL_IMAGE_SCHEME}:`) {
-      return null;
-    }
-    const rawPath = parsed.searchParams.get("path");
-    if (rawPath) {
-      return decodeURIComponent(rawPath);
-    }
-    let pathname = decodeURIComponent(parsed.pathname || "");
-    if (/^\/[A-Za-z]:\//.test(pathname)) {
-      pathname = pathname.slice(1);
-    }
-    return pathname || null;
-  } catch {
-    return null;
-  }
-}
-
-function localPathFromWebProxyUrl(value: string): string | null {
-  const trimmed = value.trim();
-  if (/^file:\/\/\/__claw\/local-image\?/i.test(trimmed)) {
-    try {
-      const parsed = new URL(trimmed);
-      const rawPath = parsed.searchParams.get("path");
-      if (!rawPath) {
-        return null;
-      }
-      return decodeURIComponent(rawPath);
-    } catch {
-      return null;
-    }
-  }
-  const marker = "/__claw/local-image?";
-  const parsePath = (raw: string | null): string | null => {
-    if (!raw) {
-      return null;
-    }
-    try {
-      return decodeURIComponent(raw);
-    } catch {
-      return raw;
-    }
-  };
-
-  if (trimmed.startsWith(marker)) {
-    return parsePath(new URLSearchParams(trimmed.slice(marker.length)).get("path"));
-  }
-
-  const markerIndex = trimmed.indexOf(marker);
-  if (markerIndex >= 0) {
-    return parsePath(new URLSearchParams(trimmed.slice(markerIndex + marker.length)).get("path"));
-  }
-
-  if (!trimmed.includes("/__claw/local-image")) {
-    return null;
-  }
-  try {
-    const parsed = new URL(trimmed, "http://127.0.0.1");
-    return parsePath(parsed.searchParams.get("path"));
-  } catch {
-    return null;
-  }
-}
-
-function isDesktopRuntime(): boolean {
-  if (window.desktopInfo?.isDesktop) {
-    return true;
-  }
-  return window.location.protocol === "file:";
-}
-
-function canUseWebLocalImageProxy(): boolean {
-  const protocol = window.location.protocol;
-  return protocol === "http:" || protocol === "https:";
-}
-
-function filePathFromFileUrl(value: string): string | null {
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol !== "file:") {
-      return null;
-    }
-    let pathname = decodeURIComponent(parsed.pathname || "");
-    if (!pathname) {
-      return null;
-    }
-    if (/^\/[A-Za-z]:\//.test(pathname)) {
-      pathname = pathname.slice(1);
-    }
-    return pathname;
-  } catch {
-    return null;
-  }
-}
-
-function buildWebLocalImageProxyUrl(localPath: string): string {
-  if (!canUseWebLocalImageProxy()) {
-    return "";
-  }
-  const origin = window.location.origin;
-  return `${origin}/__claw/local-image?path=${encodeURIComponent(localPath)}`;
-}
-
 function resolveMediaRelativeImagePath(value: string): string | null {
   const trimmed = value.trim().replace(/^\.\/+/, "").replace(/^\/+/, "");
   if (!trimmed || !inferImageMimeTypeFromPath(trimmed)) {
@@ -3382,9 +3248,7 @@ function extractMediaAttachmentsFromText(text: string): {
     }
     const mappedResolved = applyPathPrefixMappings(resolved, { homeDir: getRuntimeHomeDir() });
     const mimeType = inferImageMimeTypeFromPath(mappedResolved);
-    const dataUrl = isDesktopRuntime()
-      ? buildDesktopLocalImageUrl(mappedResolved)
-      : buildWebLocalImageProxyUrl(mappedResolved) || toFileUrl(mappedResolved);
+    const dataUrl = toRuntimeRenderableLocalPath(mappedResolved);
     if (!mimeType || !dataUrl) {
       retainedLines.push(line);
       continue;
@@ -3490,166 +3354,6 @@ function toolMessageMayContainImage(raw: unknown): boolean {
   return false;
 }
 
-function normalizeImageSourceData(
-  rawData: string,
-  mimeType: string,
-): { dataUrl: string; fromBase64: boolean; sourcePath?: string } {
-  const trimmed = rawData.trim();
-  if (!trimmed) {
-    return { dataUrl: "", fromBase64: false };
-  }
-  if (/^data:image\//i.test(trimmed)) {
-    return { dataUrl: trimmed, fromBase64: false };
-  }
-  if (/^(https?:|blob:)/i.test(trimmed)) {
-    return { dataUrl: trimmed, fromBase64: false };
-  }
-  const fromDesktopLocalPath = localPathFromDesktopLocalImageUrl(trimmed);
-  if (fromDesktopLocalPath) {
-    const mappedLocalPath = applyPathPrefixMappings(fromDesktopLocalPath, { homeDir: getRuntimeHomeDir() });
-    if (isDesktopRuntime()) {
-      return {
-        dataUrl: buildDesktopLocalImageUrl(mappedLocalPath),
-        fromBase64: false,
-        sourcePath: fromDesktopLocalPath,
-      };
-    }
-    const proxied = buildWebLocalImageProxyUrl(mappedLocalPath);
-    return {
-      dataUrl: proxied || trimmed,
-      fromBase64: false,
-      sourcePath: fromDesktopLocalPath,
-    };
-  }
-  const fromProxyPath = localPathFromWebProxyUrl(trimmed);
-  if (fromProxyPath) {
-    const mappedProxyPath = applyPathPrefixMappings(fromProxyPath, { homeDir: getRuntimeHomeDir() });
-    const resolvedProxyPath =
-      isAbsoluteFsPath(mappedProxyPath) || mappedProxyPath.startsWith("~")
-        ? mappedProxyPath
-        : getRuntimeWorkspaceDir()
-          ? `${getRuntimeWorkspaceDir()}/${mappedProxyPath}`
-          : mappedProxyPath;
-    if (isDesktopRuntime()) {
-      return {
-        dataUrl: buildDesktopLocalImageUrl(resolvedProxyPath),
-        fromBase64: false,
-        sourcePath: fromProxyPath,
-      };
-    }
-    const proxied = buildWebLocalImageProxyUrl(resolvedProxyPath);
-    return {
-      dataUrl: proxied || trimmed,
-      fromBase64: false,
-      sourcePath: fromProxyPath,
-    };
-  }
-  if (/^file:/i.test(trimmed)) {
-    if (isDesktopRuntime()) {
-      const asLocalPath = filePathFromFileUrl(trimmed);
-      if (asLocalPath) {
-        const mappedLocalPath = applyPathPrefixMappings(asLocalPath, { homeDir: getRuntimeHomeDir() });
-        return {
-          dataUrl: buildDesktopLocalImageUrl(mappedLocalPath),
-          fromBase64: false,
-          sourcePath: asLocalPath,
-        };
-      }
-      return { dataUrl: trimmed, fromBase64: false };
-    }
-    const asLocalPath = filePathFromFileUrl(trimmed);
-    if (asLocalPath) {
-      const mappedLocalPath = applyPathPrefixMappings(asLocalPath, { homeDir: getRuntimeHomeDir() });
-      const proxied = buildWebLocalImageProxyUrl(mappedLocalPath);
-      return {
-        dataUrl: proxied || trimmed,
-        fromBase64: false,
-        sourcePath: asLocalPath,
-      };
-    }
-    return { dataUrl: trimmed, fromBase64: false };
-  }
-  if (isAbsoluteFsPath(trimmed)) {
-    const mappedAbsolutePath = applyPathPrefixMappings(trimmed, { homeDir: getRuntimeHomeDir() });
-    if (isDesktopRuntime()) {
-      return {
-        dataUrl: buildDesktopLocalImageUrl(mappedAbsolutePath),
-        fromBase64: false,
-        sourcePath: trimmed,
-      };
-    }
-    if (!isDesktopRuntime()) {
-      const proxied = buildWebLocalImageProxyUrl(mappedAbsolutePath);
-      if (proxied) {
-        return {
-          dataUrl: proxied,
-          fromBase64: false,
-          sourcePath: trimmed,
-        };
-      }
-      const asFileUrl = toFileUrl(mappedAbsolutePath);
-      if (asFileUrl) {
-        return {
-          dataUrl: asFileUrl,
-          fromBase64: false,
-          sourcePath: trimmed,
-        };
-      }
-    }
-    const asFileUrl = toFileUrl(mappedAbsolutePath);
-    if (asFileUrl) {
-      return {
-        dataUrl: asFileUrl,
-        fromBase64: false,
-        sourcePath: trimmed,
-      };
-    }
-  }
-  const mediaRelativePath = resolveMediaRelativeImagePath(trimmed);
-  if (mediaRelativePath) {
-    const mappedMediaPath = applyPathPrefixMappings(mediaRelativePath, { homeDir: getRuntimeHomeDir() });
-    if (isDesktopRuntime()) {
-      return {
-        dataUrl: buildDesktopLocalImageUrl(mappedMediaPath),
-        fromBase64: false,
-        sourcePath: trimmed,
-      };
-    }
-    const proxied = buildWebLocalImageProxyUrl(mappedMediaPath);
-    return {
-      dataUrl: proxied || mappedMediaPath,
-      fromBase64: false,
-      sourcePath: trimmed,
-    };
-  }
-  const workspaceRelativePath = resolveWorkspaceRelativeImagePath(trimmed);
-  if (workspaceRelativePath) {
-    const mappedWorkspacePath = applyPathPrefixMappings(workspaceRelativePath, { homeDir: getRuntimeHomeDir() });
-    if (isDesktopRuntime()) {
-      return {
-        dataUrl: buildDesktopLocalImageUrl(mappedWorkspacePath),
-        fromBase64: false,
-        sourcePath: workspaceRelativePath,
-      };
-    }
-    const proxied = buildWebLocalImageProxyUrl(mappedWorkspacePath);
-    return {
-      dataUrl: proxied || mappedWorkspacePath,
-      fromBase64: false,
-      sourcePath: workspaceRelativePath,
-    };
-  }
-  if (trimmed.startsWith("/") && Boolean(inferImageMimeTypeFromPath(trimmed))) {
-    const mappedAbsolutePath = applyPathPrefixMappings(trimmed, { homeDir: getRuntimeHomeDir() });
-    return {
-      dataUrl: mappedAbsolutePath,
-      fromBase64: false,
-      sourcePath: trimmed,
-    };
-  }
-  return { dataUrl: `data:${mimeType};base64,${trimmed}`, fromBase64: true };
-}
-
 function toChatMessage(raw: unknown, fallbackTimestamp?: number): ChatMessage | null {
   const toolMessage = isToolMessage(raw);
   if (toolMessage && !toolMessageMayContainImage(raw)) {
@@ -3666,7 +3370,7 @@ function toChatMessage(raw: unknown, fallbackTimestamp?: number): ChatMessage | 
   const images = extractImages(raw);
   const imageAttachments: Attachment[] = images
     .map((img, index): Attachment | null => {
-      const normalized = normalizeImageSourceData(img.data, img.mimeType);
+      const normalized = normalizeRuntimeImageSourceData(img.data, img.mimeType);
       if (!normalized.dataUrl) {
         return null;
       }
