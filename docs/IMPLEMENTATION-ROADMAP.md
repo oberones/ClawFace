@@ -639,6 +639,11 @@ Primary goal:
 - desktop local decode, scheme fallback, remote media fallback, generated-image retry timing, and preview decode recovery now live behind `useMessageImageAttachmentController`
 - the image attachment surface is now closer to a pure view component, which gives future media work a clearer seam than editing JSX-heavy runtime logic directly
 
+#### Second implementation cut follow-through
+- the shell-level remote image resolver no longer lives inline in `app.tsx`
+- gateway RPC probing, HTTP fallback probing, remote image response decoding, and remote image result caching now live behind `useRemoteImageResolver`
+- the app root is closer to shell composition for media concerns, and future remote-image work has a dedicated seam instead of reopening the root component
+
 ## Track C — App-state formalization
 Primary goal:
 - define and enforce state ownership for connection, session, thread, tool, and UI domains

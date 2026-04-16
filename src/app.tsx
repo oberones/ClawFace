@@ -48,12 +48,7 @@ import {
   runMayStillProduceMedia,
   toolMayProduceMedia,
 } from "./lib/media-hydration.ts";
-import {
-  buildGatewayRemoteMediaUrlCandidates,
-  buildRemoteMediaReadParamVariants,
-  extractRenderableImageSourceFromUnknown,
-  pickRemoteMediaReadMethods,
-} from "./lib/remote-media-resolution.ts";
+import { inferImageMimeTypeFromPath } from "./lib/remote-media-resolution.ts";
 import {
   applyModelRuntimeOverride,
   applyThinkingRuntimeOverride,
@@ -88,6 +83,7 @@ import {
 import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
+import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 
 const STORAGE_KEYS = {
@@ -165,8 +161,6 @@ const ATTACHMENT_FINGERPRINT_HEAD = 96;
 const ATTACHMENT_FINGERPRINT_TAIL = 64;
 const WORKSPACE_MARKER = "/.openclaw/workspace";
 const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
-const REMOTE_IMAGE_CACHE_LIMIT = 5;
-const REMOTE_IMAGE_HTTP_FETCH_TIMEOUT_MS = 2000;
 const runtimePathHints: { homeDir: string; workspaceDir: string } = {
   homeDir: "",
   workspaceDir: "",
@@ -3148,134 +3142,6 @@ function fileNameFromPath(value: string): string {
   return parts[parts.length - 1] ?? "image";
 }
 
-function inferImageMimeTypeFromPath(value: string): string | null {
-  const normalized = normalizeFsPath(value).toLowerCase();
-  const noQuery = normalized.split("?")[0]?.split("#")[0] ?? normalized;
-  if (noQuery.endsWith(".png")) {
-    return "image/png";
-  }
-  if (noQuery.endsWith(".jpg") || noQuery.endsWith(".jpeg")) {
-    return "image/jpeg";
-  }
-  if (noQuery.endsWith(".webp")) {
-    return "image/webp";
-  }
-  if (noQuery.endsWith(".gif")) {
-    return "image/gif";
-  }
-  if (noQuery.endsWith(".bmp")) {
-    return "image/bmp";
-  }
-  if (noQuery.endsWith(".svg")) {
-    return "image/svg+xml";
-  }
-  return null;
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      if (!result) {
-        reject(new Error("empty-data-url"));
-        return;
-      }
-      resolve(result);
-    };
-    reader.onerror = () => {
-      reject(reader.error ?? new Error("file-reader-failed"));
-    };
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function extractImageDataUrlFromHttpResponse(
-  response: Response,
-  sourcePathHint: string,
-): Promise<string | null> {
-  const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
-  if (contentType.includes("json")) {
-    try {
-      const payload = await response.json();
-      return extractRenderableImageSourceFromUnknown(payload, sourcePathHint);
-    } catch {
-      return null;
-    }
-  }
-  if (contentType.startsWith("text/")) {
-    const payload = await response.text();
-    if (!payload.trim()) {
-      return null;
-    }
-    try {
-      const parsed = JSON.parse(payload);
-      return extractRenderableImageSourceFromUnknown(parsed, sourcePathHint);
-    } catch {
-      return extractRenderableImageSourceFromUnknown(payload, sourcePathHint);
-    }
-  }
-  const blob = await response.blob();
-  if (!blob.size) {
-    return null;
-  }
-  if (blob.type.toLowerCase().startsWith("image/")) {
-    return blobToDataUrl(blob);
-  }
-  const inferredType = inferImageMimeTypeFromPath(sourcePathHint) ?? "image/png";
-  return blobToDataUrl(new Blob([blob], { type: inferredType }));
-}
-
-async function resolveRemoteImageViaHttpProxy(
-  gatewayUrl: string,
-  filePath: string,
-): Promise<string | null> {
-  const candidates = buildGatewayRemoteMediaUrlCandidates(gatewayUrl, filePath);
-  const desktopFetchImageUrl = window.desktopInfo?.fetchImageUrl;
-  for (const candidate of candidates) {
-    if (typeof desktopFetchImageUrl === "function") {
-      try {
-        const result = await desktopFetchImageUrl(candidate);
-        const dataUrl = result?.ok && typeof result.dataUrl === "string" ? result.dataUrl.trim() : "";
-        if (dataUrl) {
-          return dataUrl;
-        }
-      } catch {
-        // fallback to renderer-side fetch
-      }
-    }
-    let timeoutId: number | null = null;
-    try {
-      const controller = typeof AbortController === "function" ? new AbortController() : null;
-      timeoutId =
-        controller !== null
-          ? window.setTimeout(() => {
-              controller.abort();
-            }, REMOTE_IMAGE_HTTP_FETCH_TIMEOUT_MS)
-          : null;
-      const response = await fetch(candidate, {
-        method: "GET",
-        cache: "no-store",
-        signal: controller?.signal,
-      });
-      if (!response.ok) {
-        continue;
-      }
-      const dataUrl = await extractImageDataUrlFromHttpResponse(response, filePath);
-      if (dataUrl) {
-        return dataUrl;
-      }
-    } catch {
-      // try next candidate
-    } finally {
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-    }
-  }
-  return null;
-}
-
 function toFileUrl(value: string): string | null {
   const normalized = normalizeFsPath(value).trim();
   if (!normalized) {
@@ -4122,7 +3988,6 @@ export default function App() {
   const finalizedAssistantByRunRef = useRef<Map<string, string>>(new Map());
   const lastFinalizedAssistantRef = useRef<{ text: string; at: number } | null>(null);
   const gatewayMethodsRef = useRef<Set<string>>(new Set());
-  const remoteImageDataCacheRef = useRef<Map<string, string>>(new Map());
   const sessionsRef = useRef<GatewaySessionRow[]>(sessions);
   const pendingStreamTextRef = useRef<string | null>(null);
   const streamFlushRafRef = useRef<number | null>(null);
@@ -4145,6 +4010,12 @@ export default function App() {
     gatewayUrl,
     token,
     password,
+    clientRef,
+    gatewayMethodsRef,
+  });
+  const resolveRemoteImage = useRemoteImageResolver({
+    connected,
+    gatewayUrl,
     clientRef,
     gatewayMethodsRef,
   });
@@ -4482,67 +4353,6 @@ export default function App() {
       lastLoadedAt: Date.now(),
     });
   }
-
-  const cacheRemoteImageDataUrl = (pathKey: string, dataUrl: string) => {
-    const cache = remoteImageDataCacheRef.current;
-    if (cache.has(pathKey)) {
-      cache.delete(pathKey);
-    }
-    cache.set(pathKey, dataUrl);
-    while (cache.size > REMOTE_IMAGE_CACHE_LIMIT) {
-      const oldestKey = cache.keys().next().value;
-      if (!oldestKey) {
-        break;
-      }
-      cache.delete(oldestKey);
-    }
-  };
-
-  const resolveRemoteImage = useCallback(async (filePath: string): Promise<string | null> => {
-    const normalizedPath = filePath.trim();
-    if (!normalizedPath) {
-      return null;
-    }
-    const cached = remoteImageDataCacheRef.current.get(normalizedPath);
-    if (cached) {
-      cacheRemoteImageDataUrl(normalizedPath, cached);
-      return cached;
-    }
-    const client = clientRef.current;
-    if (!client || !connected) {
-      return null;
-    }
-    const methods = pickRemoteMediaReadMethods(gatewayMethodsRef.current);
-    const paramVariants = buildRemoteMediaReadParamVariants(normalizedPath);
-
-    const seenParamKeys = new Set<string>();
-    for (const method of methods) {
-      for (const params of paramVariants) {
-        const dedupeKey = `${method}:${JSON.stringify(params)}`;
-        if (seenParamKeys.has(dedupeKey)) {
-          continue;
-        }
-        seenParamKeys.add(dedupeKey);
-        try {
-          const payload = await client.request(method, params);
-          const dataUrl = extractRenderableImageSourceFromUnknown(payload, normalizedPath);
-          if (!dataUrl) {
-            continue;
-          }
-          cacheRemoteImageDataUrl(normalizedPath, dataUrl);
-          return dataUrl;
-        } catch {
-          // try next method/params
-        }
-      }
-    }
-    const httpDataUrl = await resolveRemoteImageViaHttpProxy(gatewayUrl, normalizedPath);
-    if (httpDataUrl) {
-      cacheRemoteImageDataUrl(normalizedPath, httpDataUrl);
-      return httpDataUrl;
-    }
-    return null;
-  }, [connected, gatewayUrl]);
 
   const shouldSkipAssistantFinal = (runId: string | null | undefined, text: string): boolean => {
     const normalizedText = text.trim();
