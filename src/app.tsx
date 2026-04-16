@@ -4378,6 +4378,29 @@ export default function App() {
     }));
   }
 
+  function resolveEventSessionKeyFromCache(params: {
+    sessionKeyHint?: string | null;
+    runId?: string | null;
+    selectedSessionKey?: string | null;
+    activeRunId?: string | null;
+  }): string | null {
+    const normalizedSessionKeyHint = params.sessionKeyHint?.trim();
+    if (normalizedSessionKeyHint) {
+      return normalizedSessionKeyHint;
+    }
+    const normalizedRunId = params.runId?.trim();
+    if (!normalizedRunId) {
+      return null;
+    }
+    if (params.selectedSessionKey?.trim() && params.activeRunId?.trim() === normalizedRunId) {
+      return params.selectedSessionKey.trim();
+    }
+    return resolveEventSessionKey({
+      ...params,
+      cachedRuns: getCachedRunOwnershipEntries(),
+    });
+  }
+
   const shouldSkipAssistantFinal = (runId: string | null | undefined, text: string): boolean => {
     const normalizedText = text.trim();
     if (!normalizedText) {
@@ -6788,12 +6811,11 @@ export default function App() {
       return;
     }
     const activeSessionKey = selectedSessionRef.current;
-    const resolvedSessionKey = resolveEventSessionKey({
+    const resolvedSessionKey = resolveEventSessionKeyFromCache({
       sessionKeyHint: parsed.sessionKey,
       runId: parsed.runId,
       selectedSessionKey: activeSessionKey,
       activeRunId: chatRunRef.current,
-      cachedRuns: getCachedRunOwnershipEntries(),
     });
     const isNonActiveSession = Boolean(
       resolvedSessionKey && (!activeSessionKey || !sessionKeysMatch(resolvedSessionKey, activeSessionKey)),
@@ -6850,12 +6872,11 @@ export default function App() {
     const runId =
       getString(payload, ["runId", "run_id"]) ??
       (isRecord(payload.data) ? getString(payload.data, ["runId", "run_id"]) : null);
-    const resolvedSessionKey = resolveEventSessionKey({
+    const resolvedSessionKey = resolveEventSessionKeyFromCache({
       sessionKeyHint,
       runId,
       selectedSessionKey: activeSessionKey,
       activeRunId: chatRunRef.current,
-      cachedRuns: getCachedRunOwnershipEntries(),
     });
     const isNonActiveAgent = Boolean(
       resolvedSessionKey && (!activeSessionKey || !sessionKeysMatch(resolvedSessionKey, activeSessionKey)),
