@@ -2,6 +2,10 @@ import { applyPathPrefixMappings } from "./path-prefix-mappings.ts";
 
 export const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 const WORKSPACE_MARKER = "/.openclaw/workspace";
+const runtimePathHints: { homeDir: string; workspaceDir: string } = {
+  homeDir: "",
+  workspaceDir: "",
+};
 
 export type NormalizedRuntimeImageSourceData = {
   dataUrl: string;
@@ -21,14 +25,50 @@ function trimTrailingSlashes(value: string): string {
   return normalized.replace(/\/+$/g, "");
 }
 
+function deriveHomeFromWorkspacePath(workspacePath: string): string {
+  const normalized = trimTrailingSlashes(workspacePath).toLowerCase();
+  const markerIndex = normalized.indexOf(WORKSPACE_MARKER);
+  if (markerIndex <= 0) {
+    return "";
+  }
+  return trimTrailingSlashes(workspacePath).slice(0, markerIndex);
+}
+
+export function setImageSourceRuntimeHints(next: { homeDir?: string | null; workspaceDir?: string | null }) {
+  const homeDir = trimTrailingSlashes(next.homeDir ?? "");
+  const workspaceDir = trimTrailingSlashes(next.workspaceDir ?? "");
+  if (homeDir) {
+    runtimePathHints.homeDir = homeDir;
+  }
+  if (workspaceDir) {
+    runtimePathHints.workspaceDir = workspaceDir;
+  }
+  if (!runtimePathHints.homeDir && runtimePathHints.workspaceDir) {
+    const derivedHome = deriveHomeFromWorkspacePath(runtimePathHints.workspaceDir);
+    if (derivedHome) {
+      runtimePathHints.homeDir = derivedHome;
+    }
+  }
+  if (!runtimePathHints.workspaceDir && runtimePathHints.homeDir) {
+    runtimePathHints.workspaceDir = `${runtimePathHints.homeDir}${WORKSPACE_MARKER}`;
+  }
+}
+
 function getRuntimeHomeDir(): string {
-  return trimTrailingSlashes(window.desktopInfo?.homeDir ?? "");
+  const desktopHomeDir = trimTrailingSlashes(window.desktopInfo?.homeDir ?? "");
+  if (desktopHomeDir) {
+    return desktopHomeDir;
+  }
+  return runtimePathHints.homeDir;
 }
 
 function getRuntimeWorkspaceDir(): string {
   const desktopWorkspaceDir = trimTrailingSlashes(window.desktopInfo?.workspaceDir ?? "");
   if (desktopWorkspaceDir) {
     return desktopWorkspaceDir;
+  }
+  if (runtimePathHints.workspaceDir) {
+    return runtimePathHints.workspaceDir;
   }
   const homeDir = getRuntimeHomeDir();
   if (!homeDir) {
@@ -47,13 +87,21 @@ function isAbsoluteFsPath(value: string): boolean {
   );
 }
 
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function filePathFromFileUrl(value: string): string | null {
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== "file:") {
       return null;
     }
-    let pathname = decodeURIComponent(parsed.pathname || "");
+    let pathname = safeDecodeURIComponent(parsed.pathname || "");
     if (!pathname) {
       return null;
     }
@@ -122,7 +170,7 @@ function resolveMediaRelativeLocalPath(value: string): string | null {
   if (!trimmed || !looksLikeImagePath(trimmed)) {
     return null;
   }
-  const homeDir = window.desktopInfo?.homeDir?.trim();
+  const homeDir = getRuntimeHomeDir();
   if (!homeDir) {
     return null;
   }
@@ -134,7 +182,7 @@ function resolveWorkspaceRelativeLocalPath(value: string): string | null {
   if (!trimmed || !looksLikeImagePath(trimmed)) {
     return null;
   }
-  const workspaceDir = window.desktopInfo?.workspaceDir?.trim();
+  const workspaceDir = getRuntimeWorkspaceDir();
   if (!workspaceDir) {
     return null;
   }
@@ -143,7 +191,7 @@ function resolveWorkspaceRelativeLocalPath(value: string): string | null {
 
 function mapMediaAliasToLocalPath(value: string): string | null {
   const trimmed = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
-  const homeDir = window.desktopInfo?.homeDir?.trim();
+  const homeDir = getRuntimeHomeDir();
   if (!trimmed || !homeDir) {
     return null;
   }
@@ -158,7 +206,7 @@ function mapMediaAliasToLocalPath(value: string): string | null {
 
 function mapWorkspaceAliasToLocalPath(value: string): string | null {
   const trimmed = value.trim().replace(/\\/g, "/").replace(/^\/+/, "");
-  const homeDir = window.desktopInfo?.homeDir?.trim();
+  const homeDir = getRuntimeHomeDir();
   if (!trimmed || !homeDir) {
     return null;
   }
@@ -449,6 +497,14 @@ function toFileUrl(value: string): string | null {
   if (!normalized) {
     return null;
   }
+  if (normalized.startsWith("~/")) {
+    const homeDir = getRuntimeHomeDir();
+    if (!homeDir) {
+      return null;
+    }
+    const expanded = `${homeDir}/${normalized.slice(2)}`;
+    return toFileUrl(expanded);
+  }
   if (/^[A-Za-z]:\//.test(normalized)) {
     return `file:///${encodeURI(normalized)}`;
   }
@@ -473,9 +529,9 @@ function localPathFromDesktopLocalImageUrl(value: string): string | null {
     }
     const rawPath = parsed.searchParams.get("path");
     if (rawPath) {
-      return decodeURIComponent(rawPath);
+      return rawPath;
     }
-    let pathname = decodeURIComponent(parsed.pathname || "");
+    let pathname = safeDecodeURIComponent(parsed.pathname || "");
     if (/^\/[A-Za-z]:\//.test(pathname)) {
       pathname = pathname.slice(1);
     }
@@ -494,7 +550,7 @@ function localPathFromWebLocalImageProxyUrl(value: string): string | null {
       if (!rawPath) {
         return null;
       }
-      return decodeURIComponent(rawPath);
+      return rawPath;
     } catch {
       return null;
     }
@@ -504,11 +560,7 @@ function localPathFromWebLocalImageProxyUrl(value: string): string | null {
     if (!raw) {
       return null;
     }
-    try {
-      return decodeURIComponent(raw);
-    } catch {
-      return raw;
-    }
+    return raw;
   };
 
   if (trimmed.startsWith(marker)) {
@@ -550,6 +602,10 @@ function deriveSourcePathHint(value: string): string | null {
   const trimmed = stripPathDecorators(value);
   if (!trimmed) {
     return null;
+  }
+  const mediaRelativePath = resolveMediaRelativeLocalPath(trimmed);
+  if (mediaRelativePath) {
+    return trimmed;
   }
   const workspaceRelativePath = resolveWorkspaceRelativeLocalPath(trimmed);
   if (workspaceRelativePath) {

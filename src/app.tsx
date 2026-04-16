@@ -86,6 +86,7 @@ import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
 import {
   isDesktopRuntime,
   normalizeRuntimeImageSourceData,
+  setImageSourceRuntimeHints,
   toRuntimeRenderableLocalPath,
 } from "./lib/message-image-source.ts";
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
@@ -3054,6 +3055,10 @@ function setRuntimePathHints(next: { homeDir?: string | null; workspaceDir?: str
   if (runtimePathHints.homeDir) {
     setActivePathPrefixMappingHomeDir(runtimePathHints.homeDir);
   }
+  setImageSourceRuntimeHints({
+    homeDir: runtimePathHints.homeDir || null,
+    workspaceDir: runtimePathHints.workspaceDir || null,
+  });
 }
 
 function getRuntimeHomeDir(): string {
