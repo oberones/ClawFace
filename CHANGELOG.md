@@ -8,6 +8,16 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.9.2 (2026-04-16)
+
+### Fix
+
+- preserve runtime image source hint behavior
+
+### Refactor
+
+- extract shared image source translation seam
+
 ## v0.9.1 (2026-04-15)
 
 ### Fix
