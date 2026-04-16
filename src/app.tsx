@@ -82,6 +82,7 @@ import {
 } from "./lib/connection-recovery.ts";
 import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
+import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
 import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
@@ -4325,6 +4326,22 @@ export default function App() {
     return true;
   }
 
+  function clearActiveSessionView() {
+    messagesRef.current = [];
+    toolItemsRef.current = [];
+    thinkingLevelRef.current = null;
+    thinkingRef.current = false;
+    chatRunRef.current = null;
+    setMessages([]);
+    setStreamTextSynced(null);
+    setToolItems([]);
+    setThinking(false);
+    setChatRunId(null);
+    setThinkingLevel(null);
+    setDraft("");
+    replaceAttachments([]);
+  }
+
   function updateSessionActivity(
     key: string,
     update: Partial<SessionActivityState>,
@@ -4351,6 +4368,36 @@ export default function App() {
     sessionCacheRef.current.set(key, {
       ...next,
       lastLoadedAt: Date.now(),
+    });
+  }
+
+  function getCachedRunOwnershipEntries() {
+    return Array.from(sessionCacheRef.current.entries(), ([sessionKey, cached]) => ({
+      sessionKey,
+      runId: cached.chatRunId,
+    }));
+  }
+
+  function resolveEventSessionKeyFromCache(params: {
+    sessionKeyHint?: string | null;
+    runId?: string | null;
+    selectedSessionKey?: string | null;
+    activeRunId?: string | null;
+  }): string | null {
+    const normalizedSessionKeyHint = params.sessionKeyHint?.trim();
+    if (normalizedSessionKeyHint) {
+      return normalizedSessionKeyHint;
+    }
+    const normalizedRunId = params.runId?.trim();
+    if (!normalizedRunId) {
+      return null;
+    }
+    if (params.selectedSessionKey?.trim() && params.activeRunId?.trim() === normalizedRunId) {
+      return params.selectedSessionKey.trim();
+    }
+    return resolveEventSessionKey({
+      ...params,
+      cachedRuns: getCachedRunOwnershipEntries(),
     });
   }
 
@@ -6764,13 +6811,19 @@ export default function App() {
       return;
     }
     const activeSessionKey = selectedSessionRef.current;
+    const resolvedSessionKey = resolveEventSessionKeyFromCache({
+      sessionKeyHint: parsed.sessionKey,
+      runId: parsed.runId,
+      selectedSessionKey: activeSessionKey,
+      activeRunId: chatRunRef.current,
+    });
     const isNonActiveSession = Boolean(
-      parsed.sessionKey && (!activeSessionKey || !sessionKeysMatch(parsed.sessionKey, activeSessionKey)),
+      resolvedSessionKey && (!activeSessionKey || !sessionKeysMatch(resolvedSessionKey, activeSessionKey)),
     );
     if (isNonActiveSession) {
       const activeRun = chatRunRef.current;
       if (!activeSessionKey || !(activeRun && parsed.runId && parsed.runId === activeRun)) {
-        const targetKey = parsed.sessionKey!;
+        const targetKey = resolvedSessionKey!;
         if (parsed.state === "delta") {
           handleCachedDeltaChatEvent(parsed, targetKey);
           return;
@@ -6813,19 +6866,25 @@ export default function App() {
       return;
     }
     const activeSessionKey = selectedSessionRef.current;
-    const sessionKey =
+    const sessionKeyHint =
       getString(payload, ["sessionKey", "session_key"]) ??
       (isRecord(payload.data) ? getString(payload.data, ["sessionKey", "session_key"]) : null);
     const runId =
       getString(payload, ["runId", "run_id"]) ??
       (isRecord(payload.data) ? getString(payload.data, ["runId", "run_id"]) : null);
+    const resolvedSessionKey = resolveEventSessionKeyFromCache({
+      sessionKeyHint,
+      runId,
+      selectedSessionKey: activeSessionKey,
+      activeRunId: chatRunRef.current,
+    });
     const isNonActiveAgent = Boolean(
-      sessionKey && (!activeSessionKey || !sessionKeysMatch(sessionKey, activeSessionKey)),
+      resolvedSessionKey && (!activeSessionKey || !sessionKeysMatch(resolvedSessionKey, activeSessionKey)),
     );
     if (isNonActiveAgent) {
       const activeRun = chatRunRef.current;
       if (!activeSessionKey || !(activeRun && runId && runId === activeRun)) {
-        const targetKey = sessionKey!;
+        const targetKey = resolvedSessionKey!;
         const updates = extractToolUpdatesFromAgent(payload, runId);
         handleCachedAgentToolUpdates(targetKey, runId, updates);
         const stream = getAgentEventStream(payload);
@@ -6947,7 +7006,10 @@ export default function App() {
       saveCurrentToCache(previousKey);
     }
     updateSessionActivity(key, { unread: false });
-    restoreFromCache(key);
+    const restored = restoreFromCache(key);
+    if (!restored) {
+      clearActiveSessionView();
+    }
     selectedSessionRef.current = key;
     setCanLoadMoreHistory(historyCanLoadMoreBySessionRef.current[key] ?? false);
     setSessionTransitionState(previousKey && previousKey !== key ? "switching" : "idle");
