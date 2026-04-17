@@ -125,6 +125,7 @@ Current state and refs:
 Existing adjacent seams:
 - `src/components/ChatView.tsx` renders the shell/thread surface
 - `src/components/ChatThread.tsx`, `src/components/MessageRow.tsx`, and related Track A/B hooks now own more of the presentation/runtime detail than they used to
+- `src/hooks/useThreadToolController.ts` now owns the active thread/tool runtime state cluster inside the app shell
 
 Future boundary:
 - `threadStore`
@@ -198,6 +199,7 @@ Existing adjacent seams:
 - `src/lib/media-hydration.ts`
 - `src/lib/approval-events.ts`
 - `src/lib/session-run-routing.ts`
+- `src/hooks/useThreadToolController.ts` now owns the active live tool/thread runtime state, even though higher-level event orchestration still lives in `src/app.tsx`
 
 Future boundary:
 - `toolStore`

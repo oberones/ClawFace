@@ -81,9 +81,14 @@ import { deriveBackgroundSessionNotice } from "./lib/background-session-visibili
 import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
 import { setImageSourceRuntimeHints } from "./lib/message-image-source.ts";
 import { buildAttachmentSignature, toChatMessageSafe } from "./lib/chat-message-attachments.ts";
+import {
+  createEmptyThreadToolStateSnapshot,
+  type ThreadToolStateSnapshot,
+} from "./lib/thread-tool-state.ts";
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
 import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
+import { useThreadToolController } from "./hooks/useThreadToolController.ts";
 
 const STORAGE_KEYS = {
   gatewayUrl: "clawui.gateway.url",
@@ -1519,13 +1524,7 @@ type SessionTokenStats = {
   totalTokens: number;
 };
 
-type SessionViewState = {
-  messages: ChatMessage[];
-  streamText: string | null;
-  toolItems: ToolItem[];
-  thinking: boolean;
-  chatRunId: string | null;
-  thinkingLevel: string | null;
+type SessionViewState = ThreadToolStateSnapshot & {
   draft: string;
   attachments: Attachment[];
   lastLoadedAt: number;
@@ -3298,7 +3297,35 @@ export default function App() {
   const [sessionDefaults, setSessionDefaults] = useState<SessionsListResult["defaults"] | null>(
     null,
   );
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const threadToolController = useThreadToolController();
+  const {
+    messages,
+    setMessages,
+    streamText,
+    chatRunId,
+    setChatRunId,
+    thinking,
+    setThinking,
+    toolItems,
+    setToolItems,
+    thinkingLevel,
+    setThinkingLevel,
+    messagesRef,
+    streamTextRef,
+    chatRunRef,
+    thinkingRef,
+    toolItemsRef,
+    thinkingLevelRef,
+    pendingStreamTextRef,
+    streamFlushRafRef,
+    setStreamTextSynced,
+    mergeStreamTextSynced,
+    clearActiveStreamingState,
+    snapshotThreadToolState,
+    applyThreadToolState,
+    clearThreadToolState,
+    disposeThreadToolController,
+  } = threadToolController;
   const [draft, setDraft] = useState("");
   const {
     attachments,
@@ -3307,10 +3334,6 @@ export default function App() {
     removeAttachment,
     clearAttachments,
   } = useStagedAttachments();
-  const [streamText, setStreamText] = useState<string | null>(null);
-  const [chatRunId, setChatRunId] = useState<string | null>(null);
-  const [thinking, setThinking] = useState(false);
-  const [toolItems, setToolItems] = useState<ToolItem[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => loadUiSettings().autoHoverSidebar);
   const [activeView, setActiveView] = useState<"chat" | "files">("chat");
   const activeViewRef = useRef(activeView);
@@ -3346,7 +3369,6 @@ export default function App() {
     commit: null,
   });
   const [maxPayloadBytes, setMaxPayloadBytes] = useState(DEFAULT_MAX_WS_PAYLOAD_BYTES);
-  const [thinkingLevel, setThinkingLevel] = useState<string | null>(null);
   const [sessionActivity, setSessionActivity] = useState<Record<string, SessionActivityState>>({});
   const [sessionListLimit, setSessionListLimit] = useState(SESSION_LIST_INITIAL_LIMIT);
   const [canLoadMoreSessions, setCanLoadMoreSessions] = useState(false);
@@ -3368,12 +3390,6 @@ export default function App() {
   const connectionRecoveryNoticeTimerRef = useRef<number | null>(null);
   const connectionRecoveryNoticeSeqRef = useRef(0);
   const selectedSessionRef = useRef<string | null>(selectedSessionKey);
-  const chatRunRef = useRef<string | null>(chatRunId);
-  const thinkingRef = useRef<boolean>(thinking);
-  const streamTextRef = useRef<string | null>(streamText);
-  const messagesRef = useRef<ChatMessage[]>(messages);
-  const toolItemsRef = useRef<ToolItem[]>(toolItems);
-  const thinkingLevelRef = useRef<string | null>(thinkingLevel);
   const lastConfigSnapshotRef = useRef<unknown>(null);
   const sessionListLimitRef = useRef<number>(sessionListLimit);
   const loadingMoreSessionsRef = useRef(false);
@@ -3387,8 +3403,6 @@ export default function App() {
   const lastFinalizedAssistantRef = useRef<{ text: string; at: number } | null>(null);
   const gatewayMethodsRef = useRef<Set<string>>(new Set());
   const sessionsRef = useRef<GatewaySessionRow[]>(sessions);
-  const pendingStreamTextRef = useRef<string | null>(null);
-  const streamFlushRafRef = useRef<number | null>(null);
   const assistantReplyByRunRef = useRef<Record<string, Record<string, unknown>>>({});
   const committedAssistantAttachmentByRunRef = useRef<Record<string, string>>({});
   const scheduledHistoryHydrationByRunRef = useRef<Record<string, true>>({});
@@ -3439,30 +3453,6 @@ export default function App() {
       updateSessionActivity(selectedSessionKey, { unread: false });
     }
   }, [selectedSessionKey]);
-
-  useEffect(() => {
-    chatRunRef.current = chatRunId;
-  }, [chatRunId]);
-
-  useEffect(() => {
-    thinkingRef.current = thinking;
-  }, [thinking]);
-
-  useEffect(() => {
-    streamTextRef.current = streamText;
-  }, [streamText]);
-
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
-
-  useEffect(() => {
-    toolItemsRef.current = toolItems;
-  }, [toolItems]);
-
-  useEffect(() => {
-    thinkingLevelRef.current = thinkingLevel;
-  }, [thinkingLevel]);
 
   useEffect(() => {
     sessionsRef.current = sessions;
@@ -3623,49 +3613,9 @@ export default function App() {
     }
   }, [uiSettings.autoHoverSidebar]);
 
-  const flushPendingStreamText = useCallback(() => {
-    streamFlushRafRef.current = null;
-    const next = pendingStreamTextRef.current;
-    pendingStreamTextRef.current = null;
-    if (next === streamTextRef.current) {
-      return;
-    }
-    streamTextRef.current = next;
-    setStreamText(next);
-  }, []);
-
-  const setStreamTextSynced = useCallback((next: string | null) => {
-    pendingStreamTextRef.current = null;
-    if (streamFlushRafRef.current !== null) {
-      window.cancelAnimationFrame(streamFlushRafRef.current);
-      streamFlushRafRef.current = null;
-    }
-    if (next === streamTextRef.current) {
-      return;
-    }
-    streamTextRef.current = next;
-    setStreamText(next);
-  }, []);
-
-  const mergeStreamTextSynced = useCallback((incoming: string) => {
-    const current = pendingStreamTextRef.current ?? streamTextRef.current;
-    pendingStreamTextRef.current = mergeStreamingText(current, incoming);
-    if (streamFlushRafRef.current !== null) {
-      return;
-    }
-    streamFlushRafRef.current = window.requestAnimationFrame(() => {
-      flushPendingStreamText();
-    });
-  }, [flushPendingStreamText]);
-
   const getEmptySessionViewState = useCallback((): SessionViewState => {
     return {
-      messages: [],
-      streamText: null,
-      toolItems: [],
-      thinking: false,
-      chatRunId: null,
-      thinkingLevel: null,
+      ...createEmptyThreadToolStateSnapshot(),
       draft: "",
       attachments: [],
       lastLoadedAt: 0,
@@ -3686,13 +3636,9 @@ export default function App() {
     if (!key) {
       return;
     }
+    const snapshot = snapshotThreadToolState();
     sessionCacheRef.current.set(key, {
-      messages: [...messagesRef.current],
-      streamText: streamTextRef.current,
-      toolItems: [...toolItemsRef.current],
-      thinking: thinkingRef.current,
-      chatRunId: chatRunRef.current,
-      thinkingLevel: thinkingLevelRef.current,
+      ...snapshot,
       draft,
       attachments: [...attachments],
       lastLoadedAt: Date.now(),
@@ -3707,34 +3653,14 @@ export default function App() {
     if (!cached) {
       return false;
     }
-    messagesRef.current = cached.messages;
-    toolItemsRef.current = cached.toolItems;
-    thinkingLevelRef.current = cached.thinkingLevel;
-    thinkingRef.current = cached.thinking;
-    chatRunRef.current = cached.chatRunId;
-    setMessages(cached.messages);
-    setStreamTextSynced(cached.streamText);
-    setToolItems(cached.toolItems);
-    setThinking(cached.thinking);
-    setChatRunId(cached.chatRunId);
-    setThinkingLevel(cached.thinkingLevel);
+    applyThreadToolState(cached);
     setDraft(cached.draft);
     replaceAttachments(cached.attachments);
     return true;
   }
 
   function clearActiveSessionView() {
-    messagesRef.current = [];
-    toolItemsRef.current = [];
-    thinkingLevelRef.current = null;
-    thinkingRef.current = false;
-    chatRunRef.current = null;
-    setMessages([]);
-    setStreamTextSynced(null);
-    setToolItems([]);
-    setThinking(false);
-    setChatRunId(null);
-    setThinkingLevel(null);
+    clearThreadToolState();
     setDraft("");
     replaceAttachments([]);
   }
@@ -4144,20 +4070,6 @@ export default function App() {
     return msg && hasRenderableAttachment ? msg : null;
   };
 
-  const clearActiveStreamingState = () => {
-    pendingStreamTextRef.current = null;
-    if (streamFlushRafRef.current !== null) {
-      window.cancelAnimationFrame(streamFlushRafRef.current);
-      streamFlushRafRef.current = null;
-    }
-    streamTextRef.current = null;
-    chatRunRef.current = null;
-    thinkingRef.current = false;
-    setStreamText(null);
-    setChatRunId(null);
-    setThinking(false);
-  };
-
   const clearCachedStreamingState = (key: string) => {
     updateCacheField(key, (cached) => ({
       ...cached,
@@ -4407,11 +4319,7 @@ export default function App() {
       clearDeferredSessionRefreshTimers();
       clearDeferredHistoryHydrationTimers();
       clearConnectionRecoveryNotice();
-      if (streamFlushRafRef.current !== null) {
-        window.cancelAnimationFrame(streamFlushRafRef.current);
-        streamFlushRafRef.current = null;
-      }
-      pendingStreamTextRef.current = null;
+      disposeThreadToolController();
       for (const timer of Object.values(agentFinalizeTimerByRunRef.current)) {
         window.clearTimeout(timer);
       }
@@ -5753,18 +5661,15 @@ export default function App() {
         return;
       }
       setSessionTransitionState("idle");
-      thinkingLevelRef.current = resolvedThinkingLevel;
-      setThinkingLevel(resolvedThinkingLevel);
-      messagesRef.current = historyMessages;
-      toolItemsRef.current = mergedTools;
-      setMessages(historyMessages);
-      setToolItems(mergedTools);
+      applyThreadToolState({
+        messages: historyMessages,
+        streamText: shouldPreserveActiveStreaming ? activeStreamText : null,
+        toolItems: mergedTools,
+        thinking: shouldPreserveActiveStreaming ? thinkingRef.current : false,
+        chatRunId: shouldPreserveActiveStreaming ? chatRunRef.current : null,
+        thinkingLevel: resolvedThinkingLevel,
+      });
       if (!shouldPreserveActiveStreaming) {
-        chatRunRef.current = null;
-        thinkingRef.current = false;
-        setStreamTextSynced(null);
-        setChatRunId(null);
-        setThinking(false);
         finalizedAssistantByRunRef.current.clear();
         lastFinalizedAssistantRef.current = null;
       }
@@ -6107,7 +6012,7 @@ export default function App() {
       chatRunRef.current = runId;
       setChatRunId(runId);
     }
-    mergeStreamTextSynced(next);
+    mergeStreamTextSynced(next, mergeStreamingText);
     setThinking(false);
     updateActiveSessionRunActivity({ working: true, unread: false });
   };
@@ -6200,7 +6105,7 @@ export default function App() {
     if (typeof next !== "string" || next.length === 0) {
       return;
     }
-    mergeStreamTextSynced(next);
+    mergeStreamTextSynced(next, mergeStreamingText);
     setThinking(false);
     updateActiveSessionRunActivity({ working: true, unread: false });
   };
@@ -6461,21 +6366,11 @@ export default function App() {
       : { ...prev, [key]: [] }));
     selectedSessionRef.current = key;
     setSelectedSessionKey(key);
-    setMessages([]);
-    setToolItems([]);
-    setStreamTextSynced(null);
-    setChatRunId(null);
-    setThinking(false);
-    setThinkingLevel(null);
+    clearThreadToolState();
     setDraft("");
     clearAttachments();
     sessionCacheRef.current.set(key, {
-      messages: [],
-      streamText: null,
-      toolItems: [],
-      thinking: false,
-      chatRunId: null,
-      thinkingLevel: null,
+      ...createEmptyThreadToolStateSnapshot(),
       draft: "",
       attachments: [],
       lastLoadedAt: Date.now(),
