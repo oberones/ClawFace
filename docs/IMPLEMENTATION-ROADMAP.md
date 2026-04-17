@@ -649,6 +649,11 @@ Primary goal:
 - `src/lib/message-image-source.ts` now owns the shared desktop/web image-source translation seam used by both image rendering and attachment construction
 - `src/app.tsx` no longer carries the overlapping desktop local-image URL, web local-proxy, and file-url mapping helpers inline when turning gateway payloads into attachments
 
+#### Fourth implementation cut follow-through
+- the image lightbox runtime behavior no longer lives inline in `ChatView.tsx`
+- modal open/close state, escape-key dismissal, body scroll locking, desktop lightbox recovery, and web local-file blocking now live behind `useImageLightboxController`
+- `ChatView` is closer to a rendering/composition surface for image modal behavior instead of another home for media/runtime state
+
 ## Track C — App-state formalization
 Primary goal:
 - define and enforce state ownership for connection, session, thread, tool, and UI domains
