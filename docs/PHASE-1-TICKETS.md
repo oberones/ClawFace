@@ -1866,6 +1866,53 @@ This ticket is now complete.
 #### Recommended next step
 If Track C continues immediately, the strongest next slice is to formalize the thread/tool boundary, since that is now the densest unformalized state ownership still living in `src/app.tsx`.
 
+## Ticket C.1 — Introduce the first thread/tool controller boundary
+### Goal
+Move the active thread/tool runtime state behind an explicit controller seam instead of leaving the entire state cluster inline in `src/app.tsx`.
+
+### Scope
+- extract the active thread/tool runtime state into a dedicated hook/controller
+- move the state/ref synchronization and active streaming helpers behind that boundary
+- keep session cache ownership and higher-level event orchestration in `src/app.tsx` for now
+- add at least one focused regression seam for the new snapshot/controller layer
+
+### Deliverable
+A first concrete thread/tool boundary that answers:
+- “Where does the active thread/tool runtime state live?”
+- “Can `app.tsx` orchestrate chat and tool events without also owning all the low-level state syncing?”
+
+### Done when
+- the active thread/tool runtime state cluster lives behind a dedicated controller hook
+- `src/app.tsx` no longer inlines the corresponding state/ref synchronization helpers
+- focused regression coverage exists for the new snapshot/controller seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/hooks/useThreadToolController.ts` to own:
+  - active thread/tool state
+  - state/ref synchronization for messages, stream text, run id, thinking, tool items, and thinking level
+  - active streaming helpers
+  - snapshot/apply/clear helpers for the active thread/tool state cluster
+- added `src/lib/thread-tool-state.ts` as a small shared snapshot seam
+- rewired `src/app.tsx` to consume that controller instead of owning the full active thread/tool sync layer inline
+
+#### Architectural improvements landed
+- `app.tsx` is closer to event/shell orchestration for thread and tool behavior instead of also being the low-level state-sync implementation
+- Track C now has a real code boundary, not just a documentation note
+- the next thread/tool extraction can build on an explicit controller seam instead of starting from raw `useState` and `useRef` sprawl again
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track C continues from here, the strongest next slice is to narrow the higher-level thread/tool event orchestration that still lives in `src/app.tsx`, now that the active runtime state itself has a dedicated controller.
+
 ---
 
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially

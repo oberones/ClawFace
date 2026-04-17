@@ -501,6 +501,12 @@ The first concrete ownership map now lives in:
 
 Use that note as the current answer to “where does this state live?” before proposing further store/controller extractions.
 
+The first concrete Track C controller seam now also exists:
+
+- `src/hooks/useThreadToolController.ts`
+
+Use that as the current boundary for active thread/tool runtime state before reopening `src/app.tsx` for more low-level sync logic.
+
 ---
 
 ## Priority 5 — Decompose settings UI
