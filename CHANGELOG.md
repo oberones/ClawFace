@@ -8,6 +8,12 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.9.3 (2026-04-16)
+
+### Refactor
+
+- extract image lightbox controller from chat view
+
 ## v0.9.2 (2026-04-16)
 
 ### Fix
