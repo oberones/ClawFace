@@ -4920,3 +4920,60 @@ This ticket is now complete.
 
 #### Recommended next step
 If Track B continues after this, the next natural slice is probably the remaining app-side media directive / attachment extraction boundary, since that is the most obvious media-specific logic still living in the app shell.
+
+## Ticket B.5 — Extract the media directive and attachment extraction boundary from `app.tsx`
+
+### Why
+Even after the attachment controller, remote resolver, shared image-source mapper, and lightbox controller were extracted, `src/app.tsx` still owned the shell-side media shaping path:
+- `MEDIA:` directive parsing
+- attachment extraction from text/tool payloads
+- raw image payload normalization into chat attachments
+- tool-result attachment shaping while loading history and live updates
+
+That left one of the app root’s remaining media-specific seams living inline in the shell, which is exactly the kind of coupling Track B is supposed to shrink.
+
+### Scope
+- move `MEDIA:` parsing and attachment extraction into a dedicated shared module
+- rewire `app.tsx` to consume that module when shaping messages and tool attachment rows
+- preserve the runtime path-hint behavior used by desktop/shared-volume image rendering
+- add focused regression coverage for directive parsing and tool-result attachment shaping
+
+### Deliverable
+A clearer attachment extraction boundary that answers:
+- “Where does text/tool payload media parsing actually live?”
+- “Can the app root build chat messages without also owning the image attachment parsing rules?”
+
+### Done when
+- `app.tsx` no longer carries the inline `MEDIA:` and attachment extraction helpers
+- the shell uses a shared attachment parsing module with the existing runtime-hint behavior preserved
+- focused regression coverage exists for the extracted seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/chat-message-attachments.ts` to own:
+  - `MEDIA:` directive parsing and cleanup
+  - attachment signature/dedupe helpers
+  - raw payload-to-`ChatMessage` attachment shaping
+  - runtime-aware attachment resolution using the shared image-source boundary
+- updated `src/app.tsx` to consume that shared module for:
+  - history message parsing
+  - assistant attachment projection
+  - tool-result attachment message construction
+- added focused coverage in `tests/chat-message-attachments.test.mjs`
+
+#### Architectural improvements landed
+- `app.tsx` no longer inlines a second media parsing/shaping subsystem beside the rest of the chat shell
+- Track B now has a clearer boundary for “payload becomes attachment-bearing chat message” separate from both the renderer component layer and the remote transport layer
+- attachment shaping now shares the same runtime hint and image-source rules regardless of whether it comes from history, tool output, or assistant reply payloads
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track B continues after this, the next natural slice is probably a smaller follow-through or test-driven polish pass rather than another obvious architecture extraction, because the largest media/runtime seams have now been pulled out of the main shell surfaces.
