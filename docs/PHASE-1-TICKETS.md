@@ -1839,6 +1839,33 @@ A small state-domain note and/or initial store modules.
 ### Done when
 - there is an explicit answer to “where does this state live?” for core Phase 1 flows
 
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- added `docs/APP-STATE-DOMAINS.md` as the first explicit Phase 1 app-state ownership map
+- defined current ownership for:
+  - connection state
+  - session state
+  - thread state
+  - composer/input state
+  - tool state
+  - UI/settings state
+- called out the existing specialized controller seams that already sit outside the app root:
+  - `useStagedAttachments`
+  - `useRemoteImageResolver`
+  - `useDevicePairingController`
+  - image/media controllers from Track B
+
+#### Why this is enough for the ticket
+- the repo now has a concrete answer to “where does this state live?” for the core Phase 1 shell flows
+- future Track C work can target named domains instead of re-auditing `src/app.tsx` from scratch
+- this keeps the next state extraction from being a blind rewrite
+
+#### Recommended next step
+If Track C continues immediately, the strongest next slice is to formalize the thread/tool boundary, since that is now the densest unformalized state ownership still living in `src/app.tsx`.
+
 ---
 
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
