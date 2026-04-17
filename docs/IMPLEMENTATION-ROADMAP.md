@@ -663,6 +663,16 @@ Primary goal:
 Primary goal:
 - define and enforce state ownership for connection, session, thread, tool, and UI domains
 
+#### First implementation cut follow-through
+- the repo now has an explicit Phase 1 state-domain note in `docs/APP-STATE-DOMAINS.md`
+- connection, session, thread, composer/input, tool, UI, and settings ownership are now mapped to current app-shell state and existing controller seams
+- future Track C work can target named domains instead of re-auditing `src/app.tsx` every time a store/controller extraction is proposed
+
+#### Second implementation cut follow-through
+- the active thread/tool runtime state no longer lives entirely inline in `src/app.tsx`
+- `src/hooks/useThreadToolController.ts` now owns the active message/tool/stream/run/thinking state cluster and the corresponding state/ref synchronization helpers
+- `src/lib/thread-tool-state.ts` provides a small shared snapshot seam, which gives future Track C work a cleaner foundation than editing raw `useState`/`useRef` sprawl in the app root
+
 ## Track D — Gateway/domain normalization
 Primary goal:
 - normalize raw gateway events into app/domain events the renderer can consume cleanly
