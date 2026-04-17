@@ -5,7 +5,7 @@ import SessionSidebar from "./components/SessionSidebar.tsx";
 import SettingsModal from "./components/SettingsModal.tsx";
 import NewSessionModal from "./components/NewSessionModal.tsx";
 import { GatewayClient } from "./lib/gateway.ts";
-import { extractImages, extractMessageRunId, extractText, isToolMessage } from "./lib/message-extract.ts";
+import { extractText, isToolMessage } from "./lib/message-extract.ts";
 import {
   type AgentsListResult,
   type ApprovalDecision,
@@ -33,15 +33,11 @@ import {
   type UiSettings,
 } from "./lib/ui-settings.ts";
 import {
-  applyPathPrefixMappings,
   normalizePathPrefixMappingsText,
   setActivePathPrefixMappingHomeDir,
   setActivePathPrefixMappingsText,
 } from "./lib/path-prefix-mappings.ts";
-import {
-  normalizeMediaPathCandidate,
-  preferSpecificImagePathCandidates,
-} from "./lib/media-path-utils.ts";
+import { preferSpecificImagePathCandidates } from "./lib/media-path-utils.ts";
 import {
   decideFinalizedRunHydration,
   decideScheduledHistoryHydrationTick,
@@ -83,12 +79,8 @@ import {
 import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
 import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
-import {
-  isDesktopRuntime,
-  normalizeRuntimeImageSourceData,
-  setImageSourceRuntimeHints,
-  toRuntimeRenderableLocalPath,
-} from "./lib/message-image-source.ts";
+import { setImageSourceRuntimeHints } from "./lib/message-image-source.ts";
+import { buildAttachmentSignature, toChatMessageSafe } from "./lib/chat-message-attachments.ts";
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
 import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
@@ -163,9 +155,6 @@ const MODEL_SHORTCUT_KEY_OPTIONS = [
   "z",
 ] as const;
 const MAX_REPLY_DONE_CUSTOM_AUDIO_DATA_URL_CHARS = 900_000;
-const MEDIA_PREFIX_RE = /\bmedia\s*:/i;
-const ATTACHMENT_FINGERPRINT_HEAD = 96;
-const ATTACHMENT_FINGERPRINT_TAIL = 64;
 const WORKSPACE_MARKER = "/.openclaw/workspace";
 const runtimePathHints: { homeDir: string; workspaceDir: string } = {
   homeDir: "",
@@ -2981,28 +2970,6 @@ function mergeStreamingText(previous: string | null, incoming: string): string {
   return `${previous}${incoming}`;
 }
 
-function stripWrappingQuotes(value: string): string {
-  const trimmed = value.trim();
-  if (
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-  ) {
-    return trimmed.slice(1, -1).trim();
-  }
-  return trimmed;
-}
-
-function normalizeMediaDirectivePath(value: string): string {
-  let next = normalizeMediaPathCandidate(value);
-  if (!next) {
-    return "";
-  }
-  if (next.startsWith("`") && next.endsWith("`") && next.length > 1) {
-    next = next.slice(1, -1).trim();
-  }
-  return stripWrappingQuotes(next);
-}
-
 function isAbsoluteFsPath(value: string): boolean {
   const trimmed = value.trim();
   return (
@@ -3084,6 +3051,19 @@ function getRuntimeWorkspaceDir(): string {
   return `${homeDir}${WORKSPACE_MARKER}`;
 }
 
+function getAttachmentParsingOptions(fallbackTimestamp?: number): {
+  fallbackTimestamp?: number;
+  runtimeHints: { homeDir: string | null; workspaceDir: string | null };
+} {
+  return {
+    fallbackTimestamp,
+    runtimeHints: {
+      homeDir: getRuntimeHomeDir() || null,
+      workspaceDir: getRuntimeWorkspaceDir() || null,
+    },
+  };
+}
+
 function collectRuntimePathHintsFromConfig(snapshot: unknown) {
   if (!isRecord(snapshot)) {
     return;
@@ -3144,298 +3124,6 @@ function collectRuntimePathHintsFromConfig(snapshot: unknown) {
     homeDir: homeCandidate || derivedHome || null,
     workspaceDir: workspaceCandidate || null,
   });
-}
-
-function fileNameFromPath(value: string): string {
-  const normalized = normalizeFsPath(value);
-  const parts = normalized.split("/").filter(Boolean);
-  return parts[parts.length - 1] ?? "image";
-}
-
-function resolveMediaRelativeImagePath(value: string): string | null {
-  const trimmed = value.trim().replace(/^\.\/+/, "").replace(/^\/+/, "");
-  if (!trimmed || !inferImageMimeTypeFromPath(trimmed)) {
-    return null;
-  }
-  const homeDir = getRuntimeHomeDir();
-  if (!homeDir) {
-    return null;
-  }
-  return `${homeDir}/.openclaw/media/${trimmed}`;
-}
-
-function resolveWorkspaceRelativeImagePath(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  if (trimmed.includes("/") || trimmed.includes("\\")) {
-    return null;
-  }
-  if (!inferImageMimeTypeFromPath(trimmed)) {
-    return null;
-  }
-  const workspaceDir = getRuntimeWorkspaceDir();
-  if (!workspaceDir) {
-    return null;
-  }
-  return `${workspaceDir}/${trimmed}`;
-}
-
-function resolveMediaDirectivePath(rawPath: string): string | null {
-  const cleaned = normalizeMediaDirectivePath(rawPath);
-  if (!cleaned) {
-    return null;
-  }
-  const homeDir = getRuntimeHomeDir();
-  const workspaceDir = getRuntimeWorkspaceDir();
-  const normalized = normalizeFsPath(cleaned);
-  if (cleaned.startsWith("~/")) {
-    if (!homeDir) {
-      return null;
-    }
-    return `${homeDir}/${cleaned.slice(2)}`;
-  }
-  if (isAbsoluteFsPath(cleaned)) {
-    return cleaned;
-  }
-  if (homeDir) {
-    if (normalized.startsWith(".openclaw/media/")) {
-      return `${homeDir}/${normalized}`;
-    }
-    if (normalized.startsWith("openclaw/media/")) {
-      return `${homeDir}/.${normalized}`;
-    }
-    if (normalized.startsWith(".openclaw/workspace/")) {
-      return `${homeDir}/${normalized}`;
-    }
-    if (normalized.startsWith("openclaw/workspace/")) {
-      return `${homeDir}/.${normalized}`;
-    }
-  }
-  if (normalized.includes("/") || normalized.includes("\\")) {
-    return !isDesktopRuntime() ? cleaned : null;
-  }
-  const mediaRelativePath = resolveMediaRelativeImagePath(cleaned);
-  if (mediaRelativePath) {
-    return mediaRelativePath;
-  }
-  if (!workspaceDir) {
-    if (!isDesktopRuntime()) {
-      return cleaned;
-    }
-    return null;
-  }
-  return `${workspaceDir}/${cleaned}`;
-}
-
-function extractMediaAttachmentsFromText(text: string): {
-  cleanedText: string;
-  attachments: Attachment[];
-} {
-  const attachments: Attachment[] = [];
-  const seen = new Set<string>();
-  const retainedLines: string[] = [];
-  const lines = text.split(/\r?\n/);
-
-  for (const line of lines) {
-    const match = MEDIA_PREFIX_RE.exec(line);
-    if (!match || match.index < 0) {
-      retainedLines.push(line);
-      continue;
-    }
-    const prefix = line.slice(0, match.index).trimEnd();
-    const rawPath = line.slice(match.index + match[0].length).trim();
-    const resolved = resolveMediaDirectivePath(rawPath);
-    if (!resolved) {
-      retainedLines.push(line);
-      continue;
-    }
-    const mappedResolved = applyPathPrefixMappings(resolved, { homeDir: getRuntimeHomeDir() });
-    const mimeType = inferImageMimeTypeFromPath(mappedResolved);
-    const dataUrl = toRuntimeRenderableLocalPath(mappedResolved);
-    if (!mimeType || !dataUrl) {
-      retainedLines.push(line);
-      continue;
-    }
-    if (seen.has(dataUrl)) {
-      continue;
-    }
-    seen.add(dataUrl);
-    attachments.push({
-      id: `${generateUUID()}-media`,
-      name: fileNameFromPath(mappedResolved),
-      size: 0,
-      type: mimeType,
-      dataUrl,
-      sourcePath: resolved,
-      isImage: true,
-    });
-    if (prefix) {
-      retainedLines.push(prefix);
-    }
-  }
-
-  const cleanedText = retainedLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-  return { cleanedText, attachments };
-}
-
-function buildAttachmentSignature(type: string, dataUrl: string): string {
-  const normalizedType = type.trim().toLowerCase();
-  const normalizedDataUrl = dataUrl.trim();
-  const head = normalizedDataUrl.slice(0, ATTACHMENT_FINGERPRINT_HEAD);
-  const tail =
-    normalizedDataUrl.length > ATTACHMENT_FINGERPRINT_HEAD + ATTACHMENT_FINGERPRINT_TAIL
-      ? normalizedDataUrl.slice(-ATTACHMENT_FINGERPRINT_TAIL)
-      : "";
-  return `${normalizedType}:${normalizedDataUrl.length}:${head}:${tail}`;
-}
-
-function toolMessageMayContainImage(raw: unknown): boolean {
-  if (!isRecord(raw)) {
-    return false;
-  }
-  if (extractToolMediaPaths(raw).length > 0) {
-    return true;
-  }
-  if (Object.keys(raw).some((key) => key.toLowerCase().includes("image"))) {
-    return true;
-  }
-  const directType = getString(raw, ["type", "event", "kind"])?.toLowerCase() ?? "";
-  if (directType.includes("image")) {
-    return true;
-  }
-  const content = raw.content;
-  if (Array.isArray(content)) {
-    for (const part of content) {
-      if (!isRecord(part)) {
-        continue;
-      }
-      const type = getString(part, ["type"])?.toLowerCase() ?? "";
-      if (type.includes("image")) {
-        return true;
-      }
-      if (part.image_url !== undefined || part.imageUrl !== undefined) {
-        return true;
-      }
-      if (isRecord(part.source)) {
-        const mediaType =
-          getString(part.source, ["media_type", "mimeType", "mime_type", "contentType", "content_type"]) ??
-          "";
-        if (mediaType.toLowerCase().includes("image")) {
-          return true;
-        }
-      }
-      if (Object.keys(part).some((key) => key.toLowerCase().includes("image"))) {
-        return true;
-      }
-    }
-  }
-  const candidates = [raw.content, raw.output, raw.result, raw.response, raw.text];
-  for (const value of candidates) {
-    if (typeof value !== "string") {
-      continue;
-    }
-    const sample = value.slice(0, 2048).toLowerCase();
-    if (
-      sample.includes("data:image/") ||
-      sample.includes("media:") ||
-      /\.(png|jpe?g|webp|gif|bmp|svg)\b/i.test(sample)
-    ) {
-      return true;
-    }
-  }
-  const extractedText = extractText(raw);
-  if (extractedText) {
-    const sample = extractedText.slice(0, 2048).toLowerCase();
-    if (
-      sample.includes("data:image/") ||
-      sample.includes("media:") ||
-      /\.(png|jpe?g|webp|gif|bmp|svg)\b/i.test(sample)
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function toChatMessage(raw: unknown, fallbackTimestamp?: number): ChatMessage | null {
-  const toolMessage = isToolMessage(raw);
-  if (toolMessage && !toolMessageMayContainImage(raw)) {
-    return null;
-  }
-  const rawText = extractText(raw) ?? "";
-  let text = rawText;
-  let mediaAttachments: Attachment[] = [];
-  if (rawText && MEDIA_PREFIX_RE.test(rawText)) {
-    const mediaResult = extractMediaAttachmentsFromText(rawText);
-    text = mediaResult.cleanedText;
-    mediaAttachments = mediaResult.attachments;
-  }
-  const images = extractImages(raw);
-  const imageAttachments: Attachment[] = images
-    .map((img, index): Attachment | null => {
-      const normalized = normalizeRuntimeImageSourceData(img.data, img.mimeType);
-      if (!normalized.dataUrl) {
-        return null;
-      }
-      return {
-        id: `${generateUUID()}-${index}`,
-        name: `image-${index + 1}`,
-        size: normalized.fromBase64 ? estimateBase64Bytes(img.data) : normalized.dataUrl.length,
-        type: img.mimeType,
-        dataUrl: normalized.dataUrl,
-        sourcePath: normalized.sourcePath,
-        isImage: true,
-      };
-    })
-    .filter((item): item is Attachment => item !== null);
-  const dedupeSignatures = new Set<string>();
-  const attachments = [...imageAttachments, ...mediaAttachments].filter((item) => {
-    const signature = buildAttachmentSignature(item.type, item.dataUrl);
-    if (dedupeSignatures.has(signature)) {
-      return false;
-    }
-    dedupeSignatures.add(signature);
-    return true;
-  });
-  if (toolMessage && attachments.length === 0) {
-    return null;
-  }
-  const renderedText = toolMessage ? "" : text;
-  if (!renderedText && attachments.length === 0) {
-    return null;
-  }
-  const roleRaw = (raw as Record<string, unknown>)?.role;
-  const timestampRaw = (raw as Record<string, unknown>)?.timestamp;
-  const runIdRaw = extractMessageRunId(raw) ?? undefined;
-  const role = toolMessage
-    ? "assistant"
-    : roleRaw === "user"
-      ? "user"
-      : roleRaw === "assistant"
-        ? "assistant"
-        : "system";
-  return {
-    id: generateUUID(),
-    role,
-    text: renderedText,
-    timestamp:
-      typeof timestampRaw === "number" && Number.isFinite(timestampRaw)
-        ? timestampRaw
-        : fallbackTimestamp ?? Date.now(),
-    attachments: attachments.length > 0 ? attachments : undefined,
-    runId: runIdRaw,
-    raw,
-  };
-}
-
-function toChatMessageSafe(raw: unknown, fallbackTimestamp?: number): ChatMessage | null {
-  try {
-    return toChatMessage(raw, fallbackTimestamp);
-  } catch {
-    return null;
-  }
 }
 
 function buildChatMessageDedupeKey(message: ChatMessage): string {
@@ -3538,7 +3226,7 @@ function buildAttachmentMessagesFromToolUpdates(toolUpdates: ToolUpdate[]): Chat
     const output = update.output?.trim() ?? "";
     const mediaText = (update.mediaPaths ?? []).map((path) => `MEDIA:${path}`).join("\n");
     const combined = [output, mediaText].filter(Boolean).join("\n");
-    if (!combined || !MEDIA_PREFIX_RE.test(combined)) {
+    if (!combined) {
       continue;
     }
     const parsed = toChatMessageSafe(
@@ -3548,7 +3236,7 @@ function buildAttachmentMessagesFromToolUpdates(toolUpdates: ToolUpdate[]): Chat
         content: combined,
         timestamp: update.updatedAt,
       },
-      update.updatedAt,
+      getAttachmentParsingOptions(update.updatedAt),
     );
     if (parsed) {
       messages.push(parsed);
@@ -4339,7 +4027,10 @@ export default function App() {
     runId: string | null | undefined,
     fallbackTimestamp?: number,
   ): ChatMessage | null => {
-    const parsed = withAssistantRunId(toChatMessageSafe(rawMessage, fallbackTimestamp), runId);
+    const parsed = withAssistantRunId(
+      toChatMessageSafe(rawMessage, getAttachmentParsingOptions(fallbackTimestamp)),
+      runId,
+    );
     const attachments = parsed?.attachments ?? [];
     if (!parsed || attachments.length === 0) {
       return null;
@@ -4415,7 +4106,7 @@ export default function App() {
     streamedText: string,
     runId?: string | null,
   ): ChatMessage | null => {
-    let msg = withAssistantRunId(toChatMessageSafe(rawMessage), runId);
+    let msg = withAssistantRunId(toChatMessageSafe(rawMessage, getAttachmentParsingOptions()), runId);
     if (msg && msg.role !== "user" && !msg.text.trim() && streamedText) {
       msg = { ...msg, text: streamedText };
     }
@@ -4448,7 +4139,7 @@ export default function App() {
   };
 
   const buildToolAttachmentMessage = (rawMessage: unknown): ChatMessage | null => {
-    const msg = toChatMessageSafe(rawMessage);
+    const msg = toChatMessageSafe(rawMessage, getAttachmentParsingOptions());
     const hasRenderableAttachment = Boolean(msg?.attachments && msg.attachments.length > 0);
     return msg && hasRenderableAttachment ? msg : null;
   };
@@ -6026,7 +5717,7 @@ export default function App() {
               }),
             );
           }
-          const parsed = toChatMessageSafe(raw, inferredTs);
+          const parsed = toChatMessageSafe(raw, getAttachmentParsingOptions(inferredTs));
           if (parsed) {
             // Deduplicate only when text, timestamp window, and attachments all match.
             const contentKey = buildChatMessageDedupeKey(parsed);

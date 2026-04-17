@@ -654,6 +654,11 @@ Primary goal:
 - modal open/close state, escape-key dismissal, body scroll locking, desktop lightbox recovery, and web local-file blocking now live behind `useImageLightboxController`
 - `ChatView` is closer to a rendering/composition surface for image modal behavior instead of another home for media/runtime state
 
+#### Fifth implementation cut follow-through
+- the app-side media directive and attachment extraction path no longer lives inline in `src/app.tsx`
+- `src/lib/chat-message-attachments.ts` now owns `MEDIA:` parsing, attachment signature/dedupe logic, and runtime-aware payload-to-attachment chat-message shaping
+- the app root now consumes a shared attachment parsing boundary for history messages, tool-result attachment rows, and assistant attachment projections instead of carrying a parallel media parsing subsystem
+
 ## Track C — App-state formalization
 Primary goal:
 - define and enforce state ownership for connection, session, thread, tool, and UI domains
