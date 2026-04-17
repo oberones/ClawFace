@@ -3653,7 +3653,14 @@ export default function App() {
     if (!cached) {
       return false;
     }
-    applyThreadToolState(cached);
+    applyThreadToolState({
+      messages: cached.messages,
+      streamText: cached.streamText,
+      toolItems: cached.toolItems,
+      thinking: cached.thinking,
+      chatRunId: cached.chatRunId,
+      thinkingLevel: cached.thinkingLevel,
+    });
     setDraft(cached.draft);
     replaceAttachments(cached.attachments);
     return true;

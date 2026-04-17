@@ -174,6 +174,12 @@ export function useThreadToolController(): UseThreadToolControllerResult {
     }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      disposeThreadToolController();
+    };
+  }, [disposeThreadToolController]);
+
   return {
     messages,
     setMessages,
