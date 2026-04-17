@@ -494,6 +494,13 @@ Reduce uncontrolled state sprawl.
 
 Even if implemented as one store at first, the domains should be explicit.
 
+### Current Phase 1 ownership note
+The first concrete ownership map now lives in:
+
+- `docs/APP-STATE-DOMAINS.md`
+
+Use that note as the current answer to “where does this state live?” before proposing further store/controller extractions.
+
 ---
 
 ## Priority 5 — Decompose settings UI
