@@ -46,3 +46,32 @@ test("cloneThreadToolStateSnapshot copies message and tool arrays without sharin
   assert.equal(clone.messages.length, 1);
   assert.equal(clone.toolItems.length, 1);
 });
+
+test("cloneThreadToolStateSnapshot drops non-thread/tool fields at runtime", () => {
+  const threadToolState = loadThreadToolStateModule();
+  const original = {
+    messages: [],
+    streamText: null,
+    toolItems: [],
+    thinking: false,
+    chatRunId: null,
+    thinkingLevel: null,
+    draft: "should not leak",
+    attachments: [{ id: "a1" }],
+    lastLoadedAt: 123,
+  };
+
+  const clone = threadToolState.cloneThreadToolStateSnapshot(original);
+
+  assert.deepEqual(clone, {
+    messages: [],
+    streamText: null,
+    toolItems: [],
+    thinking: false,
+    chatRunId: null,
+    thinkingLevel: null,
+  });
+  assert.equal("draft" in clone, false);
+  assert.equal("attachments" in clone, false);
+  assert.equal("lastLoadedAt" in clone, false);
+});

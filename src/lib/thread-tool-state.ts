@@ -24,8 +24,11 @@ export function cloneThreadToolStateSnapshot(
   snapshot: ThreadToolStateSnapshot,
 ): ThreadToolStateSnapshot {
   return {
-    ...snapshot,
     messages: [...snapshot.messages],
+    streamText: snapshot.streamText,
     toolItems: [...snapshot.toolItems],
+    thinking: snapshot.thinking,
+    chatRunId: snapshot.chatRunId,
+    thinkingLevel: snapshot.thinkingLevel,
   };
 }
