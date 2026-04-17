@@ -1,7 +1,7 @@
 {
   "name": "clawface",
   "private": true,
-  "version": "0.9.3",
+  "version": "0.9.4",
   "main": "electron/main.cjs",
   "type": "module",
   "engines": {
