@@ -525,6 +525,12 @@ The first Track D seam now also exists:
 
 Use that as the current boundary for raw thread/tool chat/agent payload shaping before adding more gateway-specific parsing logic directly to `src/app.tsx`.
 
+The next Track D seam now also exists:
+
+- `src/lib/shell-gateway-events.ts`
+
+Use that as the current boundary for approval and device-pairing gateway event shaping before adding more shell-facing event parsing directly to `src/app.tsx` or the device pairing controller.
+
 ---
 
 ## Priority 5 — Decompose settings UI

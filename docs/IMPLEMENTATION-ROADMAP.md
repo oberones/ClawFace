@@ -696,6 +696,12 @@ The first Track D seam now exists:
 - `src/app.tsx` now acts more like a shell-level receiver that normalizes payloads there and delegates through the existing thread/tool controller seams
 - focused helper coverage for that boundary lives in `tests/thread-tool-domain-events.test.mjs`
 
+The next Track D seam now also exists:
+- `src/lib/shell-gateway-events.ts` owns shell-facing approval and device-pairing gateway event normalization
+- `src/app.tsx` now switches on normalized shell event kinds for approval/device flows instead of parsing those payloads inline in the gateway event handler
+- `useDevicePairingController` now consumes normalized device-pairing events rather than raw event names/payloads
+- focused helper coverage for that boundary lives in `tests/shell-gateway-events.test.mjs`
+
 ## Track E — Electron main-process cleanup
 Primary goal:
 - gradually decompose `electron/main.cjs` as the product expands beyond basic shell behavior
