@@ -19,21 +19,31 @@ type RouteParams = {
   sessionKeysMatch: ThreadToolEventSessionMatcher;
 };
 
-export type ChatEventDispatch = {
-  kind: "active" | "cached";
-  state: "delta" | "final" | "aborted" | "error";
-  targetKey: string | null;
-};
+export type ChatEventDispatch =
+  | {
+    kind: "active";
+    state: "delta" | "final" | "aborted" | "error";
+    targetKey: null;
+  }
+  | {
+    kind: "cached";
+    state: "delta" | "final" | "aborted" | "error";
+    targetKey: string;
+  };
 
-export type AgentEventDispatch = {
-  kind: "active" | "cached";
-  targetKey: string | null;
-};
+export type AgentEventDispatch =
+  | {
+    kind: "active";
+    targetKey: null;
+  }
+  | {
+    kind: "cached";
+    targetKey: string;
+  };
 
-function resolveThreadToolEventRoute(params: RouteParams): {
-  kind: "active" | "cached";
-  targetKey: string | null;
-} {
+function resolveThreadToolEventRoute(params: RouteParams):
+  | { kind: "active"; targetKey: null }
+  | { kind: "cached"; targetKey: string } {
   const activeSessionKey = params.activeSessionKey ?? null;
   const resolvedSessionKey = params.resolveSessionKey({
     sessionKeyHint: params.sessionKeyHint,
@@ -61,6 +71,10 @@ function resolveThreadToolEventRoute(params: RouteParams): {
     return { kind: "active", targetKey: null };
   }
 
+  if (!resolvedSessionKey) {
+    return { kind: "active", targetKey: null };
+  }
+
   return {
     kind: "cached",
     targetKey: resolvedSessionKey,
@@ -73,10 +87,17 @@ export function resolveChatEventDispatch(
   },
 ): ChatEventDispatch {
   const route = resolveThreadToolEventRoute(params);
+  if (route.kind === "cached") {
+    return {
+      kind: "cached",
+      state: params.state,
+      targetKey: route.targetKey,
+    };
+  }
   return {
-    kind: route.kind,
+    kind: "active",
     state: params.state,
-    targetKey: route.targetKey,
+    targetKey: null,
   };
 }
 
