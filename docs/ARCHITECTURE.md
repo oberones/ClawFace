@@ -531,6 +531,12 @@ The next Track D seam now also exists:
 
 Use that as the current boundary for approval and device-pairing gateway event shaping before adding more shell-facing event parsing directly to `src/app.tsx` or the device pairing controller.
 
+The next Track D shell-state seam now also exists:
+
+- `src/lib/shell-gateway-state.ts`
+
+Use that as the current boundary for gateway hello/close/status payload shaping before adding more shell-facing connection or status parsing directly to `src/app.tsx`.
+
 ---
 
 ## Priority 5 — Decompose settings UI
