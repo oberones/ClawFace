@@ -644,9 +644,39 @@ Primary goal:
 - gateway RPC probing, HTTP fallback probing, remote image response decoding, and remote image result caching now live behind `useRemoteImageResolver`
 - the app root is closer to shell composition for media concerns, and future remote-image work has a dedicated seam instead of reopening the root component
 
+#### Third implementation cut follow-through
+- runtime-specific attachment image-source normalization no longer lives in two places
+- `src/lib/message-image-source.ts` now owns the shared desktop/web image-source translation seam used by both image rendering and attachment construction
+- `src/app.tsx` no longer carries the overlapping desktop local-image URL, web local-proxy, and file-url mapping helpers inline when turning gateway payloads into attachments
+
+#### Fourth implementation cut follow-through
+- the image lightbox runtime behavior no longer lives inline in `ChatView.tsx`
+- modal open/close state, escape-key dismissal, body scroll locking, desktop lightbox recovery, and web local-file blocking now live behind `useImageLightboxController`
+- `ChatView` is closer to a rendering/composition surface for image modal behavior instead of another home for media/runtime state
+
+#### Fifth implementation cut follow-through
+- the app-side media directive and attachment extraction path no longer lives inline in `src/app.tsx`
+- `src/lib/chat-message-attachments.ts` now owns `MEDIA:` parsing, attachment signature/dedupe logic, and runtime-aware payload-to-attachment chat-message shaping
+- the app root now consumes a shared attachment parsing boundary for history messages, tool-result attachment rows, and assistant attachment projections instead of carrying a parallel media parsing subsystem
+
 ## Track C — App-state formalization
 Primary goal:
 - define and enforce state ownership for connection, session, thread, tool, and UI domains
+
+#### First implementation cut follow-through
+- the repo now has an explicit Phase 1 state-domain note in `docs/APP-STATE-DOMAINS.md`
+- connection, session, thread, composer/input, tool, UI, and settings ownership are now mapped to current app-shell state and existing controller seams
+- future Track C work can target named domains instead of re-auditing `src/app.tsx` every time a store/controller extraction is proposed
+
+#### Second implementation cut follow-through
+- the active thread/tool runtime state no longer lives entirely inline in `src/app.tsx`
+- `src/hooks/useThreadToolController.ts` now owns the active message/tool/stream/run/thinking state cluster and the corresponding state/ref synchronization helpers
+- `src/lib/thread-tool-state.ts` provides a small shared snapshot seam, which gives future Track C work a cleaner foundation than editing raw `useState`/`useRef` sprawl in the app root
+
+#### Third implementation cut follow-through
+- the active-vs-cached thread/tool event routing decision no longer lives inline in both top-level app event handlers
+- `src/lib/thread-tool-event-routing.ts` now owns the first event-level routing seam for chat and agent payloads
+- `src/app.tsx` still owns the branch-level cached/active update behavior, but the dispatch rule itself now has one shared source of truth
 
 ## Track D — Gateway/domain normalization
 Primary goal:
