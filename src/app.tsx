@@ -79,6 +79,10 @@ import {
 import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
 import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
+import {
+  resolveAgentEventDispatch,
+  resolveChatEventDispatch,
+} from "./lib/thread-tool-event-routing.ts";
 import { setImageSourceRuntimeHints } from "./lib/message-image-source.ts";
 import { buildAttachmentSignature, toChatMessageSafe } from "./lib/chat-message-attachments.ts";
 import {
@@ -6123,52 +6127,41 @@ export default function App() {
       return;
     }
     const activeSessionKey = selectedSessionRef.current;
-    const resolvedSessionKey = resolveEventSessionKeyFromCache({
+    const dispatch = resolveChatEventDispatch({
+      state: parsed.state,
       sessionKeyHint: parsed.sessionKey,
       runId: parsed.runId,
-      selectedSessionKey: activeSessionKey,
+      activeSessionKey,
       activeRunId: chatRunRef.current,
+      resolveSessionKey: resolveEventSessionKeyFromCache,
+      sessionKeysMatch,
     });
-    const isNonActiveSession = Boolean(
-      resolvedSessionKey && (!activeSessionKey || !sessionKeysMatch(resolvedSessionKey, activeSessionKey)),
-    );
-    if (isNonActiveSession) {
-      const activeRun = chatRunRef.current;
-      if (!activeSessionKey || !(activeRun && parsed.runId && parsed.runId === activeRun)) {
-        const targetKey = resolvedSessionKey!;
-        if (parsed.state === "delta") {
-          handleCachedDeltaChatEvent(parsed, targetKey);
-          return;
-        }
-
-        if (parsed.state === "final") {
-          handleCachedFinalChatEvent(parsed, payload, targetKey);
-          return;
-        }
-
-        if (parsed.state === "aborted" || parsed.state === "error") {
-          handleCachedTerminalChatEvent(parsed, targetKey);
-          return;
-        }
+    if (dispatch.kind === "cached") {
+      if (dispatch.state === "delta") {
+        handleCachedDeltaChatEvent(parsed, dispatch.targetKey);
         return;
       }
+
+      if (dispatch.state === "final") {
+        handleCachedFinalChatEvent(parsed, payload, dispatch.targetKey);
+        return;
+      }
+
+      handleCachedTerminalChatEvent(parsed, dispatch.targetKey);
+      return;
     }
-    if (parsed.state === "delta") {
+
+    if (dispatch.state === "delta") {
       handleActiveDeltaChatEvent(parsed);
       return;
     }
 
-    if (parsed.state === "final") {
+    if (dispatch.state === "final") {
       handleActiveFinalChatEvent(parsed, payload);
       return;
     }
 
-    if (parsed.state === "aborted") {
-      handleActiveTerminalChatEvent(parsed);
-      return;
-    }
-
-    if (parsed.state === "error") {
+    if (dispatch.state === "aborted" || dispatch.state === "error") {
       handleActiveTerminalChatEvent(parsed);
     }
   }
@@ -6184,31 +6177,27 @@ export default function App() {
     const runId =
       getString(payload, ["runId", "run_id"]) ??
       (isRecord(payload.data) ? getString(payload.data, ["runId", "run_id"]) : null);
-    const resolvedSessionKey = resolveEventSessionKeyFromCache({
+    const dispatch = resolveAgentEventDispatch({
       sessionKeyHint,
       runId,
-      selectedSessionKey: activeSessionKey,
+      activeSessionKey,
       activeRunId: chatRunRef.current,
+      resolveSessionKey: resolveEventSessionKeyFromCache,
+      sessionKeysMatch,
     });
-    const isNonActiveAgent = Boolean(
-      resolvedSessionKey && (!activeSessionKey || !sessionKeysMatch(resolvedSessionKey, activeSessionKey)),
-    );
-    if (isNonActiveAgent) {
-      const activeRun = chatRunRef.current;
-      if (!activeSessionKey || !(activeRun && runId && runId === activeRun)) {
-        const targetKey = resolvedSessionKey!;
-        const updates = extractToolUpdatesFromAgent(payload, runId);
-        handleCachedAgentToolUpdates(targetKey, runId, updates);
-        const stream = getAgentEventStream(payload);
-        if (stream === "assistant") {
-          handleCachedAgentAssistantEvent(payload, targetKey, runId);
-          return;
-        }
-        if (stream === "lifecycle") {
-          handleCachedAgentLifecycleEvent(payload, targetKey, runId);
-        }
+    if (dispatch.kind === "cached") {
+      const updates = extractToolUpdatesFromAgent(payload, runId);
+      handleCachedAgentToolUpdates(dispatch.targetKey, runId, updates);
+      const stream = getAgentEventStream(payload);
+      if (stream === "assistant") {
+        handleCachedAgentAssistantEvent(payload, dispatch.targetKey, runId);
         return;
       }
+      if (stream === "lifecycle") {
+        handleCachedAgentLifecycleEvent(payload, dispatch.targetKey, runId);
+      }
+      // Cached agent events must stop here and never mutate the active thread/tool state.
+      return;
     }
     const updates = extractToolUpdatesFromAgent(payload, runId);
     handleActiveAgentToolUpdates(updates);

@@ -126,6 +126,7 @@ Existing adjacent seams:
 - `src/components/ChatView.tsx` renders the shell/thread surface
 - `src/components/ChatThread.tsx`, `src/components/MessageRow.tsx`, and related Track A/B hooks now own more of the presentation/runtime detail than they used to
 - `src/hooks/useThreadToolController.ts` now owns the active thread/tool runtime state cluster inside the app shell
+- `src/lib/thread-tool-event-routing.ts` now owns the active-vs-cached chat/agent event routing decision that used to be duplicated inline in `src/app.tsx`
 
 Future boundary:
 - `threadStore`
@@ -200,6 +201,7 @@ Existing adjacent seams:
 - `src/lib/approval-events.ts`
 - `src/lib/session-run-routing.ts`
 - `src/hooks/useThreadToolController.ts` now owns the active live tool/thread runtime state, even though higher-level event orchestration still lives in `src/app.tsx`
+- `src/lib/thread-tool-event-routing.ts` now owns the first event-level dispatch seam for deciding whether chat/agent events should update the active thread or a cached background session
 
 Future boundary:
 - `toolStore`
@@ -291,14 +293,14 @@ These seams are good examples of the direction Track C should keep taking: expli
 
 If this work continues immediately, the strongest next state-ownership slice is:
 
-- formalize the thread/tool boundary
+- move one more level of thread/tool event orchestration out of `src/app.tsx`
 
 Why:
 - connection and session state already have clearer first-pass shapes
-- composer attachments already have a dedicated hook
-- thread and tool state are still the densest unformalized domains in `src/app.tsx`
+- the active thread/tool runtime state and the active-vs-cached event routing decision now have dedicated seams
+- the remaining density is in the branch-level orchestration for cached vs active chat/tool updates, assistant finalization follow-through, and tool-run lifecycle handling
 
 That next cut should probably avoid a giant global-store rewrite and instead introduce one explicit controller/store seam for:
-- selected-thread runtime state
-- tool timeline state
-- streaming/finalization coordination between them
+- cached vs active thread/tool update orchestration
+- tool timeline finalization and follow-through
+- streaming/finalization coordination between those event branches
