@@ -8,7 +8,7 @@ export function resolveActiveThreadToolRunSync(params: {
   activeRunId: string | null | undefined;
   incomingRunId: string | null | undefined;
   thinking: boolean;
-  onMismatchWithoutThinking: "ignore" | "reload-history";
+  onMismatchWithoutThinking: "continue" | "ignore" | "reload-history";
 }): ActiveThreadToolRunSyncOutcome {
   const activeRunId = params.activeRunId?.trim() ?? "";
   const incomingRunId = params.incomingRunId?.trim() ?? "";
@@ -19,6 +19,10 @@ export function resolveActiveThreadToolRunSync(params: {
 
   if (params.thinking) {
     return { kind: "switch-run", runId: incomingRunId };
+  }
+
+  if (params.onMismatchWithoutThinking === "continue") {
+    return { kind: "continue" };
   }
 
   return {

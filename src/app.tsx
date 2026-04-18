@@ -5718,11 +5718,9 @@ export default function App() {
   );
 
   const threadToolEventController = useThreadToolEventController({
-    selectedSessionRef,
     chatRunRef,
     thinkingRef,
     streamTextRef,
-    pendingStreamTextRef,
     setMessages,
     setChatRunId,
     setThinking,
