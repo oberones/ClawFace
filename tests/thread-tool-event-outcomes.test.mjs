@@ -34,6 +34,13 @@ test("resolveActiveThreadToolRunSync switches runs while thinking but reloads ot
     thinking: false,
     onMismatchWithoutThinking: "ignore",
   }), { kind: "ignore" });
+
+  assert.deepEqual(outcomes.resolveActiveThreadToolRunSync({
+    activeRunId: "run-a",
+    incomingRunId: "run-b",
+    thinking: false,
+    onMismatchWithoutThinking: "continue",
+  }), { kind: "continue" });
 });
 
 test("resolveThreadToolDeltaOutcome prefers tool updates and otherwise keeps only real assistant text", () => {
@@ -81,6 +88,12 @@ test("resolveThreadToolFinalOutcome separates tool-final branches from assistant
 
   assert.deepEqual(outcomes.resolveThreadToolFinalOutcome({
     isToolFinal: false,
+    hasCommittedStreamMessage: false,
+    toolFinalMessageCount: 0,
+  }), { kind: "assistant-final" });
+
+  assert.deepEqual(outcomes.resolveThreadToolFinalOutcome({
+    isToolFinal: true,
     hasCommittedStreamMessage: false,
     toolFinalMessageCount: 0,
   }), { kind: "assistant-final" });

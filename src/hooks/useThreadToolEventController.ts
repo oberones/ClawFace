@@ -86,11 +86,9 @@ function getLifecycleErrorMessage(
 }
 
 type UseThreadToolEventControllerParams = {
-  selectedSessionRef: MutableRefObject<string | null>;
   chatRunRef: MutableRefObject<string | null>;
   thinkingRef: MutableRefObject<boolean>;
   streamTextRef: MutableRefObject<string | null>;
-  pendingStreamTextRef: MutableRefObject<string | null>;
   setMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setChatRunId: Dispatch<SetStateAction<string | null>>;
   setThinking: Dispatch<SetStateAction<boolean>>;
@@ -563,7 +561,7 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
       activeRunId: params.chatRunRef.current,
       incomingRunId: runId,
       thinking: params.thinkingRef.current,
-      onMismatchWithoutThinking: "ignore",
+      onMismatchWithoutThinking: "continue",
     });
     if (runSync.kind === "ignore") {
       return;
