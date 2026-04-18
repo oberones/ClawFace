@@ -678,6 +678,15 @@ Primary goal:
 - `src/lib/thread-tool-event-routing.ts` now owns the first event-level routing seam for chat and agent payloads
 - `src/app.tsx` still owns the branch-level cached/active update behavior, but the dispatch rule itself now has one shared source of truth
 
+#### Fourth implementation cut follow-through
+- the cached-vs-active thread/tool branch orchestration no longer lives inline in `src/app.tsx`
+- `src/hooks/useThreadToolEventController.ts` now owns:
+  - cached vs active chat event handling
+  - cached vs active agent event handling
+  - branch-level finalization, lifecycle, streaming, and assistant-attachment follow-through
+- `src/lib/thread-tool-event-outcomes.ts` now provides a small pure seam for delta/final/lifecycle outcome rules, which gives the new controller focused helper coverage instead of forcing the test harness through React
+- `src/app.tsx` is now closer to a shell-level event receiver that normalizes payloads and delegates thread/tool branch behavior rather than being the full home for that orchestration
+
 ## Track D — Gateway/domain normalization
 Primary goal:
 - normalize raw gateway events into app/domain events the renderer can consume cleanly
