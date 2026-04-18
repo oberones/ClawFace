@@ -10,7 +10,7 @@ const DEFAULT_EXEC_APPROVAL_DECISIONS: ApprovalDecision[] = [
   "deny",
 ];
 
-type ApprovalResolution = {
+export type ApprovalResolution = {
   id: string;
   kind: ApprovalKind;
   sessionKey: string | null;

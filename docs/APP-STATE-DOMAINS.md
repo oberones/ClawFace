@@ -310,4 +310,9 @@ That Track D seam now also exists:
 - `src/lib/thread-tool-domain-events.ts` owns raw thread/tool chat/agent payload shaping
 - `src/app.tsx` now normalizes thread/tool gateway payloads there before delegating into the existing controller seams
 
+The next Track D seam now also exists:
+- `src/lib/shell-gateway-events.ts` owns approval and device-pairing gateway event normalization for the shell-facing path
+- `src/app.tsx` now consumes normalized shell event kinds for those families instead of parsing approval/device payloads inline
+- `useDevicePairingController` now consumes normalized device-pairing events instead of raw event names/payloads
+
 If work continues from here, the next density is more likely to be broader gateway-event normalization outside the thread/tool path rather than another state-ownership extraction inside that same subsystem.
