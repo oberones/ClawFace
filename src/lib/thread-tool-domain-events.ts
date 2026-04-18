@@ -505,7 +505,7 @@ export function extractToolUpdatesFromAgent(
   if (!isRecord(payload)) {
     return [];
   }
-  const ts = typeof payload.ts === "number" ? payload.ts : Date.now();
+  const ts = typeof payload.ts === "number" && Number.isFinite(payload.ts) ? payload.ts : Date.now();
   const root = isRecord(payload.data) ? payload.data : payload;
   const payloadRunId =
     getString(payload, ["runId", "run_id"]) ??

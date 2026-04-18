@@ -59,6 +59,53 @@ test("normalizeAgentEventPayload extracts tool updates from tool stream payloads
   assert.deepEqual(parsed?.toolUpdates[0]?.args, { prompt: "a lighthouse at dusk" });
 });
 
+test("extractToolUpdatesFromAgent handles nested function payloads, failures, and non-finite timestamps", () => {
+  const { extractToolUpdatesFromAgent } = loadThreadToolDomainEventsModule();
+
+  const before = Date.now();
+  const updates = extractToolUpdatesFromAgent({
+    ts: Number.NaN,
+    data: {
+      stream: "tool",
+      items: [
+        {
+          id: "tool-call-3",
+          function: {
+            name: "exec",
+            arguments: { cmd: "ls -la" },
+          },
+          phase: "started",
+        },
+        {
+          toolCallId: "tool-call-4",
+          toolName: "exec",
+          result: {
+            error: {
+              message: "permission denied",
+            },
+          },
+          status: "error",
+        },
+      ],
+    },
+    runId: "run-5",
+  });
+  const after = Date.now();
+
+  const started = updates.find((update) => update.status === "start" && update.name === "exec");
+  assert.ok(started);
+  assert.deepEqual(started.args, { cmd: "ls -la" });
+  assert.equal(started.runId, "run-5");
+  assert.equal(typeof started.startedAt, "number");
+  assert.ok((started.startedAt ?? 0) >= before && (started.startedAt ?? 0) <= after);
+
+  const failed = updates.find((update) => update.id === "tool-call-4");
+  assert.ok(failed);
+  assert.equal(failed.status, "result");
+  assert.equal(failed.outcome, "failed");
+  assert.equal(failed.errorMessage, "permission denied");
+});
+
 test("normalizeAgentEventPayload preserves assistant text and lifecycle error hints", () => {
   const { normalizeAgentEventPayload } = loadThreadToolDomainEventsModule();
 
@@ -124,4 +171,54 @@ test("extractToolUpdatesFromMessage merges tool use and tool result entries by i
   assert.equal(updates[0]?.runId, "run-4");
   assert.equal(updates[0]?.output, "Done");
   assert.deepEqual(updates[0]?.mediaPaths, ["/Users/test/.openclaw/media/generated/example.png"]);
+});
+
+test("attachLifecycleErrorToToolItems marks only the last running tool item for the run as failed", () => {
+  const { attachLifecycleErrorToToolItems } = loadThreadToolDomainEventsModule();
+
+  const items = [
+    {
+      id: "tool-1",
+      name: "exec",
+      status: "result",
+      outcome: "succeeded",
+      runId: "run-6",
+      startedAt: 100,
+      updatedAt: 110,
+    },
+    {
+      id: "tool-2",
+      name: "image_generate",
+      status: "update",
+      outcome: "running",
+      runId: "run-6",
+      startedAt: 120,
+      updatedAt: 130,
+    },
+    {
+      id: "tool-3",
+      name: "exec",
+      status: "update",
+      outcome: "running",
+      runId: "run-7",
+      startedAt: 140,
+      updatedAt: 150,
+    },
+  ];
+
+  const next = attachLifecycleErrorToToolItems(items, {
+    runId: "run-6",
+    errorMessage: "Gateway disconnected",
+  });
+
+  assert.equal(next[1]?.status, "result");
+  assert.equal(next[1]?.outcome, "failed");
+  assert.equal(next[1]?.errorMessage, "Gateway disconnected");
+  assert.equal(next[2]?.outcome, "running");
+
+  const unchanged = attachLifecycleErrorToToolItems(items, {
+    runId: "run-missing",
+    errorMessage: "Ignored",
+  });
+  assert.equal(unchanged, items);
 });
