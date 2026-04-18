@@ -2014,6 +2014,50 @@ The strongest next move is probably no longer another blind Track C extraction. 
 
 ---
 
+## Ticket D.1 — Introduce the first thread/tool domain-event boundary
+### Goal
+Move raw chat/agent payload shaping out of `src/app.tsx` and into a shared domain seam the shell and controller can consume cleanly.
+
+### Scope
+- centralize thread/tool chat-event normalization in a shared library module
+- centralize thread/tool agent-event normalization in that same module
+- move tool update extraction, assistant reply coercion, and lifecycle error attachment helpers out of `src/app.tsx`
+- rewire `src/app.tsx` and `useThreadToolEventController` to consume normalized thread/tool domain events instead of a bag of parser callbacks
+- add focused helper-level coverage for the new domain-event seam
+
+### Deliverable
+A dedicated thread/tool domain-event module that owns raw gateway payload shaping, plus slimmer app/controller wiring that delegates through it.
+
+### Done when
+- `src/lib/thread-tool-domain-events.ts` is the authoritative home for raw thread/tool payload shaping
+- `src/app.tsx` mainly normalizes chat/agent payloads and delegates them to the existing thread/tool controller boundary
+- `useThreadToolEventController` no longer depends on parser callbacks for tool extraction, assistant reply merging, or lifecycle parsing
+- helper-level regression coverage exists for the new domain-event seam
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- `src/lib/thread-tool-domain-events.ts` now serves as the authoritative thread/tool payload-shaping seam for:
+  - chat-event normalization
+  - agent-event normalization
+  - tool update extraction from gateway messages and agent payloads
+  - assistant reply/media coercion
+  - lifecycle error attachment follow-through
+- `src/app.tsx` now imports that seam instead of owning a parallel copy of the parsing helpers inline
+- `src/hooks/useThreadToolEventController.ts` now consumes normalized agent events and shared extraction helpers directly instead of receiving a wide parser callback surface from the app root
+- focused regression coverage now lives in `tests/thread-tool-domain-events.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues immediately, the next clean move is probably to widen the same normalization approach beyond the thread/tool path, especially around other gateway event families that still arrive at the shell as raw payloads.
+
+---
+
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
 ### Goal
 Keep the architecture doc honest as refactors land.

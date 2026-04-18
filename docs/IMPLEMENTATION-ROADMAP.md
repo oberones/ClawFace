@@ -691,6 +691,11 @@ Primary goal:
 Primary goal:
 - normalize raw gateway events into app/domain events the renderer can consume cleanly
 
+The first Track D seam now exists:
+- `src/lib/thread-tool-domain-events.ts` owns raw thread/tool chat/agent payload shaping
+- `src/app.tsx` now acts more like a shell-level receiver that normalizes payloads there and delegates through the existing thread/tool controller seams
+- focused helper coverage for that boundary lives in `tests/thread-tool-domain-events.test.mjs`
+
 ## Track E — Electron main-process cleanup
 Primary goal:
 - gradually decompose `electron/main.cjs` as the product expands beyond basic shell behavior
