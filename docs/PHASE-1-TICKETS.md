@@ -1839,6 +1839,125 @@ A small state-domain note and/or initial store modules.
 ### Done when
 - there is an explicit answer to “where does this state live?” for core Phase 1 flows
 
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- added `docs/APP-STATE-DOMAINS.md` as the first explicit Phase 1 app-state ownership map
+- defined current ownership for:
+  - connection state
+  - session state
+  - thread state
+  - composer/input state
+  - tool state
+  - UI/settings state
+- called out the existing specialized controller seams that already sit outside the app root:
+  - `useStagedAttachments`
+  - `useRemoteImageResolver`
+  - `useDevicePairingController`
+  - image/media controllers from Track B
+
+#### Why this is enough for the ticket
+- the repo now has a concrete answer to “where does this state live?” for the core Phase 1 shell flows
+- future Track C work can target named domains instead of re-auditing `src/app.tsx` from scratch
+- this keeps the next state extraction from being a blind rewrite
+
+#### Recommended next step
+If Track C continues immediately, the strongest next slice is to formalize the thread/tool boundary, since that is now the densest unformalized state ownership still living in `src/app.tsx`.
+
+## Ticket C.1 — Introduce the first thread/tool controller boundary
+### Goal
+Move the active thread/tool runtime state behind an explicit controller seam instead of leaving the entire state cluster inline in `src/app.tsx`.
+
+### Scope
+- extract the active thread/tool runtime state into a dedicated hook/controller
+- move the state/ref synchronization and active streaming helpers behind that boundary
+- keep session cache ownership and higher-level event orchestration in `src/app.tsx` for now
+- add at least one focused regression seam for the new snapshot/controller layer
+
+### Deliverable
+A first concrete thread/tool boundary that answers:
+- “Where does the active thread/tool runtime state live?”
+- “Can `app.tsx` orchestrate chat and tool events without also owning all the low-level state syncing?”
+
+### Done when
+- the active thread/tool runtime state cluster lives behind a dedicated controller hook
+- `src/app.tsx` no longer inlines the corresponding state/ref synchronization helpers
+- focused regression coverage exists for the new snapshot/controller seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/hooks/useThreadToolController.ts` to own:
+  - active thread/tool state
+  - state/ref synchronization for messages, stream text, run id, thinking, tool items, and thinking level
+  - active streaming helpers
+  - snapshot/apply/clear helpers for the active thread/tool state cluster
+- added `src/lib/thread-tool-state.ts` as a small shared snapshot seam
+- rewired `src/app.tsx` to consume that controller instead of owning the full active thread/tool sync layer inline
+
+#### Architectural improvements landed
+- `app.tsx` is closer to event/shell orchestration for thread and tool behavior instead of also being the low-level state-sync implementation
+- Track C now has a real code boundary, not just a documentation note
+- the next thread/tool extraction can build on an explicit controller seam instead of starting from raw `useState` and `useRef` sprawl again
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track C continues from here, the strongest next slice is to narrow the higher-level thread/tool event orchestration that still lives in `src/app.tsx`, now that the active runtime state itself has a dedicated controller.
+
+## Ticket C.2 — Extract the first thread/tool event-routing seam
+### Goal
+Move the active-vs-cached chat/agent event dispatch decision behind an explicit seam instead of recomputing that routing inline inside `src/app.tsx`.
+
+### Scope
+- extract the shared routing decision for chat and agent events into a dedicated helper/module
+- keep the actual cached/active branch handlers in `src/app.tsx` for now
+- preserve the current same-run fallback behavior that keeps active runs from being misrouted
+- add focused regression coverage for the new routing seam
+
+### Deliverable
+A first event-level boundary that answers:
+- “How does the app decide whether an incoming event belongs to the active thread or a cached background session?”
+- “Can the app root dispatch chat and agent events without inlining the full routing decision each time?”
+
+### Done when
+- `src/app.tsx` no longer duplicates the active-vs-cached event routing rules across chat and agent handlers
+- the routing decision lives behind a dedicated helper/module
+- focused regression coverage exists for the routing seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-17)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/thread-tool-event-routing.ts` to own the active-vs-cached event dispatch decision for:
+  - normalized chat events
+  - agent stream events
+- rewired `src/app.tsx` to consume that routing seam instead of recomputing the same session/run dispatch logic inline in both top-level event handlers
+- added focused coverage in `tests/thread-tool-event-routing.test.mjs`
+
+#### Architectural improvements landed
+- Track C now has an event-level thread/tool boundary in addition to the earlier runtime-state controller seam
+- the chat and agent handlers in `src/app.tsx` are flatter and easier to reason about because the active-vs-cached dispatch rule now has one source of truth
+- future Track C work can target the remaining branch-level orchestration directly instead of re-extracting the same routing decision again
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track C continues from here, the strongest next slice is to move one more level of branch orchestration out of `src/app.tsx`, especially the cached vs active chat/tool update paths and their finalization follow-through.
+
 ---
 
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
@@ -4811,3 +4930,169 @@ This ticket is now complete.
 
 #### Recommended next step
 If Track B continues after this, the next most natural slice is probably the desktop/web image-source mapping seam in `src/lib/message-image-source.ts`.
+
+## Ticket B.3 — Extract the desktop/web image-source mapping seam
+
+### Why
+Even after `MessageImageAttachment` and the shell-level remote resolver moved behind dedicated controller seams, the renderer still had one important media/platform boundary split across two places:
+- `src/lib/message-image-source.ts` knew how to parse and translate attachment image sources
+- `src/app.tsx` still reimplemented runtime-specific image normalization when turning raw gateway payloads into attachments
+
+That duplication kept the attachment-building path and the image-rendering path from sharing one authoritative translation layer, which is exactly the kind of drift Track B is meant to reduce.
+
+### Scope
+- move runtime-specific image source normalization behind `src/lib/message-image-source.ts`
+- update `src/app.tsx` to consume that shared image-source boundary instead of carrying its own desktop/web mapping helpers inline
+- preserve current desktop local-image, web local-proxy, base64, and file-url behavior
+- add focused regression coverage for the shared normalization path
+
+### Deliverable
+A clearer media/platform boundary that answers:
+- “Where does attachment image-source translation actually live?”
+- “Can the app shell build image attachments without reimplementing desktop/web source mapping rules?”
+
+### Done when
+- `app.tsx` no longer inlines the image-source normalization path used when building attachments
+- `src/lib/message-image-source.ts` becomes the shared source of truth for runtime-specific image source translation
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- extended `src/lib/message-image-source.ts` with:
+  - `toRuntimeRenderableLocalPath(...)`
+  - `normalizeRuntimeImageSourceData(...)`
+  - the internal desktop local-image URL and web local-proxy parsing/mapping helpers needed by that shared normalization path
+- updated `src/app.tsx` to use the shared image-source normalization seam when building attachments from raw gateway image payloads
+- removed the overlapping desktop/web image-source translation helpers from `src/app.tsx`
+- added regression coverage in `tests/message-image-source.test.mjs` for:
+  - file-URL normalization through the shared runtime mapper
+  - desktop local-image URL normalization with active path-prefix mappings
+
+#### Architectural improvements landed
+- the attachment-building path and the image-rendering path now share one image-source translation boundary instead of maintaining parallel runtime mapping rules
+- `app.tsx` is closer to shell/domain composition for media concerns and less of a second home for desktop/web source translation logic
+- future image-path or runtime-source fixes now have one more obvious place to land before the renderer or shell need to know about them
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track B continues after this, the next natural slice is probably whichever remaining media seam still feels most coupled in real use:
+- either the image lightbox/runtime behavior path in `ChatView.tsx`
+- or the remaining app-side media directive / attachment extraction boundary if it still feels too shell-specific
+
+## Ticket B.4 — Extract the image lightbox runtime behavior from `ChatView`
+
+### Why
+Even after the image attachment controller and the shared image-source mapping seam were extracted, `ChatView` still owned a small but real image-runtime subsystem for the lightbox:
+- modal open/close state
+- escape-key dismissal and body scroll lock
+- desktop local-image scheme fallback
+- lightbox read-image recovery after preview failures
+- local-file blocking behavior for web runtimes
+
+That kept media/runtime behavior mixed into one of the biggest UI components in the repo, which is exactly the sort of coupling Track B is meant to shrink.
+
+### Scope
+- move image lightbox runtime state and recovery behavior behind a dedicated hook/controller seam
+- keep `ChatView` responsible for rendering the lightbox surface and wiring open/close callbacks
+- preserve current desktop recovery behavior and web local-file blocking behavior
+- avoid expanding the lightbox into a broader redesign or separate workflow
+
+### Deliverable
+A clearer media/platform boundary that answers:
+- “Where does the lightbox runtime behavior actually live?”
+- “Can `ChatView` render the image modal without also owning the desktop recovery state machine?”
+
+### Done when
+- `ChatView.tsx` no longer inlines the lightbox modal lifecycle and image-recovery behavior
+- the lightbox runtime path lives behind a dedicated hook/controller seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/hooks/useImageLightboxController.ts` to own:
+  - lightbox open/close state
+  - escape-key dismissal
+  - body scroll locking while the modal is open
+  - desktop local-image fallback and read-image recovery
+  - web local-file blocking state
+- updated `src/components/ChatView.tsx` to consume that hook instead of carrying the lightbox runtime behavior inline
+
+#### Architectural improvements landed
+- `ChatView` is closer to a rendering/composition surface instead of also owning another media-runtime state machine
+- lightbox-specific desktop recovery behavior now has a dedicated seam that can evolve without reopening the main chat component
+- Track B now covers the attachment preview, remote resolver, shared image-source mapping, and lightbox runtime layers with clearer boundaries between them
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track B continues after this, the next natural slice is probably the remaining app-side media directive / attachment extraction boundary, since that is the most obvious media-specific logic still living in the app shell.
+
+## Ticket B.5 — Extract the media directive and attachment extraction boundary from `app.tsx`
+
+### Why
+Even after the attachment controller, remote resolver, shared image-source mapper, and lightbox controller were extracted, `src/app.tsx` still owned the shell-side media shaping path:
+- `MEDIA:` directive parsing
+- attachment extraction from text/tool payloads
+- raw image payload normalization into chat attachments
+- tool-result attachment shaping while loading history and live updates
+
+That left one of the app root’s remaining media-specific seams living inline in the shell, which is exactly the kind of coupling Track B is supposed to shrink.
+
+### Scope
+- move `MEDIA:` parsing and attachment extraction into a dedicated shared module
+- rewire `app.tsx` to consume that module when shaping messages and tool attachment rows
+- preserve the runtime path-hint behavior used by desktop/shared-volume image rendering
+- add focused regression coverage for directive parsing and tool-result attachment shaping
+
+### Deliverable
+A clearer attachment extraction boundary that answers:
+- “Where does text/tool payload media parsing actually live?”
+- “Can the app root build chat messages without also owning the image attachment parsing rules?”
+
+### Done when
+- `app.tsx` no longer carries the inline `MEDIA:` and attachment extraction helpers
+- the shell uses a shared attachment parsing module with the existing runtime-hint behavior preserved
+- focused regression coverage exists for the extracted seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-16)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/chat-message-attachments.ts` to own:
+  - `MEDIA:` directive parsing and cleanup
+  - attachment signature/dedupe helpers
+  - raw payload-to-`ChatMessage` attachment shaping
+  - runtime-aware attachment resolution using the shared image-source boundary
+- updated `src/app.tsx` to consume that shared module for:
+  - history message parsing
+  - assistant attachment projection
+  - tool-result attachment message construction
+- added focused coverage in `tests/chat-message-attachments.test.mjs`
+
+#### Architectural improvements landed
+- `app.tsx` no longer inlines a second media parsing/shaping subsystem beside the rest of the chat shell
+- Track B now has a clearer boundary for “payload becomes attachment-bearing chat message” separate from both the renderer component layer and the remote transport layer
+- attachment shaping now shares the same runtime hint and image-source rules regardless of whether it comes from history, tool output, or assistant reply payloads
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track B continues after this, the next natural slice is probably a smaller follow-through or test-driven polish pass rather than another obvious architecture extraction, because the largest media/runtime seams have now been pulled out of the main shell surfaces.

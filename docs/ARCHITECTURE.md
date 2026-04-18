@@ -494,6 +494,25 @@ Reduce uncontrolled state sprawl.
 
 Even if implemented as one store at first, the domains should be explicit.
 
+### Current Phase 1 ownership note
+The first concrete ownership map now lives in:
+
+- `docs/APP-STATE-DOMAINS.md`
+
+Use that note as the current answer to “where does this state live?” before proposing further store/controller extractions.
+
+The first concrete Track C controller seam now also exists:
+
+- `src/hooks/useThreadToolController.ts`
+
+Use that as the current boundary for active thread/tool runtime state before reopening `src/app.tsx` for more low-level sync logic.
+
+The next concrete Track C seam now also exists:
+
+- `src/lib/thread-tool-event-routing.ts`
+
+Use that as the current boundary for deciding whether chat/agent events should target the active thread or a cached background session before duplicating more event-routing logic in `src/app.tsx`.
+
 ---
 
 ## Priority 5 — Decompose settings UI

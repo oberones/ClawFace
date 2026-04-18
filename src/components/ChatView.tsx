@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import type {
-  Attachment,
   ApprovalDecision,
   ChatMessage,
   ConnectionStatus,
@@ -19,18 +18,13 @@ import { ToolActivityPanel } from "./ToolActivityPanel.tsx";
 import { Composer } from "./Composer.tsx";
 import { SessionRuntimeControls } from "./SessionRuntimeControls.tsx";
 import { buildMotionVars, MessageRow } from "./MessageRow.tsx";
-import {
-  buildDesktopLocalImageUrl,
-  filePathFromImageSource,
-  isDesktopRuntime,
-  isLikelyLocalFileSource,
-} from "../lib/message-image-source.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { deriveConnectionFeedback, PAIRING_APPROVAL_COMMAND } from "../lib/connection-feedback.ts";
 import { formatApprovalDecisionLabel } from "../lib/approval-events.ts";
 import type { ConnectionRecoveryNotice, InterruptedRunSessionBanner } from "../lib/connection-recovery.ts";
 import { useAutoScroll } from "../hooks/useAutoScroll.ts";
+import { useImageLightboxController } from "../hooks/useImageLightboxController.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
 import { createBottomPinScheduler } from "../lib/scroll-anchoring.ts";
@@ -101,7 +95,6 @@ export default function ChatView(props: ChatViewProps) {
   const [activeCommand, setActiveCommand] = useState(0);
   const [runtimeControlsMenuOpen, setRuntimeControlsMenuOpen] = useState(false);
   const [toolExpanded, setToolExpanded] = useState<Record<string, boolean>>({});
-  const [imageLightbox, setImageLightbox] = useState<Attachment | null>(null);
   const [chatImpulseActive, setChatImpulseActive] = useState(false);
   const [composerLaunchActive, setComposerLaunchActive] = useState(false);
   const [sessionTransitionPhase, setSessionTransitionPhase] = useState<"idle" | "out" | "preparing" | "in">("idle");
@@ -113,7 +106,6 @@ export default function ChatView(props: ChatViewProps) {
   const [sessionFlyInToolPanelKeys, setSessionFlyInToolPanelKeys] = useState<string[]>([]);
   const [sessionFlyInStream, setSessionFlyInStream] = useState(false);
   const [streamPopActive, setStreamPopActive] = useState(false);
-  const lightboxReadTriedRef = useRef<Set<string>>(new Set());
   const isComposingRef = useRef(false);
   const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const mainThreadRef = useRef<HTMLDivElement | null>(null);
@@ -158,6 +150,13 @@ export default function ChatView(props: ChatViewProps) {
   const streamPopResetTimerRef = useRef<number | null>(null);
   const chatImpulseRafRef = useRef<number | null>(null);
   const composerLaunchRafRef = useRef<number | null>(null);
+  const {
+    imageLightbox,
+    openImageLightbox,
+    closeImageLightbox,
+    onLightboxImageError,
+    lightboxBlockedByWebLocalFile,
+  } = useImageLightboxController();
   const sessionFlyInRafRefs = useRef<number[]>([]);
   const sessionSwitchTimersRef = useRef<number[]>([]);
   const streamWasActiveRef = useRef(Boolean(props.streamText));
@@ -593,7 +592,7 @@ export default function ChatView(props: ChatViewProps) {
     prevSessionKeyRef.current = props.sessionKey;
     setToolExpanded({});
     resetAutoScrollState();
-    setImageLightbox(null);
+    closeImageLightbox();
     setRuntimeControlsMenuOpen(false);
     setChatImpulseActive(false);
     setComposerLaunchActive(false);
@@ -616,6 +615,7 @@ export default function ChatView(props: ChatViewProps) {
     props.toolItems,
     clearSessionSwitchTimers,
     clearSessionFlyInMarks,
+    closeImageLightbox,
     triggerComposerLaunch,
     triggerVisibleSessionFlyIn,
   ]);
@@ -733,117 +733,6 @@ export default function ChatView(props: ChatViewProps) {
       }
     };
   }, [clearSessionFlyInMarks, clearSessionSwitchTimers]);
-
-  useEffect(() => {
-    if (!imageLightbox) {
-      return;
-    }
-    const onEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setImageLightbox(null);
-      }
-    };
-    window.addEventListener("keydown", onEscape);
-    return () => window.removeEventListener("keydown", onEscape);
-  }, [imageLightbox]);
-
-  useEffect(() => {
-    if (!imageLightbox) {
-      return;
-    }
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [imageLightbox]);
-
-  const onLightboxImageError = useCallback(() => {
-    if (!imageLightbox) {
-      return;
-    }
-    const filePath = filePathFromImageSource(imageLightbox.sourcePath ?? imageLightbox.dataUrl);
-    if (isDesktopRuntime() && filePath) {
-      const nextDesktopSrc = buildDesktopLocalImageUrl(filePath);
-      if (nextDesktopSrc !== imageLightbox.dataUrl) {
-        setImageLightbox((previous) => {
-          if (!previous || previous.id !== imageLightbox.id) {
-            return previous;
-          }
-          return {
-            ...previous,
-            dataUrl: nextDesktopSrc,
-          };
-        });
-        return;
-      }
-    }
-    const attemptedKey = imageLightbox.dataUrl;
-    if (!attemptedKey || lightboxReadTriedRef.current.has(attemptedKey)) {
-      return;
-    }
-    lightboxReadTriedRef.current.add(attemptedKey);
-    const readImageFile = window.desktopInfo?.readImageFile;
-    if (!readImageFile) {
-      return;
-    }
-    if (!filePath) {
-      return;
-    }
-    void readImageFile(filePath)
-      .then((result) => {
-        const nextDataUrl =
-          result.ok && typeof result.dataUrl === "string" ? result.dataUrl.trim() : "";
-        if (!nextDataUrl) {
-          return;
-        }
-        setImageLightbox((previous) => {
-          if (!previous || previous.id !== imageLightbox.id) {
-            return previous;
-          }
-          lightboxReadTriedRef.current.add(nextDataUrl);
-          return {
-            ...previous,
-            dataUrl: nextDataUrl,
-          };
-        });
-      })
-      .catch(() => {
-        // ignore
-      });
-  }, [imageLightbox]);
-
-  useEffect(() => {
-    if (!imageLightbox) {
-      return;
-    }
-    if (!isDesktopRuntime()) {
-      return;
-    }
-    const filePath = filePathFromImageSource(imageLightbox.sourcePath ?? imageLightbox.dataUrl);
-    if (filePath) {
-      const nextDesktopSrc = buildDesktopLocalImageUrl(filePath);
-      if (nextDesktopSrc !== imageLightbox.dataUrl) {
-        setImageLightbox((previous) => {
-          if (!previous || previous.id !== imageLightbox.id) {
-            return previous;
-          }
-          return {
-            ...previous,
-            dataUrl: nextDesktopSrc,
-          };
-        });
-      }
-      return;
-    }
-  }, [imageLightbox]);
-  const lightboxBlockedByWebLocalFile = useMemo(() => {
-    if (!imageLightbox) {
-      return false;
-    }
-    return !isDesktopRuntime() && isLikelyLocalFileSource(imageLightbox.dataUrl);
-  }, [imageLightbox]);
-
 
   const actionScale = props.uiSettings.composerActionScale;
   const actionFontSize = `${Math.round(12 * actionScale)}px`;
@@ -1358,7 +1247,7 @@ export default function ChatView(props: ChatViewProps) {
                     showTimestamp={props.uiSettings.showMessageTimestamp}
                     timestampFontSize={props.uiSettings.messageTimestampFontSize}
                     drawerPop={false}
-                    onOpenImage={setImageLightbox}
+                    onOpenImage={openImageLightbox}
                     onResolveRemoteImage={props.onResolveRemoteImage}
                     imageGenerationPending={false}
                   />
@@ -1420,7 +1309,7 @@ export default function ChatView(props: ChatViewProps) {
           streamMotionStyle={streamMotionStyle}
           poppingMessageIdSet={poppingMessageIdSet}
           sessionFlyInMessageIdSet={sessionFlyInMessageIdSet}
-          onOpenImage={setImageLightbox}
+          onOpenImage={openImageLightbox}
           onResolveRemoteImage={props.onResolveRemoteImage}
           onRenderToolPanel={renderToolPanel}
           onHandleMarkdownClick={(event) => {
@@ -1541,7 +1430,7 @@ export default function ChatView(props: ChatViewProps) {
           role="dialog"
           aria-modal="true"
           aria-label="Image viewer"
-          onClick={() => setImageLightbox(null)}
+          onClick={closeImageLightbox}
         >
           <div className="image-lightbox" onClick={(event) => event.stopPropagation()}>
             <div className="image-lightbox-header">
@@ -1560,7 +1449,7 @@ export default function ChatView(props: ChatViewProps) {
                 <button
                   type="button"
                   className="ui-btn ui-btn-primary"
-                  onClick={() => setImageLightbox(null)}
+                  onClick={closeImageLightbox}
                 >
                   Close
                 </button>
