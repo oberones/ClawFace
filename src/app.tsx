@@ -79,10 +79,6 @@ import {
 import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
 import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
-import {
-  resolveAgentEventDispatch,
-  resolveChatEventDispatch,
-} from "./lib/thread-tool-event-routing.ts";
 import { setImageSourceRuntimeHints } from "./lib/message-image-source.ts";
 import { buildAttachmentSignature, toChatMessageSafe } from "./lib/chat-message-attachments.ts";
 import {
@@ -92,6 +88,7 @@ import {
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
 import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
+import { useThreadToolEventController } from "./hooks/useThreadToolEventController.ts";
 import { useThreadToolController } from "./hooks/useThreadToolController.ts";
 
 const STORAGE_KEYS = {
@@ -5704,511 +5701,106 @@ export default function App() {
     }
   }
 
-  const handleCachedFinalChatEvent = (
-    parsed: NormalizedChatEvent,
-    payload: unknown,
-    targetKey: string,
-  ) => {
-    clearAgentFinalizeTimer(parsed.runId);
-    const pendingAssistantReply = getAssistantReplyForRun(parsed.runId);
-    const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
-    if (toolUpdates.length > 0) {
-      updateCacheField(targetKey, (cached) => ({
-        ...cached,
-        toolItems: mergeToolItems(cached.toolItems, toolUpdates),
-      }));
-    }
-    applySessionTokenStatsFromMessage(parsed.message, parsed.sessionKey);
-    applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
-    const isToolFinal = isToolMessage(parsed.message);
-    const cachedStreamText = (sessionCacheRef.current.get(targetKey)?.streamText ?? "").trim();
-    const committedStreamMessage = buildStreamCommittedAssistantMessage(cachedStreamText);
-    const toolAttachmentMessage = isToolFinal ? buildToolAttachmentMessage(parsed.message) : null;
-    const toolAttachmentMessagesFromUpdates = isToolFinal ? buildAttachmentMessagesFromToolUpdates(toolUpdates) : [];
-    const cachedToolFinalMessages = collectToolFinalMessages({
-      committedStreamMessage,
-      includeCommittedStreamMessage: true,
-      toolAttachmentMessage,
-      toolAttachmentMessagesFromUpdates,
-    });
-    if (isToolFinal && committedStreamMessage) {
-      updateCacheField(targetKey, (cached) => ({
-        ...cached,
-        messages: appendDistinctMessages(cached.messages, cachedToolFinalMessages),
-        streamText: null,
-      }));
-      clearRunAssistantProjectionState(parsed.runId);
-      updateSessionActivity(targetKey, { working: true });
-      return;
-    }
-    if (isToolFinal && cachedToolFinalMessages.length > 0) {
-      updateCacheField(targetKey, (cached) => ({
-        ...cached,
-        messages: appendDistinctMessages(cached.messages, cachedToolFinalMessages),
-        streamText: null,
-      }));
-      clearRunAssistantProjectionState(parsed.runId);
-      updateSessionActivity(targetKey, { working: true });
-      return;
-    }
-    const msg = !isToolFinal
-      ? buildFinalAssistantMessage(
-          mergeAssistantReplyMessageCandidate(parsed.message, pendingAssistantReply),
-          cachedStreamText,
-          parsed.runId,
-        )
-      : null;
-    if (!isToolFinal && msg) {
-      updateCacheField(targetKey, (cached) => ({
-        ...cached,
-        messages: upsertAssistantMessageForRun(cached.messages, parsed.runId, msg),
-        streamText: null,
-        chatRunId: null,
-        thinking: false,
-      }));
-      updateSessionActivity(targetKey, { working: false, unread: true });
-    }
-    clearRunAssistantProjectionState(parsed.runId);
-    // Refresh session list so sidebar picks up lastMessagePreview & derivedTitle
-    refreshSessionListsSoon();
-  };
-
-  const handleCachedTerminalChatEvent = (
-    parsed: NormalizedChatEvent,
-    targetKey: string,
-  ) => {
-    clearAgentFinalizeTimer(parsed.runId);
-    clearRunAssistantProjectionState(parsed.runId);
-    clearCachedStreamingState(targetKey);
-    if (parsed.state === "error") {
-      attachLifecycleErrorToCachedTools(targetKey, {
-        runId: parsed.runId,
-        errorMessage: parsed.errorMessage,
-      });
-      updateSessionActivity(targetKey, { working: false, unread: true });
-      return;
-    }
-    updateSessionActivity(targetKey, { working: false });
-  };
-
-  const handleActiveFinalChatEvent = (
-    parsed: NormalizedChatEvent,
-    payload: unknown,
-  ) => {
-    clearAgentFinalizeTimer(parsed.runId);
-    clearInterruptedRunSnapshotForRun(selectedSessionRef.current, parsed.runId);
-    const pendingAssistantReply = getAssistantReplyForRun(parsed.runId);
-    const activeRun = chatRunRef.current;
-    if (activeRun && parsed.runId && parsed.runId !== activeRun) {
-      if (thinkingRef.current) {
-        chatRunRef.current = parsed.runId;
-        setChatRunId(parsed.runId);
-      } else {
-        void reloadActiveSessionHistory();
-        return;
-      }
-    }
-    const activeRunAfterSync = chatRunRef.current;
-    if (activeRunAfterSync && parsed.runId && parsed.runId !== activeRunAfterSync) {
-      void reloadActiveSessionHistory();
-      return;
-    }
-    const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
-    if (toolUpdates.length > 0) {
-      setToolItems((prev) => mergeToolItems(prev, toolUpdates));
-    }
-    applySessionTokenStatsFromMessage(parsed.message, parsed.sessionKey);
-    applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
-    const isToolFinal = isToolMessage(parsed.message);
-    const streamedText = (streamTextRef.current ?? "").trim();
-    const committedStreamMessage = buildStreamCommittedAssistantMessage(streamedText);
-    const toolAttachmentMessage = isToolFinal ? buildToolAttachmentMessage(parsed.message) : null;
-    const toolAttachmentMessagesFromUpdates = isToolFinal ? buildAttachmentMessagesFromToolUpdates(toolUpdates) : [];
-    const activeToolFinalMessages = collectToolFinalMessages({
-      committedStreamMessage,
-      includeCommittedStreamMessage:
-        Boolean(committedStreamMessage) && !shouldSkipAssistantFinal(parsed.runId, committedStreamMessage?.text ?? ""),
-      toolAttachmentMessage,
-      toolAttachmentMessagesFromUpdates,
-    });
-    if (isToolFinal && committedStreamMessage) {
-      const hydrationDecision = decideFinalizedRunHydration({
-        hasFinalAssistantMessage: true,
-        hasRenderableAttachment:
-          Boolean(toolAttachmentMessage) ||
-          toolAttachmentMessagesFromUpdates.length > 0,
-        hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(parsed.runId),
-        hasCommittedMessage: true,
-        expectsMedia: runHasExpectedMediaForRun(parsed.runId, { toolUpdates }),
-      });
-      if (activeToolFinalMessages.length > 0) {
-        setMessages((prev) => appendDistinctMessages(prev, activeToolFinalMessages));
-      }
-      applyFinalizedRunHydrationDecision(parsed.runId, hydrationDecision);
-      clearActiveRunTransientState(parsed.runId);
-      // Model will continue after tool execution — keep activity working.
-      updateActiveSessionRunActivity({ working: true, unread: false });
-      return;
-    }
-    if (isToolFinal && activeToolFinalMessages.length > 0) {
-      setMessages((prev) => appendDistinctMessages(prev, activeToolFinalMessages));
-      clearActiveRunTransientState(parsed.runId);
-      updateActiveSessionRunActivity({ working: true, unread: false });
-      return;
-    }
-    const msg = buildFinalAssistantMessage(
-      mergeAssistantReplyMessageCandidate(parsed.message, pendingAssistantReply),
-      streamedText,
-      parsed.runId,
-    );
-    const activeFinalAssistantResolution = resolveActiveFinalAssistantEvent({
-      message: msg,
-      hasCommittedAttachment: hasCommittedAssistantAttachmentForRun(parsed.runId),
-      expectsMedia: runHasExpectedMediaForRun(parsed.runId, { toolUpdates }),
-      shouldSkipText: msg?.text.trim() ? shouldSkipAssistantFinal(parsed.runId, msg.text) : true,
-    });
-    if (activeFinalAssistantResolution.kind === "final-assistant-message") {
-      if (activeFinalAssistantResolution.shouldCommitMessage) {
-        setMessages((prev) => upsertAssistantMessageForRun(prev, parsed.runId, msg));
-        notifyReplyCompleted();
-      }
-      applyFinalizedRunHydrationDecision(parsed.runId, activeFinalAssistantResolution.hydrationDecision);
-    } else {
-      scheduleActiveHistoryHydration(parsed.runId);
-    }
-    clearActiveRunTransientState(parsed.runId);
-    updateActiveSessionRunActivity({ working: false, unread: false });
-    refreshSessionListsSoon();
-  };
-
-  const handleActiveTerminalChatEvent = (parsed: NormalizedChatEvent) => {
-    clearAgentFinalizeTimer(parsed.runId);
-    clearInterruptedRunSnapshotForRun(selectedSessionRef.current, parsed.runId);
-    clearActiveRunTransientState(parsed.runId, { clearScheduledHydration: true });
-    if (parsed.state === "error") {
-      attachLifecycleErrorToActiveTools({
-        runId: parsed.runId,
-        errorMessage: parsed.errorMessage,
-      });
-      if (parsed.errorMessage) {
-        pushSystemMessage(`Error: ${parsed.errorMessage}`);
-      }
-    }
-    updateActiveSessionRunActivity({ working: false, unread: false });
-  };
-
   const getAgentEventStream = (payload: Record<string, unknown>): string => {
     const streamRaw =
       getString(payload, ["stream", "channel", "topic"]) ??
       (isRecord(payload.data) ? getString(payload.data, ["stream", "channel", "topic"]) : null);
     return streamRaw?.toLowerCase() ?? "";
   };
+  const getCachedStreamText = useCallback(
+    (key: string) => sessionCacheRef.current.get(key)?.streamText ?? "",
+    [],
+  );
 
-  const handleCachedAgentToolUpdates = (
-    targetKey: string,
-    runId: string | null,
-    updates: ToolUpdate[],
-  ) => {
-    if (updates.length === 0) {
-      return;
-    }
-    const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(updates);
-    updateCacheField(targetKey, (cached) => ({
-      ...cached,
-      toolItems: mergeToolItems(cached.toolItems, updates),
-      messages: appendDistinctMessages(cached.messages, toolAttachmentMessagesFromUpdates),
-      chatRunId: runId ?? cached.chatRunId,
-    }));
-    updateSessionActivity(targetKey, { working: true });
-  };
+  const getCachedChatRunId = useCallback(
+    (key: string) => sessionCacheRef.current.get(key)?.chatRunId ?? null,
+    [],
+  );
 
-  const handleCachedAgentAssistantEvent = (
-    payload: Record<string, unknown>,
-    targetKey: string,
-    runId: string | null,
-  ) => {
-    const assistantReply = coerceAssistantReplyMessage(isRecord(payload.data) ? payload.data : payload);
-    commitAssistantReplyAttachmentProjection(
-      buildAssistantReplyAttachmentProjection(assistantReply, runId),
-      ({ runId: projectedRunId, attachmentMessage }) => {
-        updateCacheField(targetKey, (cached) => ({
-          ...cached,
-          messages: upsertAssistantMessageForRun(cached.messages, projectedRunId, attachmentMessage),
-        }));
-      },
-    );
-    // Skip if chat events are already handling this run's streaming
-    // (mirrors the active-session guard in the main handleAgentEvent path)
-    const cachedChatRunId = sessionCacheRef.current.get(targetKey)?.chatRunId;
-    if (cachedChatRunId && (!runId || runId === cachedChatRunId)) {
-      return;
-    }
-    const next = extractAssistantTextFromAgentPayload(payload);
-    if (!next) {
-      return;
-    }
-    updateCacheField(targetKey, (cached) => ({
-      ...cached,
-      streamText: mergeStreamingText(cached.streamText, next),
-      thinking: false,
-      chatRunId: runId ?? cached.chatRunId,
-    }));
-    updateSessionActivity(targetKey, { working: true });
-  };
-
-  const handleCachedAgentLifecycleEvent = (
-    payload: Record<string, unknown>,
-    targetKey: string,
-    runId: string | null,
-  ) => {
-    if (!isRecord(payload.data)) {
-      return;
-    }
-    const phase = normalizeLifecyclePhase(
-      getString(payload.data, ["phase", "status", "state", "event", "type"]),
-    );
-    if (phase !== "end" && phase !== "error") {
-      return;
-    }
-    clearAgentFinalizeTimer(runId);
-    if (phase === "error") {
-      attachLifecycleErrorToCachedTools(targetKey, {
-        runId,
-        errorMessage:
-          getString(payload.data, ["errorMessage", "error", "reason"]) ??
-          getString(payload, ["errorMessage", "error"]),
-      });
-      updateSessionActivity(targetKey, { working: false, unread: true });
-      return;
-    }
-    updateSessionActivity(targetKey, { working: false });
-  };
-
-  const handleActiveAgentToolUpdates = (updates: ToolUpdate[]) => {
-    if (updates.length === 0) {
-      return;
-    }
-    for (const update of updates) {
-      clearInterruptedRunSnapshotForRun(selectedSessionRef.current, update.runId);
-    }
-    const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(updates);
-    setToolItems((prev) => mergeToolItems(prev, updates));
-    if (toolAttachmentMessagesFromUpdates.length > 0) {
-      setMessages((prev) => appendDistinctMessages(prev, toolAttachmentMessagesFromUpdates));
-    }
-    updateActiveSessionRunActivity({ working: true, unread: false });
-  };
-
-  const handleActiveAgentAssistantEvent = (
-    payload: Record<string, unknown>,
-    runId: string | null,
-  ) => {
-    clearInterruptedRunSnapshotForRun(selectedSessionRef.current, runId);
-    const assistantReply = coerceAssistantReplyMessage(isRecord(payload.data) ? payload.data : payload);
-    commitAssistantReplyAttachmentProjection(
-      buildAssistantReplyAttachmentProjection(assistantReply, runId),
-      ({ runId: projectedRunId, attachmentMessage }) => {
-        setMessages((prev) => upsertAssistantMessageForRun(prev, projectedRunId, attachmentMessage));
-      },
-    );
-    const activeRun = chatRunRef.current;
-    if (activeRun && (!runId || runId === activeRun)) {
-      return;
-    }
-    const next = extractAssistantTextFromAgentPayload(payload);
-    if (!next) {
-      return;
-    }
-    if (runId && chatRunRef.current && runId !== chatRunRef.current && thinkingRef.current) {
-      chatRunRef.current = runId;
-      setChatRunId(runId);
-    }
-    mergeStreamTextSynced(next, mergeStreamingText);
-    setThinking(false);
-    updateActiveSessionRunActivity({ working: true, unread: false });
-  };
-
-  const handleActiveAgentLifecycleEvent = (
-    payload: Record<string, unknown>,
-    activeSessionKey: string | null,
-    runId: string | null,
-  ) => {
-    clearInterruptedRunSnapshotForRun(activeSessionKey, runId);
-    if (!isRecord(payload.data)) {
-      return;
-    }
-    const phase = normalizeLifecyclePhase(
-      getString(payload.data, ["phase", "status", "state", "event", "type"]),
-    );
-    if (phase !== "end" && phase !== "error") {
-      return;
-    }
-    const lifecycleErrorMessage =
-      getString(payload.data, ["errorMessage", "error", "reason"]) ??
-      getString(payload, ["errorMessage", "error"]);
-    if (phase === "error") {
-      attachLifecycleErrorToActiveTools({ runId, errorMessage: lifecycleErrorMessage });
-    }
-    updateActiveSessionRunActivity({ working: false, unread: false });
-    scheduleAgentFinalizeFallback({
-      sessionKey: activeSessionKey,
-      runId,
-      phase,
-      errorMessage: lifecycleErrorMessage,
-    });
-  };
-
-  const handleCachedDeltaChatEvent = (
-    parsed: NormalizedChatEvent,
-    targetKey: string,
-  ) => {
-    const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
-    if (deltaToolUpdates.length > 0) {
-      const toolAttachmentMessage = buildToolAttachmentMessage(parsed.message);
-      const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(deltaToolUpdates);
-      updateCacheField(targetKey, (cached) => ({
-        ...cached,
-        toolItems: mergeToolItems(cached.toolItems, deltaToolUpdates),
-        messages: appendDistinctMessages(cached.messages, [toolAttachmentMessage, ...toolAttachmentMessagesFromUpdates]),
-        chatRunId: parsed.runId ?? cached.chatRunId,
-      }));
-      updateSessionActivity(targetKey, { working: true });
-      return;
-    }
-    if (isToolMessage(parsed.message)) {
-      return;
-    }
-    const next = extractText(parsed.message);
-    if (typeof next !== "string" || next.length === 0) {
-      return;
-    }
-    updateCacheField(targetKey, (cached) => ({
-      ...cached,
-      streamText: mergeStreamingText(cached.streamText, next),
-      thinking: false,
-      chatRunId: parsed.runId ?? cached.chatRunId,
-    }));
-    updateSessionActivity(targetKey, { working: true });
-  };
-
-  const handleActiveDeltaChatEvent = (parsed: NormalizedChatEvent) => {
-    clearInterruptedRunSnapshotForRun(selectedSessionRef.current, parsed.runId);
-    if (chatRunRef.current && parsed.runId && parsed.runId !== chatRunRef.current) {
-      if (!thinkingRef.current) {
-        return;
-      }
-      chatRunRef.current = parsed.runId;
-      setChatRunId(parsed.runId);
-    }
-    const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
-    if (deltaToolUpdates.length > 0) {
-      const toolAttachmentMessage = buildToolAttachmentMessage(parsed.message);
-      const toolAttachmentMessagesFromUpdates = buildAttachmentMessagesFromToolUpdates(deltaToolUpdates);
-      setToolItems((prev) => mergeToolItems(prev, deltaToolUpdates));
-      setMessages((prev) => appendDistinctMessages(prev, [toolAttachmentMessage, ...toolAttachmentMessagesFromUpdates]));
-      updateActiveSessionRunActivity({ working: true, unread: false });
-      return;
-    }
-    if (isToolMessage(parsed.message)) {
-      return;
-    }
-    const next = extractText(parsed.message);
-    if (typeof next !== "string" || next.length === 0) {
-      return;
-    }
-    mergeStreamTextSynced(next, mergeStreamingText);
-    setThinking(false);
-    updateActiveSessionRunActivity({ working: true, unread: false });
-  };
+  const threadToolEventController = useThreadToolEventController({
+    selectedSessionRef,
+    chatRunRef,
+    thinkingRef,
+    streamTextRef,
+    pendingStreamTextRef,
+    setMessages,
+    setChatRunId,
+    setThinking,
+    setToolItems,
+    mergeStreamTextSynced,
+    reloadActiveSessionHistory,
+    resolveSessionKeyFromCache: resolveEventSessionKeyFromCache,
+    sessionKeysMatch,
+    updateCacheField,
+    getCachedStreamText,
+    getCachedChatRunId,
+    updateSessionActivity,
+    clearAgentFinalizeTimer,
+    getAssistantReplyForRun,
+    applySessionTokenStatsFromMessage,
+    clearRunAssistantProjectionState,
+    clearCachedStreamingState,
+    clearActiveRunTransientState,
+    updateActiveSessionRunActivity,
+    applyFinalizedRunHydrationDecision,
+    scheduleActiveHistoryHydration,
+    hasCommittedAssistantAttachmentForRun,
+    runHasExpectedMediaForRun,
+    shouldSkipAssistantFinal,
+    refreshSessionListsSoon,
+    notifyReplyCompleted,
+    attachLifecycleErrorToCachedTools,
+    attachLifecycleErrorToActiveTools,
+    scheduleAgentFinalizeFallback,
+    clearInterruptedRunSnapshotForRun,
+    pushSystemMessage,
+    extractToolUpdatesFromMessage,
+    extractToolUpdatesFromAgent,
+    getAgentEventStream,
+    isToolMessage,
+    extractText,
+    buildStreamCommittedAssistantMessage,
+    buildToolAttachmentMessage,
+    buildAttachmentMessagesFromToolUpdates,
+    collectToolFinalMessages,
+    mergeAssistantReplyMessageCandidate,
+    buildFinalAssistantMessage,
+    upsertAssistantMessageForRun,
+    appendDistinctMessages,
+    mergeToolItems,
+    coerceAssistantReplyMessage,
+    buildAssistantReplyAttachmentProjection,
+    commitAssistantReplyAttachmentProjection,
+    extractAssistantTextFromAgentPayload,
+    normalizeLifecyclePhase,
+    mergeStreamingText,
+    resolveActiveFinalAssistantEvent,
+  });
 
   function handleChatEvent(payload: unknown, eventHint?: string) {
     const parsed = normalizeChatEventPayload(payload, eventHint);
     if (!parsed) {
       return;
     }
-    const activeSessionKey = selectedSessionRef.current;
-    const dispatch = resolveChatEventDispatch({
-      state: parsed.state,
-      sessionKeyHint: parsed.sessionKey,
-      runId: parsed.runId,
-      activeSessionKey,
-      activeRunId: chatRunRef.current,
-      resolveSessionKey: resolveEventSessionKeyFromCache,
-      sessionKeysMatch,
-    });
-    if (dispatch.kind === "cached") {
-      if (dispatch.state === "delta") {
-        handleCachedDeltaChatEvent(parsed, dispatch.targetKey);
-        return;
-      }
-
-      if (dispatch.state === "final") {
-        handleCachedFinalChatEvent(parsed, payload, dispatch.targetKey);
-        return;
-      }
-
-      handleCachedTerminalChatEvent(parsed, dispatch.targetKey);
-      return;
-    }
-
-    if (dispatch.state === "delta") {
-      handleActiveDeltaChatEvent(parsed);
-      return;
-    }
-
-    if (dispatch.state === "final") {
-      handleActiveFinalChatEvent(parsed, payload);
-      return;
-    }
-
-    if (dispatch.state === "aborted" || dispatch.state === "error") {
-      handleActiveTerminalChatEvent(parsed);
-    }
+    threadToolEventController.handleChatEvent(parsed, payload, selectedSessionRef.current);
   }
 
   function handleAgentEvent(payload: unknown) {
     if (!isRecord(payload)) {
       return;
     }
-    const activeSessionKey = selectedSessionRef.current;
     const sessionKeyHint =
       getString(payload, ["sessionKey", "session_key"]) ??
       (isRecord(payload.data) ? getString(payload.data, ["sessionKey", "session_key"]) : null);
     const runId =
       getString(payload, ["runId", "run_id"]) ??
       (isRecord(payload.data) ? getString(payload.data, ["runId", "run_id"]) : null);
-    const dispatch = resolveAgentEventDispatch({
+    threadToolEventController.handleAgentEvent(
+      payload,
+      selectedSessionRef.current,
       sessionKeyHint,
       runId,
-      activeSessionKey,
-      activeRunId: chatRunRef.current,
-      resolveSessionKey: resolveEventSessionKeyFromCache,
-      sessionKeysMatch,
-    });
-    if (dispatch.kind === "cached") {
-      const updates = extractToolUpdatesFromAgent(payload, runId);
-      handleCachedAgentToolUpdates(dispatch.targetKey, runId, updates);
-      const stream = getAgentEventStream(payload);
-      if (stream === "assistant") {
-        handleCachedAgentAssistantEvent(payload, dispatch.targetKey, runId);
-        return;
-      }
-      if (stream === "lifecycle") {
-        handleCachedAgentLifecycleEvent(payload, dispatch.targetKey, runId);
-      }
-      // Cached agent events must stop here and never mutate the active thread/tool state.
-      return;
-    }
-    const updates = extractToolUpdatesFromAgent(payload, runId);
-    handleActiveAgentToolUpdates(updates);
-    const stream = getAgentEventStream(payload);
-    if (stream === "assistant") {
-      handleActiveAgentAssistantEvent(payload, runId);
-      return;
-    }
-    if (stream === "lifecycle") {
-      handleActiveAgentLifecycleEvent(payload, activeSessionKey, runId);
-    }
+    );
   }
 
   function handleRequestedApproval(approval: PendingApproval) {
