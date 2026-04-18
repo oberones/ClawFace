@@ -293,14 +293,15 @@ These seams are good examples of the direction Track C should keep taking: expli
 
 If this work continues immediately, the strongest next state-ownership slice is:
 
-- move one more level of thread/tool event orchestration out of `src/app.tsx`
+- pause and reassess whether the next clean boundary is now Track D normalization rather than another blind Track C extraction
 
 Why:
 - connection and session state already have clearer first-pass shapes
-- the active thread/tool runtime state and the active-vs-cached event routing decision now have dedicated seams
-- the remaining density is in the branch-level orchestration for cached vs active chat/tool updates, assistant finalization follow-through, and tool-run lifecycle handling
+- the active thread/tool runtime state, the active-vs-cached event routing decision, and the cached-vs-active branch orchestration now all have dedicated seams:
+  - `useThreadToolController`
+  - `thread-tool-event-routing`
+  - `useThreadToolEventController`
+- the remaining density is less about state ownership and more about raw gateway payload shaping still living in `src/app.tsx`
 
-That next cut should probably avoid a giant global-store rewrite and instead introduce one explicit controller/store seam for:
-- cached vs active thread/tool update orchestration
-- tool timeline finalization and follow-through
-- streaming/finalization coordination between those event branches
+If work continues immediately, the cleanest next seam is likely:
+- normalize raw chat and agent payloads into a domain-event boundary (Track D)

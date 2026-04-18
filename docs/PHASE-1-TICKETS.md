@@ -1958,6 +1958,60 @@ This ticket is now complete.
 #### Recommended next step
 If Track C continues from here, the strongest next slice is to move one more level of branch orchestration out of `src/app.tsx`, especially the cached vs active chat/tool update paths and their finalization follow-through.
 
+## Ticket C.3 — Extract cached/active thread-tool branch orchestration
+### Goal
+Move the cached-vs-active chat/tool branch behavior behind an explicit controller seam instead of keeping the full branch orchestration inline in `src/app.tsx`.
+
+### Scope
+- extract the cached/active chat and agent branch handlers into a dedicated controller hook/module
+- keep raw payload parsing and top-level event receipt in `src/app.tsx` for now
+- preserve the current finalization, lifecycle, streaming, and interrupted-run follow-through behavior
+- add a focused regression seam for the newly shared delta/final/lifecycle outcome rules
+
+### Deliverable
+A branch-level thread/tool boundary that answers:
+- “Where does the cached-vs-active chat/tool update orchestration live?”
+- “Can `app.tsx` receive normalized events without also owning every branch-specific update rule?”
+
+### Done when
+- `src/app.tsx` no longer inlines the cached-vs-active chat/tool branch handler stack
+- a dedicated controller seam owns the branch orchestration
+- focused regression coverage exists for the extracted delta/final/lifecycle outcomes
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-18)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/hooks/useThreadToolEventController.ts` to own:
+  - cached vs active chat event orchestration
+  - cached vs active agent event orchestration
+  - branch-level finalization, lifecycle, streaming, and assistant-attachment follow-through
+- added `src/lib/thread-tool-event-outcomes.ts` as a small pure outcome seam for:
+  - active run synchronization
+  - delta handling
+  - final-message/tool-final branching
+  - lifecycle terminal handling
+- rewired `src/app.tsx` so it now:
+  - normalizes raw chat payloads
+  - extracts agent event hints
+  - delegates the cached/active branch behavior into the new controller hook
+- added focused coverage in `tests/thread-tool-event-outcomes.test.mjs`
+
+#### Architectural improvements landed
+- Track C now has a branch-level thread/tool event seam in addition to the earlier runtime-state and routing seams
+- `src/app.tsx` is closer to being a shell-level event receiver/dispatcher instead of the full home for thread/tool branch behavior
+- the extracted controller makes it easier to reason about cached vs active follow-through without re-reading the entire app root
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+The strongest next move is probably no longer another blind Track C extraction. The remaining density is now closer to raw gateway payload normalization, so the next clean seam is likely the first Track D cut: move chat/agent payload shaping toward an explicit domain-event boundary.
+
 ---
 
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially

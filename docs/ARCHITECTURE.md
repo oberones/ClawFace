@@ -513,6 +513,12 @@ The next concrete Track C seam now also exists:
 
 Use that as the current boundary for deciding whether chat/agent events should target the active thread or a cached background session before duplicating more event-routing logic in `src/app.tsx`.
 
+The next Track C seam now also exists:
+
+- `src/hooks/useThreadToolEventController.ts`
+
+Use that as the current boundary for cached-vs-active thread/tool branch orchestration before adding more chat/tool finalization or lifecycle behavior directly to `src/app.tsx`.
+
 ---
 
 ## Priority 5 — Decompose settings UI
