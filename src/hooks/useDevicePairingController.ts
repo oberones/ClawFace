@@ -11,6 +11,7 @@ import {
   normalizeDevicePairingVisibility,
   type DevicePairingVisibility,
 } from "../lib/device-pairing-visibility.ts";
+import type { DevicePairingGatewayEvent } from "../lib/shell-gateway-events.ts";
 import type { ConnectionStatus } from "../lib/types.ts";
 
 const DEFAULT_DEVICE_PAIRING_ACTION_SUPPORT: DevicePairingActionSupport = {
@@ -41,20 +42,6 @@ type UseDevicePairingControllerParams = {
   clientRef: MutableRefObject<GatewayClient | null>;
   gatewayMethodsRef: MutableRefObject<Set<string>>;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function getString(source: Record<string, unknown>, keys: string[]): string | null {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-  return null;
-}
 
 export function useDevicePairingController(
   params: UseDevicePairingControllerParams,
@@ -189,22 +176,12 @@ export function useDevicePairingController(
     setDevicePairingLoading(false);
   }, []);
 
-  const handleGatewayEvent = useCallback((
-    eventName: string,
-    payload: unknown,
-    client: GatewayClient,
-  ) => {
-    if (
-      (eventName === "device.pair.requested" || eventName === "device.pair.resolved") &&
-      settingsOpenRef.current
-    ) {
+  const handleGatewayEvent = useCallback((event: DevicePairingGatewayEvent, client: GatewayClient) => {
+    if (settingsOpenRef.current) {
       void refreshDevicePairingVisibility(client);
     }
-    if (eventName === "device.pair.resolved" && isRecord(payload)) {
-      const requestId = getString(payload, ["requestId", "request_id"]);
-      if (requestId) {
-        clearResolvingDevicePairRequest(requestId);
-      }
+    if (event.kind === "device-pair-resolved" && event.requestId) {
+      clearResolvingDevicePairRequest(event.requestId);
     }
   }, [clearResolvingDevicePairRequest, refreshDevicePairingVisibility]);
 
