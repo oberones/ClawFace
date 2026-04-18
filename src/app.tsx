@@ -56,12 +56,11 @@ import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
 import { PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
 import {
-  extractApprovalResolutionFromGatewayEvent,
-  extractPendingApprovalFromGatewayEvent,
   formatApprovalDecisionLabel,
   pickApprovalResolveMethod,
   removeResolvedApprovalBySession,
   upsertPendingApprovalBySession,
+  type ApprovalResolution,
 } from "./lib/approval-events.ts";
 import {
   buildConnectionRecoveryNotice,
@@ -78,6 +77,7 @@ import { deriveBackgroundSessionNotice } from "./lib/background-session-visibili
 import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
 import { setImageSourceRuntimeHints } from "./lib/message-image-source.ts";
 import { buildAttachmentSignature, toChatMessageSafe } from "./lib/chat-message-attachments.ts";
+import { normalizeShellGatewayEvent } from "./lib/shell-gateway-events.ts";
 import {
   attachLifecycleErrorToToolItems,
   collectReplyPayloadMediaUrls,
@@ -4128,16 +4128,20 @@ export default function App() {
         }
       },
       onEvent: (evt) => {
-        devicePairingController.handleGatewayEvent(evt.event, evt.payload, client);
-        if (evt.event === "exec.approval.requested" || evt.event === "plugin.approval.requested") {
-          const approval = extractPendingApprovalFromGatewayEvent(evt.event, evt.payload);
-          if (approval) {
-            handleRequestedApproval(approval);
+        const shellEvent = normalizeShellGatewayEvent(evt.event, evt.payload);
+        if (shellEvent) {
+          switch (shellEvent.kind) {
+            case "device-pair-requested":
+            case "device-pair-resolved":
+              devicePairingController.handleGatewayEvent(shellEvent, client);
+              break;
+            case "approval-requested":
+              handleRequestedApproval(shellEvent.approval);
+              break;
+            case "approval-resolved":
+              handleResolvedApproval(shellEvent.resolution);
+              break;
           }
-          return;
-        }
-        if (evt.event === "exec.approval.resolved" || evt.event === "plugin.approval.resolved") {
-          handleResolvedApproval(evt.event, evt.payload);
           return;
         }
         if (isEventVariant(evt.event, "chat")) {
@@ -4894,11 +4898,7 @@ export default function App() {
     setPendingApprovalsBySession((prev) => upsertPendingApprovalBySession(prev, approval));
   }
 
-  function handleResolvedApproval(eventName: string, payload: unknown) {
-    const resolution = extractApprovalResolutionFromGatewayEvent(eventName, payload);
-    if (!resolution) {
-      return;
-    }
+  function handleResolvedApproval(resolution: ApprovalResolution) {
     setPendingApprovalsBySession((prev) => removeResolvedApprovalBySession(prev, resolution));
     setResolvingApprovalIds((prev) => {
       if (!Object.prototype.hasOwnProperty.call(prev, resolution.id)) {

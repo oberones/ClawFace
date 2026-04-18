@@ -2058,6 +2058,48 @@ If Track D continues immediately, the next clean move is probably to widen the s
 
 ---
 
+## Ticket D.2 — Normalize approval and device-pairing gateway events
+### Goal
+Move approval and device-pairing gateway event shaping behind a shared shell-level domain seam so `src/app.tsx` does not keep parsing those payload families inline.
+
+### Scope
+- normalize approval request and resolution events into discriminated shell-domain events
+- normalize device pairing request and resolution events into that same shell-domain layer
+- rewire `src/app.tsx` to switch on normalized shell events instead of raw event names/payloads for approval/device flows
+- update `useDevicePairingController` to consume normalized device-pairing events instead of raw event names
+- add focused helper-level coverage for the new shell gateway-event seam
+
+### Deliverable
+A small shell gateway-event normalization module that owns approval/device-pair payload shaping, plus slimmer app/controller wiring that consumes those normalized events.
+
+### Done when
+- `src/lib/shell-gateway-events.ts` is the authoritative home for approval/device-pair event shaping
+- `src/app.tsx` no longer calls approval extractors directly from the raw gateway event handler
+- `useDevicePairingController` no longer parses raw `device.pair.*` event names or payloads itself
+- helper-level regression coverage exists for approval/device-pair gateway event normalization
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `src/lib/shell-gateway-events.ts` as the shared shell-domain event seam for:
+  - approval request events
+  - approval resolution events
+  - device pairing requested/resolved events
+- rewired `src/app.tsx` so the raw gateway event handler now switches on normalized shell event kinds for approval/device flows instead of parsing those payloads inline
+- updated `src/hooks/useDevicePairingController.ts` to consume normalized device-pairing events rather than raw event names/payloads
+- added focused helper coverage in `tests/shell-gateway-events.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues from here, the next clean move is probably to widen the same normalization approach to the remaining shell-facing gateway families such as connection/recovery and status/background payload shaping, instead of starting another app-root extraction blind.
+
+---
+
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
 ### Goal
 Keep the architecture doc honest as refactors land.
