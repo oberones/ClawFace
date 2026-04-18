@@ -315,4 +315,9 @@ The next Track D seam now also exists:
 - `src/app.tsx` now consumes normalized shell event kinds for those families instead of parsing approval/device payloads inline
 - `useDevicePairingController` now consumes normalized device-pairing events instead of raw event names/payloads
 
+The next Track D shell-state seam now also exists:
+- `src/lib/shell-gateway-state.ts` owns gateway hello normalization, gateway close normalization, and shared status snapshot extraction
+- `src/app.tsx` now consumes normalized hello/close state instead of parsing those payloads inline
+- `src/lib/status-background-visibility.ts` now reuses the shared status snapshot seam instead of keeping a second copy of status-root parsing logic
+
 If work continues from here, the next density is more likely to be broader gateway-event normalization outside the thread/tool path rather than another state-ownership extraction inside that same subsystem.

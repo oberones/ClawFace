@@ -72,12 +72,16 @@ import {
   type InterruptedRunSessionBanner,
   type InterruptedRunSnapshot,
 } from "./lib/connection-recovery.ts";
-import { extractStatusBackgroundVisibility } from "./lib/status-background-visibility.ts";
 import { deriveBackgroundSessionNotice } from "./lib/background-session-visibility.ts";
 import { resolveEventSessionKey } from "./lib/session-run-routing.ts";
 import { setImageSourceRuntimeHints } from "./lib/message-image-source.ts";
 import { buildAttachmentSignature, toChatMessageSafe } from "./lib/chat-message-attachments.ts";
 import { normalizeShellGatewayEvent } from "./lib/shell-gateway-events.ts";
+import {
+  extractGatewayStatusSnapshot,
+  normalizeGatewayCloseState,
+  normalizeGatewayHelloState,
+} from "./lib/shell-gateway-state.ts";
 import {
   attachLifecycleErrorToToolItems,
   collectReplyPayloadMediaUrls,
@@ -4037,6 +4041,7 @@ export default function App() {
       clientName: "openclaw-control-ui",
       mode: "webchat",
       onHello: (hello) => {
+        const helloState = normalizeGatewayHelloState(hello, DEFAULT_MAX_WS_PAYLOAD_BYTES);
         const previousConnectionStatus = connectionStatusRef.current;
         const isRecoveryHello = shouldAnnounceConnectionRecovery(
           previousConnectionStatus,
@@ -4048,21 +4053,13 @@ export default function App() {
           reason: null,
           note: null,
         });
-        gatewayMethodsRef.current = new Set(
-          Array.isArray(hello.features?.methods)
-            ? hello.features.methods.filter((item): item is string => typeof item === "string")
-            : [],
-        );
+        gatewayMethodsRef.current = helloState.methods;
         devicePairingController.handleGatewayHello(client);
         setServerInfo({
-          version: typeof hello.server?.version === "string" ? hello.server.version : null,
-          commit: typeof hello.server?.commit === "string" ? hello.server.commit : null,
+          version: helloState.serverVersion,
+          commit: helloState.serverCommit,
         });
-        setMaxPayloadBytes(
-          typeof hello.policy?.maxPayload === "number" && Number.isFinite(hello.policy.maxPayload)
-            ? hello.policy.maxPayload
-            : DEFAULT_MAX_WS_PAYLOAD_BYTES,
-        );
+        setMaxPayloadBytes(helloState.maxPayloadBytes);
         void loadAgents(client);
         void loadModels(client);
         void refreshSessions(client);
@@ -4100,32 +4097,9 @@ export default function App() {
         if (activeSessionKey) {
           updateSessionActivity(activeSessionKey, { working: false, unread: false });
         }
-        const reason = info.reason?.trim() ?? "";
-        if (reason.toLowerCase().includes("pairing")) {
-          connectionStatusRef.current = "pairing-required";
-          setConnectionState({
-            status: "pairing-required",
-            reason,
-            note: "Pairing required. Approve this device in the gateway.",
-          });
-        } else {
-          const hint =
-            !reason && info.code === 1006
-              ? "Handshake failed. Check Gateway URL/path or Origin allowlist."
-              : "";
-          const nextStatus = !client.isClosed && info.code !== 1000 ? "connecting" : reason ? "error" : "disconnected";
-          connectionStatusRef.current = nextStatus;
-          const baseNote = nextStatus === "connecting"
-            ? "Connection lost. Reconnecting…"
-            : reason
-              ? `Disconnected (${info.code}): ${reason}`
-              : `Disconnected (${info.code}). ${hint}`.trim();
-          setConnectionState({
-            status: nextStatus,
-            reason: reason || null,
-            note: baseNote,
-          });
-        }
+        const nextConnectionState = normalizeGatewayCloseState(info, client.isClosed);
+        connectionStatusRef.current = nextConnectionState.status;
+        setConnectionState(nextConnectionState);
       },
       onEvent: (evt) => {
         const shellEvent = normalizeShellGatewayEvent(evt.event, evt.payload);
@@ -5158,18 +5132,8 @@ export default function App() {
   }, [agents, connected, modelShortcutSchemes, agentSessionShortcutSchemes, appActionShortcuts, newSessionPreferredModel, uiSettings.autoHoverSidebar, switchView]);
 
   function buildStatusCard(statusPayload: unknown, configSnapshot: unknown): string {
-    const statusRoot: Record<string, unknown> =
-      isRecord(statusPayload) && isRecord(statusPayload.status)
-        ? statusPayload.status
-        : isRecord(statusPayload)
-          ? statusPayload
-          : {};
-    const sessionsRoot = isRecord(statusRoot.sessions) ? statusRoot.sessions : null;
-    const defaults = sessionsRoot && isRecord(sessionsRoot.defaults) ? sessionsRoot.defaults : null;
-    const recent =
-      sessionsRoot && Array.isArray(sessionsRoot.recent)
-        ? sessionsRoot.recent.filter(isRecord)
-        : [];
+    const statusSnapshot = extractGatewayStatusSnapshot(statusPayload);
+    const { statusRoot, defaults, recent } = statusSnapshot;
     const activeKey = selectedSessionRef.current ?? selectedSessionKey ?? currentSession?.key ?? null;
     const statusSession =
       (activeKey ? recent.find((entry) => getString(entry, ["key"]) === activeKey) : null) ??
@@ -5266,7 +5230,7 @@ export default function App() {
     const queueMode = resolveQueueMode(configSnapshot);
     const version = serverInfo.version?.trim() || "dev";
     const commit = serverInfo.commit?.trim() || null;
-    const { subagentsLine, taskLine } = extractStatusBackgroundVisibility(statusPayload);
+    const { subagentsLine, taskLine } = statusSnapshot;
 
     return [
       `🦞 OpenClaw ${version}${commit ? ` (${commit})` : ""}`,
