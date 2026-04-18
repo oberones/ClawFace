@@ -11,6 +11,14 @@ import {
   resolveThreadToolFinalOutcome,
   resolveThreadToolLifecycleOutcome,
 } from "../lib/thread-tool-event-outcomes.ts";
+import {
+  extractToolUpdatesFromMessage,
+  mergeAssistantReplyMessageCandidate,
+  type NormalizedAgentEvent,
+  type NormalizedChatEvent as ThreadToolNormalizedChatEvent,
+  type ToolUpdate as ThreadToolEventToolUpdate,
+} from "../lib/thread-tool-domain-events.ts";
+import { extractText, isToolMessage } from "../lib/message-extract.ts";
 import type {
   Attachment,
   ChatMessage,
@@ -18,28 +26,6 @@ import type {
   ToolItem,
 } from "../lib/types.ts";
 import type { ThreadToolStateSnapshot } from "../lib/thread-tool-state.ts";
-
-export type ThreadToolEventToolUpdate = {
-  id: string;
-  name?: string;
-  status?: ToolItem["status"];
-  outcome?: ToolItem["outcome"];
-  runId?: string;
-  args?: unknown;
-  output?: string;
-  mediaPaths?: string[];
-  errorMessage?: string;
-  startedAt?: number;
-  updatedAt?: number;
-};
-
-export type ThreadToolNormalizedChatEvent = {
-  runId?: string;
-  sessionKey?: string;
-  state: "delta" | "final" | "aborted" | "error";
-  message?: unknown;
-  errorMessage?: string;
-};
 
 type ThreadToolSessionCacheState = ThreadToolStateSnapshot & {
   draft: string;
@@ -53,37 +39,6 @@ type AssistantReplyProjection = {
   attachmentMessage: ChatMessage;
   attachmentSignature: string;
 };
-
-function getLifecycleDataRecord(payload: Record<string, unknown>): Record<string, unknown> | null {
-  const payloadData = payload.data;
-  return typeof payloadData === "object" && payloadData !== null
-    ? payloadData as Record<string, unknown>
-    : null;
-}
-
-function getLifecyclePhaseHint(payloadData: Record<string, unknown> | null): string | null {
-  if (!payloadData) {
-    return null;
-  }
-  return (typeof payloadData.phase === "string" ? payloadData.phase : null) ??
-    (typeof payloadData.status === "string" ? payloadData.status : null) ??
-    (typeof payloadData.state === "string" ? payloadData.state : null) ??
-    (typeof payloadData.event === "string" ? payloadData.event : null) ??
-    (typeof payloadData.type === "string" ? payloadData.type : null);
-}
-
-function getLifecycleErrorMessage(
-  payload: Record<string, unknown>,
-  payloadData: Record<string, unknown> | null,
-): string | null {
-  return (payloadData && typeof payloadData.errorMessage === "string"
-    ? payloadData.errorMessage
-    : null) ??
-    (payloadData && typeof payloadData.error === "string" ? payloadData.error : null) ??
-    (payloadData && typeof payloadData.reason === "string" ? payloadData.reason : null) ??
-    (typeof payload.errorMessage === "string" ? payload.errorMessage : null) ??
-    (typeof payload.error === "string" ? payload.error : null);
-}
 
 type UseThreadToolEventControllerParams = {
   chatRunRef: MutableRefObject<string | null>;
@@ -152,18 +107,6 @@ type UseThreadToolEventControllerParams = {
     runId: string | null | undefined,
   ) => void;
   pushSystemMessage: (text: string) => void;
-  extractToolUpdatesFromMessage: (
-    message: unknown,
-    fallbackTimestamp?: number,
-    fallbackRunId?: string | null,
-  ) => ThreadToolEventToolUpdate[];
-  extractToolUpdatesFromAgent: (
-    payload: unknown,
-    fallbackRunId?: string | null,
-  ) => ThreadToolEventToolUpdate[];
-  getAgentEventStream: (payload: Record<string, unknown>) => string;
-  isToolMessage: (message: unknown) => boolean;
-  extractText: (value: unknown) => string | null;
   buildStreamCommittedAssistantMessage: (streamedText: string) => ChatMessage | null;
   buildToolAttachmentMessage: (rawMessage: unknown) => ChatMessage | null;
   buildAttachmentMessagesFromToolUpdates: (
@@ -175,10 +118,6 @@ type UseThreadToolEventControllerParams = {
     toolAttachmentMessage: ChatMessage | null;
     toolAttachmentMessagesFromUpdates: ChatMessage[];
   }) => ChatMessage[];
-  mergeAssistantReplyMessageCandidate: (
-    message: unknown,
-    pending: Record<string, unknown> | null,
-  ) => unknown;
   buildFinalAssistantMessage: (
     rawMessage: unknown,
     streamedText: string,
@@ -194,7 +133,6 @@ type UseThreadToolEventControllerParams = {
     additions: Array<ChatMessage | null | undefined>,
   ) => ChatMessage[];
   mergeToolItems: (prev: ToolItem[], updates: ThreadToolEventToolUpdate[]) => ToolItem[];
-  coerceAssistantReplyMessage: (value: unknown) => unknown;
   buildAssistantReplyAttachmentProjection: (
     assistantReply: unknown,
     runId: string | null,
@@ -203,8 +141,6 @@ type UseThreadToolEventControllerParams = {
     projection: AssistantReplyProjection | null,
     commitAttachmentMessage: (params: { runId: string; attachmentMessage: ChatMessage }) => void,
   ) => void;
-  extractAssistantTextFromAgentPayload: (payload: Record<string, unknown>) => string | null;
-  normalizeLifecyclePhase: (raw: string | null | undefined) => "start" | "end" | "error" | null;
   mergeStreamingText: (previous: string | null, incoming: string) => string;
   resolveActiveFinalAssistantEvent: (params: {
     message: Pick<ChatMessage, "text" | "attachments"> | null;
@@ -228,7 +164,7 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
   ) => {
     params.clearAgentFinalizeTimer(parsed.runId);
     const pendingAssistantReply = params.getAssistantReplyForRun(parsed.runId);
-    const toolUpdates = params.extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
+    const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
     if (toolUpdates.length > 0) {
       params.updateCacheField(targetKey, (cached) => ({
         ...cached,
@@ -237,7 +173,7 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     }
     params.applySessionTokenStatsFromMessage(parsed.message, parsed.sessionKey);
     params.applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
-    const isToolFinal = params.isToolMessage(parsed.message);
+    const isToolFinal = isToolMessage(parsed.message);
     const cachedStreamText = params.getCachedStreamText(targetKey).trim();
     const committedStreamMessage = params.buildStreamCommittedAssistantMessage(cachedStreamText);
     const toolAttachmentMessage = isToolFinal ? params.buildToolAttachmentMessage(parsed.message) : null;
@@ -269,7 +205,7 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     }
 
     const msg = params.buildFinalAssistantMessage(
-      params.mergeAssistantReplyMessageCandidate(parsed.message, pendingAssistantReply),
+      mergeAssistantReplyMessageCandidate(parsed.message, pendingAssistantReply),
       cachedStreamText,
       parsed.runId,
     );
@@ -335,14 +271,14 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     }
 
     const pendingAssistantReply = params.getAssistantReplyForRun(parsed.runId);
-    const toolUpdates = params.extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
+    const toolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
     if (toolUpdates.length > 0) {
       params.setToolItems((prev) => params.mergeToolItems(prev, toolUpdates));
     }
     params.applySessionTokenStatsFromMessage(parsed.message, parsed.sessionKey);
     params.applySessionTokenStatsFromMessage(payload, parsed.sessionKey);
 
-    const isToolFinal = params.isToolMessage(parsed.message);
+    const isToolFinal = isToolMessage(parsed.message);
     const streamedText = (params.streamTextRef.current ?? "").trim();
     const committedStreamMessage = params.buildStreamCommittedAssistantMessage(streamedText);
     const toolAttachmentMessage = isToolFinal ? params.buildToolAttachmentMessage(parsed.message) : null;
@@ -392,7 +328,7 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     }
 
     const msg = params.buildFinalAssistantMessage(
-      params.mergeAssistantReplyMessageCandidate(parsed.message, pendingAssistantReply),
+      mergeAssistantReplyMessageCandidate(parsed.message, pendingAssistantReply),
       streamedText,
       parsed.runId,
     );
@@ -459,11 +395,11 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
   }, [params]);
 
   const handleCachedAgentAssistantEvent = useCallback((
-    payload: Record<string, unknown>,
+    assistantReply: unknown,
+    assistantText: string | null,
     targetKey: string,
     runId: string | null,
   ) => {
-    const assistantReply = params.coerceAssistantReplyMessage(payload.data ?? payload);
     params.commitAssistantReplyAttachmentProjection(
       params.buildAssistantReplyAttachmentProjection(assistantReply, runId),
       ({ runId: projectedRunId, attachmentMessage }) => {
@@ -481,7 +417,7 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     if (cachedChatRunId && (!runId || runId === cachedChatRunId)) {
       return;
     }
-    const next = params.extractAssistantTextFromAgentPayload(payload);
+    const next = assistantText;
     if (!next) {
       return;
     }
@@ -495,13 +431,13 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
   }, [params]);
 
   const handleCachedAgentLifecycleEvent = useCallback((
-    payload: Record<string, unknown>,
     targetKey: string,
     runId: string | null,
+    lifecyclePhase: NormalizedAgentEvent["lifecyclePhase"],
+    lifecycleErrorMessage: string | null,
   ) => {
-    const payloadData = getLifecycleDataRecord(payload);
     const phase = resolveThreadToolLifecycleOutcome(
-      params.normalizeLifecyclePhase(getLifecyclePhaseHint(payloadData)),
+      lifecyclePhase,
     );
     if (phase === "ignore") {
       return;
@@ -510,7 +446,7 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     if (phase === "error") {
       params.attachLifecycleErrorToCachedTools(targetKey, {
         runId,
-        errorMessage: getLifecycleErrorMessage(payload, payloadData),
+        errorMessage: lifecycleErrorMessage,
       });
       params.updateSessionActivity(targetKey, { working: false, unread: true });
       return;
@@ -537,12 +473,12 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
   }, [params]);
 
   const handleActiveAgentAssistantEvent = useCallback((
-    payload: Record<string, unknown>,
+    assistantReply: unknown,
+    assistantText: string | null,
     runId: string | null,
     activeSessionKey: string | null,
   ) => {
     params.clearInterruptedRunSnapshotForRun(activeSessionKey, runId);
-    const assistantReply = params.coerceAssistantReplyMessage(payload.data ?? payload);
     params.commitAssistantReplyAttachmentProjection(
       params.buildAssistantReplyAttachmentProjection(assistantReply, runId),
       ({ runId: projectedRunId, attachmentMessage }) => {
@@ -553,7 +489,7 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     if (activeRun && (!runId || runId === activeRun)) {
       return;
     }
-    const next = params.extractAssistantTextFromAgentPayload(payload);
+    const next = assistantText;
     if (!next) {
       return;
     }
@@ -576,19 +512,18 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
   }, [params]);
 
   const handleActiveAgentLifecycleEvent = useCallback((
-    payload: Record<string, unknown>,
     activeSessionKey: string | null,
     runId: string | null,
+    lifecyclePhase: NormalizedAgentEvent["lifecyclePhase"],
+    lifecycleErrorMessage: string | null,
   ) => {
     params.clearInterruptedRunSnapshotForRun(activeSessionKey, runId);
-    const payloadData = getLifecycleDataRecord(payload);
     const phase = resolveThreadToolLifecycleOutcome(
-      params.normalizeLifecyclePhase(getLifecyclePhaseHint(payloadData)),
+      lifecyclePhase,
     );
     if (phase === "ignore") {
       return;
     }
-    const lifecycleErrorMessage = getLifecycleErrorMessage(payload, payloadData);
     if (phase === "error") {
       params.attachLifecycleErrorToActiveTools({ runId, errorMessage: lifecycleErrorMessage });
     }
@@ -605,11 +540,11 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     parsed: ThreadToolNormalizedChatEvent,
     targetKey: string,
   ) => {
-    const deltaToolUpdates = params.extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
+    const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
     const deltaOutcome = resolveThreadToolDeltaOutcome({
       toolUpdateCount: deltaToolUpdates.length,
-      isToolMessage: params.isToolMessage(parsed.message),
-      extractedText: params.extractText(parsed.message),
+      isToolMessage: isToolMessage(parsed.message),
+      extractedText: extractText(parsed.message),
     });
     if (deltaOutcome.kind === "tool-updates") {
       const toolAttachmentMessage = params.buildToolAttachmentMessage(parsed.message);
@@ -655,11 +590,11 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
       params.chatRunRef.current = runSync.runId;
       params.setChatRunId(runSync.runId);
     }
-    const deltaToolUpdates = params.extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
+    const deltaToolUpdates = extractToolUpdatesFromMessage(parsed.message, undefined, parsed.runId);
     const deltaOutcome = resolveThreadToolDeltaOutcome({
       toolUpdateCount: deltaToolUpdates.length,
-      isToolMessage: params.isToolMessage(parsed.message),
-      extractedText: params.extractText(parsed.message),
+      isToolMessage: isToolMessage(parsed.message),
+      extractedText: extractText(parsed.message),
     });
     if (deltaOutcome.kind === "tool-updates") {
       const toolAttachmentMessage = params.buildToolAttachmentMessage(parsed.message);
@@ -731,14 +666,12 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
   ]);
 
   const handleAgentEvent = useCallback((
-    payload: Record<string, unknown>,
+    normalized: NormalizedAgentEvent,
     activeSessionKey: string | null,
-    sessionKeyHint: string | null,
-    runId: string | null,
   ) => {
     const dispatch = resolveAgentEventDispatch({
-      sessionKeyHint,
-      runId,
+      sessionKeyHint: normalized.sessionKey,
+      runId: normalized.runId,
       activeSessionKey,
       activeRunId: params.chatRunRef.current,
       resolveSessionKey: params.resolveSessionKeyFromCache,
@@ -746,28 +679,44 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     });
 
     if (dispatch.kind === "cached") {
-      const updates = params.extractToolUpdatesFromAgent(payload, runId);
-      handleCachedAgentToolUpdates(dispatch.targetKey, runId, updates);
-      const stream = params.getAgentEventStream(payload);
-      if (stream === "assistant") {
-        handleCachedAgentAssistantEvent(payload, dispatch.targetKey, runId);
+      handleCachedAgentToolUpdates(dispatch.targetKey, normalized.runId, normalized.toolUpdates);
+      if (normalized.stream === "assistant") {
+        handleCachedAgentAssistantEvent(
+          normalized.assistantReply,
+          normalized.assistantText,
+          dispatch.targetKey,
+          normalized.runId,
+        );
         return;
       }
-      if (stream === "lifecycle") {
-        handleCachedAgentLifecycleEvent(payload, dispatch.targetKey, runId);
+      if (normalized.stream === "lifecycle") {
+        handleCachedAgentLifecycleEvent(
+          dispatch.targetKey,
+          normalized.runId,
+          normalized.lifecyclePhase,
+          normalized.lifecycleErrorMessage,
+        );
       }
       return;
     }
 
-    const updates = params.extractToolUpdatesFromAgent(payload, runId);
-    handleActiveAgentToolUpdates(updates, activeSessionKey);
-    const stream = params.getAgentEventStream(payload);
-    if (stream === "assistant") {
-      handleActiveAgentAssistantEvent(payload, runId, activeSessionKey);
+    handleActiveAgentToolUpdates(normalized.toolUpdates, activeSessionKey);
+    if (normalized.stream === "assistant") {
+      handleActiveAgentAssistantEvent(
+        normalized.assistantReply,
+        normalized.assistantText,
+        normalized.runId,
+        activeSessionKey,
+      );
       return;
     }
-    if (stream === "lifecycle") {
-      handleActiveAgentLifecycleEvent(payload, activeSessionKey, runId);
+    if (normalized.stream === "lifecycle") {
+      handleActiveAgentLifecycleEvent(
+        activeSessionKey,
+        normalized.runId,
+        normalized.lifecyclePhase,
+        normalized.lifecycleErrorMessage,
+      );
     }
   }, [
     handleActiveAgentAssistantEvent,
@@ -777,8 +726,6 @@ export function useThreadToolEventController(params: UseThreadToolEventControlle
     handleCachedAgentLifecycleEvent,
     handleCachedAgentToolUpdates,
     params.chatRunRef,
-    params.extractToolUpdatesFromAgent,
-    params.getAgentEventStream,
     params.resolveSessionKeyFromCache,
     params.sessionKeysMatch,
   ]);
