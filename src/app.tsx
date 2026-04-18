@@ -6136,7 +6136,7 @@ export default function App() {
       resolveSessionKey: resolveEventSessionKeyFromCache,
       sessionKeysMatch,
     });
-    if (dispatch.kind === "cached" && dispatch.targetKey) {
+    if (dispatch.kind === "cached") {
       if (dispatch.state === "delta") {
         handleCachedDeltaChatEvent(parsed, dispatch.targetKey);
         return;
@@ -6185,7 +6185,7 @@ export default function App() {
       resolveSessionKey: resolveEventSessionKeyFromCache,
       sessionKeysMatch,
     });
-    if (dispatch.kind === "cached" && dispatch.targetKey) {
+    if (dispatch.kind === "cached") {
       const updates = extractToolUpdatesFromAgent(payload, runId);
       handleCachedAgentToolUpdates(dispatch.targetKey, runId, updates);
       const stream = getAgentEventStream(payload);
@@ -6196,6 +6196,7 @@ export default function App() {
       if (stream === "lifecycle") {
         handleCachedAgentLifecycleEvent(payload, dispatch.targetKey, runId);
       }
+      // Cached agent events must stop here and never mutate the active thread/tool state.
       return;
     }
     const updates = extractToolUpdatesFromAgent(payload, runId);
