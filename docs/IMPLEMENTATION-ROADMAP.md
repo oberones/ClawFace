@@ -673,6 +673,11 @@ Primary goal:
 - `src/hooks/useThreadToolController.ts` now owns the active message/tool/stream/run/thinking state cluster and the corresponding state/ref synchronization helpers
 - `src/lib/thread-tool-state.ts` provides a small shared snapshot seam, which gives future Track C work a cleaner foundation than editing raw `useState`/`useRef` sprawl in the app root
 
+#### Third implementation cut follow-through
+- the active-vs-cached thread/tool event routing decision no longer lives inline in both top-level app event handlers
+- `src/lib/thread-tool-event-routing.ts` now owns the first event-level routing seam for chat and agent payloads
+- `src/app.tsx` still owns the branch-level cached/active update behavior, but the dispatch rule itself now has one shared source of truth
+
 ## Track D — Gateway/domain normalization
 Primary goal:
 - normalize raw gateway events into app/domain events the renderer can consume cleanly

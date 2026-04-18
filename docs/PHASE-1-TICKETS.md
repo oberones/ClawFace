@@ -1913,6 +1913,51 @@ This ticket is now complete.
 #### Recommended next step
 If Track C continues from here, the strongest next slice is to narrow the higher-level thread/tool event orchestration that still lives in `src/app.tsx`, now that the active runtime state itself has a dedicated controller.
 
+## Ticket C.2 — Extract the first thread/tool event-routing seam
+### Goal
+Move the active-vs-cached chat/agent event dispatch decision behind an explicit seam instead of recomputing that routing inline inside `src/app.tsx`.
+
+### Scope
+- extract the shared routing decision for chat and agent events into a dedicated helper/module
+- keep the actual cached/active branch handlers in `src/app.tsx` for now
+- preserve the current same-run fallback behavior that keeps active runs from being misrouted
+- add focused regression coverage for the new routing seam
+
+### Deliverable
+A first event-level boundary that answers:
+- “How does the app decide whether an incoming event belongs to the active thread or a cached background session?”
+- “Can the app root dispatch chat and agent events without inlining the full routing decision each time?”
+
+### Done when
+- `src/app.tsx` no longer duplicates the active-vs-cached event routing rules across chat and agent handlers
+- the routing decision lives behind a dedicated helper/module
+- focused regression coverage exists for the routing seam
+- `make test-unit`, `make typecheck`, and `make build` pass
+
+### Implementation notes (2026-04-17)
+
+This ticket is now complete.
+
+#### What changed
+- added `src/lib/thread-tool-event-routing.ts` to own the active-vs-cached event dispatch decision for:
+  - normalized chat events
+  - agent stream events
+- rewired `src/app.tsx` to consume that routing seam instead of recomputing the same session/run dispatch logic inline in both top-level event handlers
+- added focused coverage in `tests/thread-tool-event-routing.test.mjs`
+
+#### Architectural improvements landed
+- Track C now has an event-level thread/tool boundary in addition to the earlier runtime-state controller seam
+- the chat and agent handlers in `src/app.tsx` are flatter and easier to reason about because the active-vs-cached dispatch rule now has one source of truth
+- future Track C work can target the remaining branch-level orchestration directly instead of re-extracting the same routing decision again
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track C continues from here, the strongest next slice is to move one more level of branch orchestration out of `src/app.tsx`, especially the cached vs active chat/tool update paths and their finalization follow-through.
+
 ---
 
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
