@@ -25,6 +25,12 @@ export type GatewayErrorInfo = {
   details?: unknown;
 };
 
+export type GatewayCloseInfo = {
+  code: number;
+  reason: string;
+  error?: GatewayErrorInfo;
+};
+
 export type GatewayHelloOk = {
   type: "hello-ok";
   protocol: number;
@@ -117,7 +123,7 @@ export type GatewayClientOptions = {
   instanceId?: string;
   onHello?: (hello: GatewayHelloOk) => void;
   onEvent?: (evt: GatewayEventFrame) => void;
-  onClose?: (info: { code: number; reason: string; error?: GatewayErrorInfo }) => void;
+  onClose?: (info: GatewayCloseInfo) => void;
   onGap?: (info: { expected: number; received: number }) => void;
 };
 

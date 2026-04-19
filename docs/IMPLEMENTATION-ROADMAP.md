@@ -702,6 +702,12 @@ The next Track D seam now also exists:
 - `useDevicePairingController` now consumes normalized device-pairing events rather than raw event names/payloads
 - focused helper coverage for that boundary lives in `tests/shell-gateway-events.test.mjs`
 
+The next Track D shell-state seam now also exists:
+- `src/lib/shell-gateway-state.ts` owns gateway hello normalization, gateway close normalization, and shared status snapshot extraction
+- `src/app.tsx` now consumes normalized hello/close state instead of parsing those payloads inline
+- `src/lib/status-background-visibility.ts` now reuses the shared status snapshot seam instead of keeping its own status-root parsing copy
+- focused helper coverage for that boundary lives in `tests/shell-gateway-state.test.mjs`
+
 ## Track E — Electron main-process cleanup
 Primary goal:
 - gradually decompose `electron/main.cjs` as the product expands beyond basic shell behavior
