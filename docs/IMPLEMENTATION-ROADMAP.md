@@ -732,6 +732,10 @@ The next Track D mutation seam now also exists:
 Primary goal:
 - gradually decompose `electron/main.cjs` as the product expands beyond basic shell behavior
 
+The first Track E seam now also exists:
+- `electron/window/create-window.cjs` owns BrowserWindow construction, blank-screen recovery, external-link handling, and basic close/closed behavior
+- `electron/main.cjs` now delegates window creation there while keeping app bootstrap, protocols, and IPC registration
+
 ---
 
 # Suggested execution order inside Milestone 1

@@ -588,6 +588,12 @@ This is not the first refactor to do, but it is a high-value cleanup.
 ### Goal
 Reduce main-process risk and make the desktop shell easier to extend.
 
+The first Track E seam now also exists:
+
+- `electron/window/create-window.cjs`
+
+Use that as the current boundary for BrowserWindow construction and window-specific resilience behavior before adding more window lifecycle logic back into `electron/main.cjs`.
+
 ### Suggested structure
 ```text
 electron/
