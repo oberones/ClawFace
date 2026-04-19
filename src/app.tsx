@@ -10,7 +10,6 @@ import {
   type ApprovalDecision,
   type Attachment,
   type ChatMessage,
-  type ChatHistoryResult,
   type ConnectionState,
   type GatewayConfig,
   type GatewaySessionRow,
@@ -87,6 +86,7 @@ import {
   normalizeSessionsListResult,
   normalizeSessionsPreviewResult,
 } from "./lib/shell-gateway-responses.ts";
+import { normalizeShellGatewayHistory } from "./lib/shell-gateway-history.ts";
 import {
   normalizeShellGatewayConfigState,
   resolvePrimarySessionKey,
@@ -96,7 +96,6 @@ import {
 import {
   attachLifecycleErrorToToolItems,
   collectReplyPayloadMediaUrls,
-  extractToolUpdatesFromMessage,
   hasReplyPayloadLikeContent,
   mergeAssistantReplyPayload,
   normalizeAgentEventPayload,
@@ -4429,12 +4428,17 @@ export default function App() {
         Math.max(1, requestedLimit ?? getHistoryLimit(key)),
       );
       setHistoryLimit(key, limit);
-      const res = (await client.request("chat.history", {
+      const history = normalizeShellGatewayHistory(await client.request("chat.history", {
         sessionKey: key,
         limit,
-      })) as ChatHistoryResult;
-      const rawCount = Array.isArray(res.messages) ? res.messages.length : 0;
-      const canLoadMore = rawCount >= limit && limit < CHAT_HISTORY_MAX_LIMIT;
+      }), {
+        fallbackNow: Date.now(),
+        toChatMessage: (raw, fallbackTimestamp) =>
+          toChatMessageSafe(raw, getAttachmentParsingOptions(fallbackTimestamp)),
+        buildToolAttachmentMessages: buildAttachmentMessagesFromToolUpdates,
+        buildMessageDedupeKey: buildChatMessageDedupeKey,
+      });
+      const canLoadMore = history.rawCount >= limit && limit < CHAT_HISTORY_MAX_LIMIT;
       historyCanLoadMoreBySessionRef.current = {
         ...historyCanLoadMoreBySessionRef.current,
         [key]: canLoadMore,
@@ -4443,46 +4447,9 @@ export default function App() {
       if (isActiveSession) {
         setCanLoadMoreHistory(canLoadMore);
       }
-      const resolvedThinkingLevel = res.thinkingLevel ?? null;
-      const historyMessages: ChatMessage[] = [];
-      const seenContentKeys = new Set<string>();
-      let historyTools: ToolItem[] = [];
-      if (Array.isArray(res.messages)) {
-        let lastTs = Date.now() - Math.max(1, res.messages.length);
-        for (const raw of res.messages) {
-          const rawTs =
-            isRecord(raw) && typeof raw.timestamp === "number" && Number.isFinite(raw.timestamp)
-              ? raw.timestamp
-              : null;
-          const inferredTs = rawTs ?? (lastTs + 1);
-          lastTs = inferredTs;
-          const toolUpdates = extractToolUpdatesFromMessage(raw, inferredTs);
-          historyTools = mergeToolItems(historyTools, toolUpdates);
-          if (toolUpdates.length > 0) {
-            historyMessages.splice(
-              historyMessages.length,
-              0,
-              ...buildAttachmentMessagesFromToolUpdates(toolUpdates).filter((message) => {
-                const contentKey = buildChatMessageDedupeKey(message);
-                if (seenContentKeys.has(contentKey)) {
-                  return false;
-                }
-                seenContentKeys.add(contentKey);
-                return true;
-              }),
-            );
-          }
-          const parsed = toChatMessageSafe(raw, getAttachmentParsingOptions(inferredTs));
-          if (parsed) {
-            // Deduplicate only when text, timestamp window, and attachments all match.
-            const contentKey = buildChatMessageDedupeKey(parsed);
-            if (!seenContentKeys.has(contentKey)) {
-              seenContentKeys.add(contentKey);
-              historyMessages.push(parsed);
-            }
-          }
-        }
-      }
+      const resolvedThinkingLevel = history.thinkingLevel;
+      const historyMessages = history.messages;
+      const historyTools = mergeToolItems([], history.toolUpdates);
       const activeStreamText = pendingStreamTextRef.current ?? streamTextRef.current;
       const shouldPreserveActiveStreaming =
         isActiveSession &&

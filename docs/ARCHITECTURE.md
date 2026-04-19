@@ -549,6 +549,12 @@ The next Track D config seam now also exists:
 
 Use that as the current boundary for shell-facing `config.get` normalization before adding more ad hoc config-root scans directly to `src/app.tsx`.
 
+The next Track D history seam now also exists:
+
+- `src/lib/shell-gateway-history.ts`
+
+Use that as the current boundary for shell-facing `chat.history` payload shaping before adding more raw history-row parsing directly to `src/app.tsx`.
+
 ---
 
 ## Priority 5 — Decompose settings UI

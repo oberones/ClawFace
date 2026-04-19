@@ -328,4 +328,8 @@ The next Track D config seam now also exists:
 - `src/lib/shell-gateway-config.ts` owns shell-facing `config.get` normalization for configured model keys, runtime path hints, provider auth labels, queue mode, and heartbeat-session overrides
 - `src/app.tsx` now consumes normalized config state instead of keeping its own parallel config-root scanners for those shell-facing behaviors
 
-If work continues from here, the next density is more likely to be the remaining shell-facing history response shaping rather than another state-ownership extraction inside that same subsystem.
+The next Track D history seam now also exists:
+- `src/lib/shell-gateway-history.ts` owns shell-facing `chat.history` normalization for timestamp inference, tool-update extraction, and attachment/message dedupe
+- `src/app.tsx` now consumes normalized history output in `loadHistory(...)` instead of rebuilding those response details inline
+
+If work continues from here, the next density is more likely to be any remaining shell-facing response families that still rely on ad hoc payload shaping rather than another state-ownership extraction inside that same subsystem.
