@@ -2149,6 +2149,49 @@ If Track D continues from here, the next clean move is probably to normalize the
 
 ---
 
+## Ticket D.4 — Normalize shell-facing catalog and session response payloads
+### Goal
+Move the remaining shell-facing catalog/list response shaping out of `src/app.tsx` so the shell no longer trusts optimistic casts for agents, models, sessions, and session preview payloads.
+
+### Scope
+- normalize `agents.list` payloads into a shared shell-response seam
+- normalize `models.list` payloads into that same seam
+- normalize `sessions.list` payloads there, including session defaults and row coercion
+- normalize `sessions.preview` payloads there, including preview item filtering
+- rewire the app’s catalog/session loaders to consume those normalized response helpers
+- add focused helper-level coverage for the new response-family seam
+
+### Deliverable
+A shared shell gateway-response module that owns shell-facing catalog/session response normalization, plus slimmer app loaders that consume it.
+
+### Done when
+- `src/lib/shell-gateway-responses.ts` is the authoritative home for shell-facing catalog/session response shaping
+- `src/app.tsx` no longer uses direct optimistic casts for `agents.list`, `models.list`, `sessions.list`, or `sessions.preview`
+- session preview and session list filtering rules are locked into helper-level tests
+- helper-level regression coverage exists for the new shell response seam
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `src/lib/shell-gateway-responses.ts` as the shared shell-response seam for:
+  - `agents.list`
+  - `models.list`
+  - `sessions.list`
+  - `sessions.preview`
+- rewired `src/app.tsx` to consume those normalized helpers instead of trusting raw cast payloads in the shell loaders
+- added focused helper coverage in `tests/shell-gateway-responses.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues from here, the next clean move is probably to normalize the remaining shell-facing response families such as history/config-derived response shaping before introducing another app-root extraction.
+
+---
+
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
 ### Goal
 Keep the architecture doc honest as refactors land.

@@ -537,6 +537,12 @@ The next Track D shell-state seam now also exists:
 
 Use that as the current boundary for gateway hello/close/status payload shaping before adding more shell-facing connection or status parsing directly to `src/app.tsx`.
 
+The next Track D response seam now also exists:
+
+- `src/lib/shell-gateway-responses.ts`
+
+Use that as the current boundary for shell-facing catalog/session response normalization before adding more optimistic gateway result casting directly to `src/app.tsx`.
+
 ---
 
 ## Priority 5 — Decompose settings UI
