@@ -2100,6 +2100,55 @@ If Track D continues from here, the next clean move is probably to widen the sam
 
 ---
 
+## Ticket D.3 — Normalize gateway hello/close and status payload shaping
+### Goal
+Move the remaining shell-facing gateway hello/close/status payload shaping behind a shared domain seam so `src/app.tsx` does not keep normalizing those raw families inline.
+
+### Scope
+- normalize gateway hello payloads into a shared shell-state shape for:
+  - advertised methods
+  - server version/commit
+  - payload budget
+- normalize gateway close payloads into a shared connection-state shape for:
+  - pairing-required closes
+  - reconnecting closes
+  - disconnected/error closes
+- centralize status payload unwrapping for shell-facing consumers such as the status card and background visibility extraction
+- rewire `src/app.tsx` and `src/lib/status-background-visibility.ts` to consume those shared shell-state helpers
+- add focused helper-level coverage for hello/close/status normalization
+
+### Deliverable
+A shared shell gateway-state module that owns hello/close/status payload shaping, plus slimmer app/status wiring that consumes it.
+
+### Done when
+- `src/lib/shell-gateway-state.ts` is the authoritative home for hello/close/status payload shaping
+- `src/app.tsx` no longer parses hello methods/maxPayload/version/commit inline
+- `src/app.tsx` no longer derives pairing/reconnecting/disconnected close-state copy inline from raw close payloads
+- the status card and background visibility helpers reuse the shared status snapshot extraction seam
+- helper-level regression coverage exists for the new shell gateway-state boundary
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `src/lib/shell-gateway-state.ts` as the shared shell-state seam for:
+  - gateway hello normalization
+  - gateway close normalization
+  - gateway status snapshot extraction
+- rewired `src/app.tsx` to consume normalized hello and close state instead of parsing those payloads inline
+- updated `src/lib/status-background-visibility.ts` to reuse the shared status snapshot extraction seam
+- added focused helper coverage in `tests/shell-gateway-state.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues from here, the next clean move is probably to normalize the remaining shell-facing gateway response families that still surface as ad hoc payload parsing, rather than introducing another app-root extraction first.
+
+---
+
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
 ### Goal
 Keep the architecture doc honest as refactors land.
