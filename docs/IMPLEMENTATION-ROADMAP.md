@@ -708,6 +708,11 @@ The next Track D shell-state seam now also exists:
 - `src/lib/status-background-visibility.ts` now reuses the shared status snapshot seam instead of keeping its own status-root parsing copy
 - focused helper coverage for that boundary lives in `tests/shell-gateway-state.test.mjs`
 
+The next Track D response seam now also exists:
+- `src/lib/shell-gateway-responses.ts` owns shell-facing response normalization for `agents.list`, `models.list`, `sessions.list`, and `sessions.preview`
+- `src/app.tsx` now consumes normalized catalog/session response helpers instead of relying on optimistic result casts in those loaders
+- focused helper coverage for that boundary lives in `tests/shell-gateway-responses.test.mjs`
+
 ## Track E — Electron main-process cleanup
 Primary goal:
 - gradually decompose `electron/main.cjs` as the product expands beyond basic shell behavior

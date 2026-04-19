@@ -320,4 +320,8 @@ The next Track D shell-state seam now also exists:
 - `src/app.tsx` now consumes normalized hello/close state instead of parsing those payloads inline
 - `src/lib/status-background-visibility.ts` now reuses the shared status snapshot seam instead of keeping a second copy of status-root parsing logic
 
+The next Track D response seam now also exists:
+- `src/lib/shell-gateway-responses.ts` owns shell-facing response normalization for agents/models/sessions/session previews
+- `src/app.tsx` now consumes normalized catalog/session response helpers instead of relying on optimistic result casts in those loaders
+
 If work continues from here, the next density is more likely to be broader gateway-event normalization outside the thread/tool path rather than another state-ownership extraction inside that same subsystem.
