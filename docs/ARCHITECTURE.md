@@ -594,6 +594,12 @@ The first Track E seam now also exists:
 
 Use that as the current boundary for BrowserWindow construction and window-specific resilience behavior before adding more window lifecycle logic back into `electron/main.cjs`.
 
+The next Track E seam now also exists:
+
+- `electron/ipc/register-desktop-ipc.cjs`
+
+Use that as the current boundary for desktop IPC registration before adding more `.handle(...)` bindings back into `electron/main.cjs`.
+
 ### Suggested structure
 ```text
 electron/
