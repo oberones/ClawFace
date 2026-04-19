@@ -8,6 +8,12 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.10.1 (2026-04-19)
+
+### Fix
+
+- resolve chat naming bug and enable speckit
+
 ## v0.10.0 (2026-04-19)
 
 ### Feat
