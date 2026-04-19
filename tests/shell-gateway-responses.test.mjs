@@ -111,6 +111,71 @@ test("normalizeSessionsListResult filters invalid session rows and normalizes de
   assert.equal(normalized.sessions[0]?.responseUsage, "tokens");
 });
 
+test("normalizeSessionsListResult sanitizes derived titles and previews that contain OpenClaw metadata", () => {
+  const { normalizeSessionsListResult } = loadShellGatewayResponsesModule();
+
+  const normalized = normalizeSessionsListResult({
+    sessions: [
+      {
+        key: "agent:main:main",
+        kind: "direct",
+        derived_title: 'Sender (untrusted metadata): ```json {"label":"bad"}',
+        last_message_preview:
+          'Conversation info (untrusted metadata): ```json\n{"sender":"Primary"}\n```\n[Wed 2026-04-13 09:15 UTC] Real preview',
+      },
+    ],
+  });
+
+  assert.equal(normalized.sessions[0]?.derivedTitle, undefined);
+  assert.equal(normalized.sessions[0]?.lastMessagePreview, "Real preview");
+});
+
+test("mergeSessionRowsWithLocalState preserves an existing explicit label when a refreshed row omits it", () => {
+  const { mergeSessionRowsWithLocalState } = loadShellGatewayResponsesModule();
+
+  const merged = mergeSessionRowsWithLocalState(
+    [
+      {
+        key: "agent:main:main",
+        kind: "direct",
+        label: "Pinned title",
+        derivedTitle: "Pinned title",
+        updatedAt: 10,
+      },
+    ],
+    [
+      {
+        key: "agent:main:main",
+        kind: "direct",
+        derivedTitle: "Fresh derived title",
+        updatedAt: 20,
+      },
+      {
+        key: "agent:main:secondary",
+        kind: "direct",
+        label: "Fresh explicit title",
+        updatedAt: 30,
+      },
+    ],
+  );
+
+  assert.deepEqual(merged, [
+    {
+      key: "agent:main:main",
+      kind: "direct",
+      label: "Pinned title",
+      derivedTitle: "Fresh derived title",
+      updatedAt: 20,
+    },
+    {
+      key: "agent:main:secondary",
+      kind: "direct",
+      label: "Fresh explicit title",
+      updatedAt: 30,
+    },
+  ]);
+});
+
 test("normalizeSessionsListResult does not coerce blank numeric strings to zero", () => {
   const { normalizeSessionsListResult } = loadShellGatewayResponsesModule();
 

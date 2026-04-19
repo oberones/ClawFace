@@ -84,6 +84,35 @@ test("deriveBackgroundSessionNotice sanitizes session labels before showing them
   );
 });
 
+test("deriveBackgroundSessionNotice falls back to the session key when derived metadata text is unusable", () => {
+  const { deriveBackgroundSessionNotice } = loadBackgroundSessionVisibilityModule();
+
+  assert.deepEqual(
+    deriveBackgroundSessionNotice({
+      selectedSessionKey: "current",
+      sessions: [
+        { key: "current", kind: "direct", label: "Current", updatedAt: null },
+        {
+          key: "analysis",
+          kind: "direct",
+          derivedTitle: 'Sender (untrusted metadata): ```json {"label":"analysis"}',
+          updatedAt: null,
+        },
+      ],
+      sessionActivity: {
+        analysis: { working: true, unread: false },
+      },
+    }),
+    {
+      count: 1,
+      sessionKeys: ["analysis"],
+      title: "Background session still working",
+      detail:
+        "\"analysis\" is still running in the background. Check the sidebar to switch back when you're ready.",
+    },
+  );
+});
+
 test("deriveBackgroundSessionNotice keeps session order and summarizes multiple background sessions", () => {
   const { deriveBackgroundSessionNotice } = loadBackgroundSessionVisibilityModule();
 

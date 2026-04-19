@@ -11,6 +11,21 @@ function loadMessageExtractModule() {
   return loader.loadModule(path.join(repoRoot, "src/lib/message-extract.ts"));
 }
 
+test("sanitizeSessionPresentationText drops metadata-only session text but keeps real content after a full envelope", () => {
+  const { sanitizeSessionPresentationText } = loadMessageExtractModule();
+
+  assert.equal(
+    sanitizeSessionPresentationText('Sender (untrusted metadata): ```json {"label":"oops"}'),
+    "",
+  );
+  assert.equal(
+    sanitizeSessionPresentationText(
+      'Conversation info (untrusted metadata): ```json\n{"sender":"Primary"}\n```\n[Wed 2026-04-13 09:15 UTC] Real preview',
+    ),
+    "Real preview",
+  );
+});
+
 test("extractMessageRunId preserves top-level and nested run ids from history-like payloads", () => {
   const { extractMessageRunId } = loadMessageExtractModule();
 

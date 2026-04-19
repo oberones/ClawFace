@@ -5,6 +5,7 @@ import type {
   SessionsListResult,
   SessionsPreviewResult,
 } from "./types.ts";
+import { sanitizeSessionPresentationText } from "./message-extract.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -87,16 +88,22 @@ function normalizeGatewaySessionRow(raw: unknown): GatewaySessionRow | null {
   if (label !== null) {
     row.label = label;
   }
-  const displayName = pickTrimmedString(raw, ["displayName", "display_name"]);
-  if (displayName !== null) {
+  const displayName = sanitizeSessionPresentationText(
+    pickTrimmedString(raw, ["displayName", "display_name"]) ?? "",
+  );
+  if (displayName) {
     row.displayName = displayName;
   }
-  const derivedTitle = pickTrimmedString(raw, ["derivedTitle", "derived_title"]);
-  if (derivedTitle !== null) {
+  const derivedTitle = sanitizeSessionPresentationText(
+    pickTrimmedString(raw, ["derivedTitle", "derived_title"]) ?? "",
+  );
+  if (derivedTitle) {
     row.derivedTitle = derivedTitle;
   }
-  const lastMessagePreview = pickTrimmedString(raw, ["lastMessagePreview", "last_message_preview"]);
-  if (lastMessagePreview !== null) {
+  const lastMessagePreview = sanitizeSessionPresentationText(
+    pickTrimmedString(raw, ["lastMessagePreview", "last_message_preview"]) ?? "",
+  );
+  if (lastMessagePreview) {
     row.lastMessagePreview = lastMessagePreview;
   }
   const channel = pickTrimmedString(raw, ["channel"]);
@@ -192,6 +199,26 @@ function normalizeGatewaySessionRow(raw: unknown): GatewaySessionRow | null {
     row.responseUsage = responseUsage;
   }
   return row;
+}
+
+export function mergeSessionRowsWithLocalState(
+  previousRows: GatewaySessionRow[],
+  incomingRows: GatewaySessionRow[],
+): GatewaySessionRow[] {
+  if (previousRows.length === 0 || incomingRows.length === 0) {
+    return incomingRows;
+  }
+  const previousByKey = new Map(previousRows.map((row) => [row.key, row]));
+  return incomingRows.map((row) => {
+    const previous = previousByKey.get(row.key);
+    if (!previous?.label || row.label) {
+      return row;
+    }
+    return {
+      ...row,
+      label: previous.label,
+    };
+  });
 }
 
 export function normalizeSessionsListResult(payload: unknown): SessionsListResult {

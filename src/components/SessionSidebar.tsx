@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GatewaySessionRow, SessionActivityState, SessionPreviewItem } from "../lib/types.ts";
 import { formatTime } from "../lib/format.ts";
-import { sanitizeUserText } from "../lib/message-extract.ts";
+import { sanitizeSessionPresentationText, sanitizeUserText } from "../lib/message-extract.ts";
 import { useCardTilt } from "../hooks/useCardTilt.ts";
 import { deriveSessionSidebarActivityState } from "../lib/session-sidebar-activity.ts";
 
@@ -44,8 +44,8 @@ function parseNeedles(query: string): string[] {
 function isPreviewMatch(session: GatewaySessionRow, needles: string[]): boolean {
   const haystack = [
     session.label ?? "",
-    sanitizeUserText(session.derivedTitle ?? ""),
-    sanitizeUserText(session.lastMessagePreview ?? ""),
+    sanitizeSessionPresentationText(session.derivedTitle ?? ""),
+    sanitizeSessionPresentationText(session.lastMessagePreview ?? ""),
   ].join(" ").toLowerCase();
   return needles.every((n) => haystack.includes(n));
 }
@@ -431,9 +431,12 @@ export default function SessionSidebar(props: SessionSidebarProps) {
           const isDeleting = props.deletingKeys.has(session.key);
           const activity = props.sessionActivity[session.key];
           const pendingApprovalCount = props.pendingApprovalCounts[session.key] ?? 0;
-          const rawTitle = session.label || session.derivedTitle || session.key;
-          const title = rawTitle ? sanitizeUserText(rawTitle) || rawTitle : session.key;
-          const preview = session.lastMessagePreview ? sanitizeUserText(session.lastMessagePreview) : "";
+          const title =
+            sanitizeUserText(session.label ?? "") ||
+            sanitizeSessionPresentationText(session.derivedTitle ?? "") ||
+            sanitizeSessionPresentationText(session.displayName ?? "") ||
+            session.key;
+          const preview = sanitizeSessionPresentationText(session.lastMessagePreview ?? "");
           const contentSnippet = result.contentSnippet;
           const { activityLabel, activityClass } = deriveSessionSidebarActivityState({
             isActive,

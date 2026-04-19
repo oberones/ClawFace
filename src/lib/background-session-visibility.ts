@@ -1,5 +1,5 @@
 import type { GatewaySessionRow, SessionActivityState } from "./types.ts";
-import { sanitizeUserText } from "./message-extract.ts";
+import { sanitizeSessionPresentationText, sanitizeUserText } from "./message-extract.ts";
 
 export type BackgroundSessionNotice = {
   count: number;
@@ -17,8 +17,8 @@ type DeriveBackgroundSessionNoticeParams = {
 function resolveSessionLabel(session: GatewaySessionRow | null, sessionKey: string): string {
   const label =
     sanitizeUserText(session?.label?.trim() || "").trim() ||
-    sanitizeUserText(session?.derivedTitle?.trim() || "").trim() ||
-    sanitizeUserText(session?.displayName?.trim() || "").trim();
+    sanitizeSessionPresentationText(session?.derivedTitle?.trim() || "").trim() ||
+    sanitizeSessionPresentationText(session?.displayName?.trim() || "").trim();
   return label || sessionKey;
 }
 
