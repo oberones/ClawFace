@@ -62,6 +62,15 @@ test("normalizeGatewayCloseState distinguishes pairing-required from reconnectin
       note: "Disconnected (1000).",
     },
   );
+
+  assert.deepEqual(
+    normalizeGatewayCloseState({ code: 1006, reason: "" }, true),
+    {
+      status: "disconnected",
+      reason: null,
+      note: "Disconnected (1006). Handshake failed. Check Gateway URL/path or Origin allowlist.",
+    },
+  );
 });
 
 test("extractGatewayStatusSnapshot unwraps nested status payloads and preserves background lines", () => {

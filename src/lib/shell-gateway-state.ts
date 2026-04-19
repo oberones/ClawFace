@@ -2,7 +2,7 @@ import type { ConnectionStatus } from "./types.ts";
 import type { GatewayCloseInfo, GatewayHelloOk } from "./gateway.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function getString(source: Record<string, unknown>, keys: string[]): string | null {
