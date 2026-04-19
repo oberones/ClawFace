@@ -555,6 +555,12 @@ The next Track D history seam now also exists:
 
 Use that as the current boundary for shell-facing `chat.history` payload shaping before adding more raw history-row parsing directly to `src/app.tsx`.
 
+The next Track D mutation seam now also exists:
+
+- `src/lib/shell-gateway-mutations.ts`
+
+Use that as the current boundary for shell-facing acknowledgement parsing before adding more inline `chat.send` / `sessions.reset` result casts directly to `src/app.tsx`.
+
 ---
 
 ## Priority 5 — Decompose settings UI

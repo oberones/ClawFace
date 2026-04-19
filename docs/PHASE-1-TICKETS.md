@@ -2278,6 +2278,44 @@ If Track D continues from here, the next clean move is probably to normalize any
 
 ---
 
+## Ticket D.7 — Normalize shell-facing mutation response acknowledgements
+### Goal
+Move the remaining shell-facing command/mutation response shaping out of `src/app.tsx` so send/reset acknowledgement parsing no longer relies on inline optimistic casts.
+
+### Scope
+- normalize `chat.send` acknowledgement payloads into a shared Track D mutation module
+- normalize `sessions.reset` acknowledgement payloads there too
+- rewire the send, `/compact`, and `/reset` paths to consume the normalized mutation helpers
+- add focused helper-level coverage for the new mutation seam
+
+### Deliverable
+A shared shell gateway-mutation module that owns shell-facing acknowledgement parsing, plus slimmer send/reset consumers in `src/app.tsx`.
+
+### Done when
+- `src/lib/shell-gateway-mutations.ts` is the authoritative home for shell-facing `chat.send` and `sessions.reset` acknowledgement parsing
+- `src/app.tsx` no longer uses direct optimistic casts for those mutation responses
+- helper-level regression coverage exists for the new mutation seam
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `src/lib/shell-gateway-mutations.ts` as the shared shell mutation seam for:
+  - `chat.send`
+  - `sessions.reset`
+- rewired `src/app.tsx` to consume those normalized acknowledgement helpers in send, `/compact`, and `/reset`
+- added focused helper coverage in `tests/shell-gateway-mutations.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues from here, the next clean move is probably to pause and reassess whether there are any remaining shell-facing response families with enough density to justify another normalization seam before starting a new track.
+
+---
+
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
 ### Goal
 Keep the architecture doc honest as refactors land.
