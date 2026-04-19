@@ -2618,6 +2618,45 @@ If Track E continues from here, the next safest move is probably to split one of
 
 ---
 
+## Ticket E.4 — Extract the `claw-fs` protocol stack from main-process bootstrap
+### Goal
+Continue Track E by moving the dense `claw-fs` route/config/proxy subsystem out of `electron/main.cjs` so the main process keeps trending toward bootstrap and coordination code instead of being the direct home for a full protocol implementation.
+
+### Scope
+- extract the `claw-fs` protocol stack into `electron/protocols/claw-fs.cjs`
+- move config loading/saving, root validation, proxy behavior, route handling, and file operations behind that seam
+- keep the server URL state and IPC setter in `electron/main.cjs`
+- preserve current desktop file-protocol behavior
+
+### Deliverable
+A shared `claw-fs` protocol seam that owns the route/config/proxy implementation while `electron/main.cjs` provides the current server URL and protocol registration.
+
+### Done when
+- `electron/protocols/claw-fs.cjs` exists and owns the `claw-fs` request handling stack
+- `electron/main.cjs` no longer inlines the `claw-fs` route/config/proxy subsystem
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/protocols/claw-fs.cjs` as the fourth Track E seam
+- rewired `electron/main.cjs` to create the `claw-fs` protocol handler there instead of carrying the route/config/proxy subsystem inline
+- kept the file-server URL state and IPC update path in `electron/main.cjs`, so the extraction stayed narrow and safe
+- added focused helper coverage for default-root handling and remote proxy URL forwarding
+
+#### Validation status
+- `node -c electron/main.cjs` passes
+- `node -c electron/protocols/claw-fs.cjs` passes
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably the desktop local-image transport stack, since that is now the densest remaining protocol/helper family still living inline in `electron/main.cjs`.
+
+---
+
 # Phase 2 working tickets
 
 ## Ticket 2.1 — Drag and drop attachments
