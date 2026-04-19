@@ -588,6 +588,36 @@ This is not the first refactor to do, but it is a high-value cleanup.
 ### Goal
 Reduce main-process risk and make the desktop shell easier to extend.
 
+The first Track E seam now also exists:
+
+- `electron/window/create-window.cjs`
+
+Use that as the current boundary for BrowserWindow construction and window-specific resilience behavior before adding more window lifecycle logic back into `electron/main.cjs`.
+
+The next Track E seam now also exists:
+
+- `electron/ipc/register-desktop-ipc.cjs`
+
+Use that as the current boundary for desktop IPC registration before adding more `.handle(...)` bindings back into `electron/main.cjs`.
+
+The next Track E protocol seam now also exists:
+
+- `electron/protocols/register-desktop-protocols.cjs`
+
+Use that as the current boundary for privileged desktop scheme registration and `protocol.handle(...)` binding before adding more protocol bootstrap directly back into `electron/main.cjs`.
+
+The next Track E protocol-helper seam now also exists:
+
+- `electron/protocols/claw-fs.cjs`
+
+Use that as the current boundary for the `claw-fs` route/config/proxy subsystem before adding more file-protocol implementation directly back into `electron/main.cjs`.
+
+The next Track E local-image seam now also exists:
+
+- `electron/protocols/local-image.cjs`
+
+Use that as the current boundary for desktop local-image path resolution, remote image probing, and local-image transport helpers before adding more image-protocol implementation directly back into `electron/main.cjs`.
+
 ### Suggested structure
 ```text
 electron/

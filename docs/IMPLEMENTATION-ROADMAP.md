@@ -732,6 +732,26 @@ The next Track D mutation seam now also exists:
 Primary goal:
 - gradually decompose `electron/main.cjs` as the product expands beyond basic shell behavior
 
+The first Track E seam now also exists:
+- `electron/window/create-window.cjs` owns BrowserWindow construction, blank-screen recovery, external-link handling, and basic close/closed behavior
+- `electron/main.cjs` now delegates window creation there while keeping app bootstrap, protocols, and IPC registration
+
+The next Track E seam now also exists:
+- `electron/ipc/register-desktop-ipc.cjs` owns the desktop IPC registration surface for local image reads, remote image fetches, gateway URL updates, file-server URL updates, and desktop beep behavior
+- `electron/main.cjs` now provides the underlying runtime callbacks for that seam instead of inlining the IPC `.handle(...)` registrations directly
+
+The next Track E protocol seam now also exists:
+- `electron/protocols/register-desktop-protocols.cjs` owns the privileged desktop scheme registration and `protocol.handle(...)` binding for `claw-local-image` and `claw-fs`
+- `electron/main.cjs` now provides the underlying local-image and claw-fs request handlers for that seam instead of inlining the registration/binding stack directly
+
+The next Track E protocol-helper seam now also exists:
+- `electron/protocols/claw-fs.cjs` owns the `claw-fs` route/config/proxy implementation
+- `electron/main.cjs` now provides the current file-server URL and consumes that handler instead of carrying the `claw-fs` subsystem inline
+
+The next Track E local-image seam now also exists:
+- `electron/protocols/local-image.cjs` owns desktop local-image path resolution, remote gateway candidate building, image cache management, and local-image transport helpers
+- `electron/main.cjs` now provides the current gateway base-candidate state and consumes that transport instead of carrying the local-image subsystem inline
+
 ---
 
 # Suggested execution order inside Milestone 1
