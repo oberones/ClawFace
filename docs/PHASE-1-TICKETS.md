@@ -2352,6 +2352,25 @@ A small checklist the project can use during Phase 1 iteration.
 ### Done when
 - there is at least a manual verification checklist for the key shell flows
 
+### Status update
+This ticket is now complete.
+
+#### What landed
+- added `docs/PHASE-1-REGRESSION-CHECKLIST.md` as the lightweight manual verification checklist for:
+  - connection and reconnect behavior
+  - session switching
+  - send and streaming flows
+  - slash command entry
+  - thread and scroll behavior
+  - media and tool visibility
+  - desktop shell behavior
+
+#### Validation status
+- docs-only slice
+
+#### Recommended next step
+Use the checklist during ongoing Phase 1 refactors, especially when a slice touches `src/app.tsx`, thread/session controllers, or Electron shell behavior.
+
 ---
 
 # Suggested implementation order
@@ -2485,6 +2504,195 @@ Validation outcome:
 Reassess whether Phase 1 still has any remaining high-leverage work. At this point, the likely best move is to either:
 - declare Phase 1 complete,
 - or identify one final sharply-scoped Phase 1 ticket only if it clearly improves the core shell reliability/product direction.
+
+---
+
+## Ticket E.1 — Extract Electron window creation from main-process bootstrap
+### Goal
+Start Track E with the safest concrete cut: move BrowserWindow construction and window-specific resilience behavior out of `electron/main.cjs` so the main process starts acting more like bootstrap and coordination code.
+
+### Scope
+- extract BrowserWindow creation into `electron/window/create-window.cjs`
+- move blank-screen recovery, external-link handling, and window close/closed behavior into that seam
+- keep protocol registration, IPC handlers, and runtime configuration in `electron/main.cjs`
+- preserve current desktop behavior
+
+### Deliverable
+A shared Electron window-creation seam that owns the main window lifecycle details while `electron/main.cjs` delegates to it.
+
+### Done when
+- `electron/window/create-window.cjs` exists and owns the BrowserWindow construction flow
+- `electron/main.cjs` no longer inlines the main window creation and blank-screen recovery stack
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/window/create-window.cjs` as the first Track E seam
+- rewired `electron/main.cjs` to delegate BrowserWindow creation and window lifecycle wiring there
+- kept protocol registration, IPC handlers, and app bootstrap in `electron/main.cjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably to extract one of the remaining main-process concern families, most likely protocol registration/handlers or IPC runtime-config wiring.
+
+---
+
+## Ticket E.2 — Extract desktop IPC/runtime-config wiring from main-process bootstrap
+### Goal
+Continue Track E by moving the desktop IPC registration surface out of `electron/main.cjs` so the main process keeps trending toward bootstrap and coordination code instead of being the direct home for every handler binding.
+
+### Scope
+- extract desktop IPC registration into `electron/ipc/register-desktop-ipc.cjs`
+- move the `desktop:beep`, `desktop:read-image-file`, `desktop:fetch-image-url`, `desktop:set-gateway-url`, and `desktop:set-fs-server-url` bindings behind that seam
+- keep the underlying image/gateway/fs helper logic in `electron/main.cjs` for now
+- preserve current desktop IPC behavior
+
+### Deliverable
+A shared desktop IPC registration seam that owns Electron IPC binding while `electron/main.cjs` provides the underlying runtime callbacks.
+
+### Done when
+- `electron/ipc/register-desktop-ipc.cjs` exists and owns the desktop IPC handler registration
+- `electron/main.cjs` no longer inlines the desktop IPC `.handle(...)` registrations
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/ipc/register-desktop-ipc.cjs` as the second Track E seam
+- rewired `electron/main.cjs` to delegate desktop IPC binding there
+- kept the image/gateway/fs runtime helper logic in `electron/main.cjs` for now, so the extraction stayed narrow and safe
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably the protocol family: extract the `protocol.registerSchemesAsPrivileged(...)` and `protocol.handle(...)` stack out of `electron/main.cjs` without reopening the heavier file-server/media helper logic all at once.
+
+---
+
+## Ticket E.3 — Extract desktop protocol registration from main-process bootstrap
+### Goal
+Continue Track E by moving the desktop protocol registration surface out of `electron/main.cjs` so the main process keeps trending toward bootstrap and coordination code instead of being the direct home for scheme registration and handler binding.
+
+### Scope
+- extract desktop protocol registration into `electron/protocols/register-desktop-protocols.cjs`
+- move the privileged scheme registration and `protocol.handle(...)` binding for `claw-local-image` and `claw-fs` behind that seam
+- keep the actual local-image and claw-fs request logic in `electron/main.cjs` for now
+- preserve current desktop protocol behavior
+
+### Deliverable
+A shared desktop protocol-registration seam that owns Electron scheme registration and handler binding while `electron/main.cjs` provides the underlying request handlers.
+
+### Done when
+- `electron/protocols/register-desktop-protocols.cjs` exists and owns the desktop protocol registration flow
+- `electron/main.cjs` no longer inlines the privileged scheme registration or the `protocol.handle(...)` bindings
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/protocols/register-desktop-protocols.cjs` as the third Track E seam
+- rewired `electron/main.cjs` to delegate privileged scheme registration and protocol handler binding there
+- kept the local-image and claw-fs request logic in `electron/main.cjs` for now, so the extraction stayed narrow and safe
+- added focused stub-based regression coverage for the protocol registration seam
+
+#### Validation status
+- `node -c electron/main.cjs` passes
+- `node -c electron/protocols/register-desktop-protocols.cjs` passes
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably to split one of the remaining protocol helper families themselves, most likely the `claw-fs` route stack or the desktop local-image transport stack, instead of reopening app bootstrap again.
+
+---
+
+## Ticket E.4 — Extract the `claw-fs` protocol stack from main-process bootstrap
+### Goal
+Continue Track E by moving the dense `claw-fs` route/config/proxy subsystem out of `electron/main.cjs` so the main process keeps trending toward bootstrap and coordination code instead of being the direct home for a full protocol implementation.
+
+### Scope
+- extract the `claw-fs` protocol stack into `electron/protocols/claw-fs.cjs`
+- move config loading/saving, root validation, proxy behavior, route handling, and file operations behind that seam
+- keep the server URL state and IPC setter in `electron/main.cjs`
+- preserve current desktop file-protocol behavior
+
+### Deliverable
+A shared `claw-fs` protocol seam that owns the route/config/proxy implementation while `electron/main.cjs` provides the current server URL and protocol registration.
+
+### Done when
+- `electron/protocols/claw-fs.cjs` exists and owns the `claw-fs` request handling stack
+- `electron/main.cjs` no longer inlines the `claw-fs` route/config/proxy subsystem
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/protocols/claw-fs.cjs` as the fourth Track E seam
+- rewired `electron/main.cjs` to create the `claw-fs` protocol handler there instead of carrying the route/config/proxy subsystem inline
+- kept the file-server URL state and IPC update path in `electron/main.cjs`, so the extraction stayed narrow and safe
+- added focused helper coverage for default-root handling and remote proxy URL forwarding
+
+#### Validation status
+- `node -c electron/main.cjs` passes
+- `node -c electron/protocols/claw-fs.cjs` passes
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably the desktop local-image transport stack, since that is now the densest remaining protocol/helper family still living inline in `electron/main.cjs`.
+
+---
+
+## Ticket E.5 — Extract the desktop local-image transport stack from main-process bootstrap
+### Goal
+Continue Track E by moving the dense desktop local-image transport subsystem out of `electron/main.cjs` so the main process keeps trending toward bootstrap and coordination code instead of being the direct home for image path resolution, remote image probing, cache management, and local-image handler behavior.
+
+### Scope
+- extract the desktop local-image transport stack into `electron/protocols/local-image.cjs`
+- move local image path resolution, remote gateway candidate building, follow-up fetch handling, image caching, and the local-image protocol/IPC-facing helpers behind that seam
+- keep the gateway base-candidate state and IPC URL setter in `electron/main.cjs`
+- preserve current desktop local-image behavior
+
+### Deliverable
+A shared desktop local-image transport seam that owns local-image path/fetch/cache behavior while `electron/main.cjs` provides the current gateway candidate state and wiring.
+
+### Done when
+- `electron/protocols/local-image.cjs` exists and owns the local-image transport stack
+- `electron/main.cjs` no longer inlines the desktop local-image path/fetch/cache subsystem
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/protocols/local-image.cjs` as the fifth Track E seam
+- rewired `electron/main.cjs` to consume a local-image transport object there for local-image protocol handling, desktop image-file reads, remote image URL reads, and gateway URL normalization support
+- kept the gateway base-candidate state in `electron/main.cjs`, so the extraction stayed narrow and safe
+- added focused helper coverage for gateway candidate normalization and local image file reads
+
+#### Validation status
+- `node -c electron/main.cjs` passes
+- `node -c electron/protocols/local-image.cjs` passes
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably to pause and reassess the remaining `electron/main.cjs` density before forcing another extraction, because the biggest protocol/helper families have now been split into their own seams.
 
 ---
 
