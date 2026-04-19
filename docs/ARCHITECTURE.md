@@ -606,6 +606,12 @@ The next Track E protocol seam now also exists:
 
 Use that as the current boundary for privileged desktop scheme registration and `protocol.handle(...)` binding before adding more protocol bootstrap directly back into `electron/main.cjs`.
 
+The next Track E protocol-helper seam now also exists:
+
+- `electron/protocols/claw-fs.cjs`
+
+Use that as the current boundary for the `claw-fs` route/config/proxy subsystem before adding more file-protocol implementation directly back into `electron/main.cjs`.
+
 ### Suggested structure
 ```text
 electron/

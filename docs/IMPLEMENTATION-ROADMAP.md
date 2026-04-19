@@ -744,6 +744,10 @@ The next Track E protocol seam now also exists:
 - `electron/protocols/register-desktop-protocols.cjs` owns the privileged desktop scheme registration and `protocol.handle(...)` binding for `claw-local-image` and `claw-fs`
 - `electron/main.cjs` now provides the underlying local-image and claw-fs request handlers for that seam instead of inlining the registration/binding stack directly
 
+The next Track E protocol-helper seam now also exists:
+- `electron/protocols/claw-fs.cjs` owns the `claw-fs` route/config/proxy implementation
+- `electron/main.cjs` now provides the current file-server URL and consumes that handler instead of carrying the `claw-fs` subsystem inline
+
 ---
 
 # Suggested execution order inside Milestone 1
