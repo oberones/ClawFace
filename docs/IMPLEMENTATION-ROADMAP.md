@@ -748,6 +748,10 @@ The next Track E protocol-helper seam now also exists:
 - `electron/protocols/claw-fs.cjs` owns the `claw-fs` route/config/proxy implementation
 - `electron/main.cjs` now provides the current file-server URL and consumes that handler instead of carrying the `claw-fs` subsystem inline
 
+The next Track E local-image seam now also exists:
+- `electron/protocols/local-image.cjs` owns desktop local-image path resolution, remote gateway candidate building, image cache management, and local-image transport helpers
+- `electron/main.cjs` now provides the current gateway base-candidate state and consumes that transport instead of carrying the local-image subsystem inline
+
 ---
 
 # Suggested execution order inside Milestone 1

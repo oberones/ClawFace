@@ -612,6 +612,12 @@ The next Track E protocol-helper seam now also exists:
 
 Use that as the current boundary for the `claw-fs` route/config/proxy subsystem before adding more file-protocol implementation directly back into `electron/main.cjs`.
 
+The next Track E local-image seam now also exists:
+
+- `electron/protocols/local-image.cjs`
+
+Use that as the current boundary for desktop local-image path resolution, remote image probing, and local-image transport helpers before adding more image-protocol implementation directly back into `electron/main.cjs`.
+
 ### Suggested structure
 ```text
 electron/
