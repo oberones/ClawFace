@@ -2657,6 +2657,45 @@ If Track E continues from here, the next safest move is probably the desktop loc
 
 ---
 
+## Ticket E.5 — Extract the desktop local-image transport stack from main-process bootstrap
+### Goal
+Continue Track E by moving the dense desktop local-image transport subsystem out of `electron/main.cjs` so the main process keeps trending toward bootstrap and coordination code instead of being the direct home for image path resolution, remote image probing, cache management, and local-image handler behavior.
+
+### Scope
+- extract the desktop local-image transport stack into `electron/protocols/local-image.cjs`
+- move local image path resolution, remote gateway candidate building, follow-up fetch handling, image caching, and the local-image protocol/IPC-facing helpers behind that seam
+- keep the gateway base-candidate state and IPC URL setter in `electron/main.cjs`
+- preserve current desktop local-image behavior
+
+### Deliverable
+A shared desktop local-image transport seam that owns local-image path/fetch/cache behavior while `electron/main.cjs` provides the current gateway candidate state and wiring.
+
+### Done when
+- `electron/protocols/local-image.cjs` exists and owns the local-image transport stack
+- `electron/main.cjs` no longer inlines the desktop local-image path/fetch/cache subsystem
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/protocols/local-image.cjs` as the fifth Track E seam
+- rewired `electron/main.cjs` to consume a local-image transport object there for local-image protocol handling, desktop image-file reads, remote image URL reads, and gateway URL normalization support
+- kept the gateway base-candidate state in `electron/main.cjs`, so the extraction stayed narrow and safe
+- added focused helper coverage for gateway candidate normalization and local image file reads
+
+#### Validation status
+- `node -c electron/main.cjs` passes
+- `node -c electron/protocols/local-image.cjs` passes
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably to pause and reassess the remaining `electron/main.cjs` density before forcing another extraction, because the biggest protocol/helper families have now been split into their own seams.
+
+---
+
 # Phase 2 working tickets
 
 ## Ticket 2.1 — Drag and drop attachments
