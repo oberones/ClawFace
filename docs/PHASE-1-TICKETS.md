@@ -2192,6 +2192,51 @@ If Track D continues from here, the next clean move is probably to normalize the
 
 ---
 
+## Ticket D.5 — Normalize shell-facing config-derived response shaping
+### Goal
+Move the remaining `config.get`-driven shell parsing out of `src/app.tsx` so model filtering, runtime path hints, queue mode, provider auth labels, and primary-session overrides all come from one shared config seam.
+
+### Scope
+- normalize the shell-facing `config.get` payload into a shared Track D config module
+- move configured-model key extraction there
+- move runtime path hint extraction there
+- move provider auth label resolution there
+- move queue-mode resolution there
+- move heartbeat-session override / primary-session resolution there
+- rewire model loading, session ordering, and status-card rendering to consume the normalized config seam
+- add focused helper-level coverage for the new config module
+
+### Deliverable
+A shared shell gateway-config module that owns shell-facing config-derived response shaping, plus slimmer app-side consumers.
+
+### Done when
+- `src/lib/shell-gateway-config.ts` is the authoritative home for shell-facing `config.get` parsing
+- `src/app.tsx` no longer keeps its own parallel config-root scanners for model filtering, runtime path hints, provider auth labels, queue mode, or primary-session overrides
+- helper-level regression coverage exists for the new config seam
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `src/lib/shell-gateway-config.ts` as the shared shell config seam for:
+  - configured model keys
+  - runtime path hints
+  - provider auth labels
+  - queue mode
+  - heartbeat-session overrides / primary-session resolution
+- rewired `src/app.tsx` to consume normalized config state in model loading, session ordering, and `/status`
+- added focused helper coverage in `tests/shell-gateway-config.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues from here, the next clean move is probably to normalize the remaining shell-facing history response shaping before introducing another app-root extraction.
+
+---
+
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
 ### Goal
 Keep the architecture doc honest as refactors land.
