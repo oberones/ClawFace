@@ -2352,6 +2352,25 @@ A small checklist the project can use during Phase 1 iteration.
 ### Done when
 - there is at least a manual verification checklist for the key shell flows
 
+### Status update
+This ticket is now complete.
+
+#### What landed
+- added `docs/PHASE-1-REGRESSION-CHECKLIST.md` as the lightweight manual verification checklist for:
+  - connection and reconnect behavior
+  - session switching
+  - send and streaming flows
+  - slash command entry
+  - thread and scroll behavior
+  - media and tool visibility
+  - desktop shell behavior
+
+#### Validation status
+- docs-only slice
+
+#### Recommended next step
+Use the checklist during ongoing Phase 1 refactors, especially when a slice touches `src/app.tsx`, thread/session controllers, or Electron shell behavior.
+
 ---
 
 # Suggested implementation order
@@ -2485,6 +2504,42 @@ Validation outcome:
 Reassess whether Phase 1 still has any remaining high-leverage work. At this point, the likely best move is to either:
 - declare Phase 1 complete,
 - or identify one final sharply-scoped Phase 1 ticket only if it clearly improves the core shell reliability/product direction.
+
+---
+
+## Ticket E.1 — Extract Electron window creation from main-process bootstrap
+### Goal
+Start Track E with the safest concrete cut: move BrowserWindow construction and window-specific resilience behavior out of `electron/main.cjs` so the main process starts acting more like bootstrap and coordination code.
+
+### Scope
+- extract BrowserWindow creation into `electron/window/create-window.cjs`
+- move blank-screen recovery, external-link handling, and window close/closed behavior into that seam
+- keep protocol registration, IPC handlers, and runtime configuration in `electron/main.cjs`
+- preserve current desktop behavior
+
+### Deliverable
+A shared Electron window-creation seam that owns the main window lifecycle details while `electron/main.cjs` delegates to it.
+
+### Done when
+- `electron/window/create-window.cjs` exists and owns the BrowserWindow construction flow
+- `electron/main.cjs` no longer inlines the main window creation and blank-screen recovery stack
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/window/create-window.cjs` as the first Track E seam
+- rewired `electron/main.cjs` to delegate BrowserWindow creation and window lifecycle wiring there
+- kept protocol registration, IPC handlers, and app bootstrap in `electron/main.cjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably to extract one of the remaining main-process concern families, most likely protocol registration/handlers or IPC runtime-config wiring.
 
 ---
 

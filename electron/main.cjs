@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { app, BrowserWindow, shell, ipcMain, nativeImage, protocol } = require("electron");
+const { app, ipcMain, nativeImage, protocol } = require("electron");
+const { createMainWindow: createDesktopWindow } = require("./window/create-window.cjs");
 
 const WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 820;
@@ -1505,126 +1506,29 @@ function createMainWindow() {
   }
 
   const appIcon = getAppIcon();
-  const nextWindow = new BrowserWindow({
-    width: WINDOW_WIDTH,
-    height: WINDOW_HEIGHT,
+  const nextWindow = createDesktopWindow({
+    electronRootDir: __dirname,
+    appIcon,
+    devServerUrl: DESKTOP_DEV_SERVER_URL,
+    windowWidth: WINDOW_WIDTH,
+    windowHeight: WINDOW_HEIGHT,
     minWidth: 1000,
     minHeight: 640,
-    autoHideMenuBar: true,
-    icon: appIcon || undefined,
-    webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
+    blankCheckDelayMs: BLANK_CHECK_DELAY_MS,
+    maxBlankRecoveryAttempts: MAX_BLANK_RECOVERY_ATTEMPTS,
+    getIsQuitting: () => isQuitting,
+    shouldHideOnClose: () => process.platform === "darwin" && !isQuitting,
+    onRenderProcessGone: () => {
+      recreateMainWindow();
+    },
+    onClosed: () => {
+      if (mainWindow === nextWindow) {
+        mainWindow = null;
+      }
     },
   });
 
   mainWindow = nextWindow;
-  if (DESKTOP_DEV_SERVER_URL) {
-    nextWindow.loadURL(DESKTOP_DEV_SERVER_URL);
-  } else {
-    const entryPath = path.join(__dirname, "..", "dist", "index.html");
-    if (!fs.existsSync(entryPath)) {
-      throw new Error(`Desktop bundle is missing: ${entryPath}`);
-    }
-    nextWindow.loadFile(entryPath);
-  }
-  let blankRecoveryAttempts = 0;
-  let blankCheckTimer = null;
-
-  const clearBlankCheckTimer = () => {
-    if (blankCheckTimer === null) {
-      return;
-    }
-    clearTimeout(blankCheckTimer);
-    blankCheckTimer = null;
-  };
-
-  const runBlankCheck = async () => {
-    if (nextWindow.isDestroyed()) {
-      return;
-    }
-    try {
-      const state = await nextWindow.webContents.executeJavaScript(
-        `(() => {
-          const root = document.getElementById("root");
-          const hasRoot = Boolean(root);
-          const rootChildren = hasRoot ? root.childElementCount : 0;
-          const rootText = hasRoot ? (root.textContent || "").trim().length : 0;
-          return { hasRoot, rootChildren, rootText };
-        })();`,
-      );
-      const looksBlank =
-        !state ||
-        typeof state !== "object" ||
-        state.hasRoot !== true ||
-        (((state.rootChildren ?? 0) === 0) && ((state.rootText ?? 0) === 0));
-      if (!looksBlank) {
-        return;
-      }
-    } catch {
-      // If script execution fails, treat it as a blank state and recover.
-    }
-
-    if (blankRecoveryAttempts >= MAX_BLANK_RECOVERY_ATTEMPTS) {
-      return;
-    }
-    blankRecoveryAttempts += 1;
-
-    if (!nextWindow.isDestroyed()) {
-      nextWindow.webContents.reloadIgnoringCache();
-    }
-  };
-
-  const scheduleBlankCheck = () => {
-    clearBlankCheckTimer();
-    blankCheckTimer = setTimeout(() => {
-      blankCheckTimer = null;
-      void runBlankCheck();
-    }, BLANK_CHECK_DELAY_MS);
-  };
-
-  nextWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: "deny" };
-  });
-
-  nextWindow.webContents.on("did-finish-load", () => {
-    scheduleBlankCheck();
-  });
-
-  nextWindow.webContents.on("did-fail-load", (_event, _errorCode, _errorDescription, _validatedURL, isMainFrame) => {
-    if (!isMainFrame || isQuitting || nextWindow.isDestroyed()) {
-      return;
-    }
-    if (blankRecoveryAttempts >= MAX_BLANK_RECOVERY_ATTEMPTS) {
-      return;
-    }
-    blankRecoveryAttempts += 1;
-    nextWindow.webContents.reloadIgnoringCache();
-  });
-
-  nextWindow.webContents.on("render-process-gone", () => {
-    if (isQuitting) {
-      return;
-    }
-    recreateMainWindow();
-  });
-
-  nextWindow.on("close", (event) => {
-    if (process.platform === "darwin" && !isQuitting) {
-      event.preventDefault();
-      nextWindow.hide();
-    }
-  });
-
-  nextWindow.on("closed", () => {
-    clearBlankCheckTimer();
-    if (mainWindow === nextWindow) {
-      mainWindow = null;
-    }
-  });
 
   return nextWindow;
 }
