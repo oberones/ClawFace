@@ -8,6 +8,38 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.10.0 (2026-04-19)
+
+### Feat
+
+- IPC extraction
+
+### Fix
+
+- tighten shell gateway responses follow-up
+- tighten shell gateway state follow-up
+- harden thread tool domain event follow-up
+- tighten thread tool event controller follow-up
+- tighten thread tool event routing types
+- tighten thread tool controller boundaries
+
+### Refactor
+
+- extract local image transport stack
+- extract claw fs protocol stack
+- extract desktop protocol registration seam
+- extract electron window creation seam
+- normalize shell gateway mutation responses
+- normalize shell gateway history responses
+- normalize shell gateway config state
+- normalize shell gateway responses
+- normalize shell gateway state
+- normalize shell gateway events
+- introduce thread tool domain event boundary
+- extract thread tool event controller
+- extract thread tool event routing seam
+- extract thread/tool controller from app root
+
 ## v0.9.4 (2026-04-16)
 
 ### Refactor
