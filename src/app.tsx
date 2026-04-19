@@ -20,7 +20,6 @@ import {
   type SessionPreviewItem,
   type SessionState,
   type SessionsListResult,
-  type SessionsPreviewResult,
   type ToolItem,
 } from "./lib/types.ts";
 import { generateUUID } from "./lib/uuid.ts";
@@ -82,6 +81,12 @@ import {
   normalizeGatewayCloseState,
   normalizeGatewayHelloState,
 } from "./lib/shell-gateway-state.ts";
+import {
+  normalizeAgentsListResult,
+  normalizeModelsListResult,
+  normalizeSessionsListResult,
+  normalizeSessionsPreviewResult,
+} from "./lib/shell-gateway-responses.ts";
 import {
   attachLifecycleErrorToToolItems,
   collectReplyPayloadMediaUrls,
@@ -4459,7 +4464,7 @@ export default function App() {
 
   async function loadAgents(client: GatewayClient) {
     try {
-      const res = (await client.request("agents.list", {})) as AgentsListResult;
+      const res = normalizeAgentsListResult(await client.request("agents.list", {}));
       setAgents(res);
       if (!selectedSessionKey) {
         setSelectedSessionKey(resolveMainSessionFallback(res));
@@ -4477,8 +4482,8 @@ export default function App() {
 
   async function loadModels(client: GatewayClient): Promise<ModelsListResult["models"]> {
     try {
-      const res = (await client.request("models.list", {})) as ModelsListResult;
-      const catalog = res.models ?? [];
+      const res = normalizeModelsListResult(await client.request("models.list", {}));
+      const catalog = res.models;
       let configuredKeys = new Set<string>();
       try {
         const configSnapshot = await client.request("config.get", {});
@@ -4505,13 +4510,13 @@ export default function App() {
       return [];
     }
     try {
-      const res = (await client.request("sessions.list", {
+      const res = normalizeSessionsListResult(await client.request("sessions.list", {
         search: needle,
         limit: SESSION_SEARCH_LIMIT,
         includeDerivedTitles: true,
         includeLastMessage: true,
-      })) as SessionsListResult;
-      return Array.isArray(res.sessions) ? res.sessions : [];
+      }));
+      return res.sessions;
     } catch {
       return [];
     }
@@ -4521,12 +4526,12 @@ export default function App() {
     // Step 1: Fetch ALL session keys with titles (for search result display)
     let allSessions: GatewaySessionRow[];
     try {
-      const res = (await client.request("sessions.list", {
+      const res = normalizeSessionsListResult(await client.request("sessions.list", {
         limit: SESSION_LIST_MAX_LIMIT,
         includeDerivedTitles: true,
         includeLastMessage: true,
-      })) as SessionsListResult;
-      allSessions = Array.isArray(res.sessions) ? res.sessions : [];
+      }));
+      allSessions = res.sessions;
     } catch {
       return;
     }
@@ -4560,23 +4565,13 @@ export default function App() {
       }
       const batch = uniqueKeys.slice(index, index + SESSION_PREVIEW_BATCH_SIZE);
       try {
-        const res = (await client.request("sessions.preview", {
+        const res = normalizeSessionsPreviewResult(await client.request("sessions.preview", {
           keys: batch,
           limit: SESSION_PREVIEW_ITEM_LIMIT,
           maxChars: SESSION_PREVIEW_MAX_CHARS,
-        })) as SessionsPreviewResult;
-        const previews = Array.isArray(res.previews) ? res.previews : [];
-        for (const preview of previews) {
-          if (!preview || typeof preview.key !== "string") {
-            continue;
-          }
-          const items = Array.isArray(preview.items) ? preview.items : [];
-          fetchedByKey[preview.key] = items
-            .map((item) => ({
-              role: typeof item?.role === "string" ? item.role : "unknown",
-              text: typeof item?.text === "string" ? item.text : "",
-            }))
-            .filter((item) => item.text.trim().length > 0);
+        }));
+        for (const preview of res.previews) {
+          fetchedByKey[preview.key] = preview.items;
         }
       } catch {
         // Ignore individual preview batch failures; search can still use partial cache.
@@ -4606,12 +4601,12 @@ export default function App() {
         sessionListLimitRef.current = limit;
         setSessionListLimit(limit);
       }
-      const res = (await client.request("sessions.list", {
+      const res = normalizeSessionsListResult(await client.request("sessions.list", {
         limit,
         includeDerivedTitles: true,
         includeLastMessage: true,
-      })) as SessionsListResult;
-      setSessionDefaults(res.defaults ?? null);
+      }));
+      setSessionDefaults(res.defaults);
       const primarySessionKey = resolvePrimarySessionKey(agents, lastConfigSnapshotRef.current);
       const ordered = [...res.sessions].sort((a, b) => {
         const aIsPrimary = a.key.toLowerCase() === primarySessionKey;
