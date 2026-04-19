@@ -2579,6 +2579,45 @@ If Track E continues from here, the next safest move is probably the protocol fa
 
 ---
 
+## Ticket E.3 — Extract desktop protocol registration from main-process bootstrap
+### Goal
+Continue Track E by moving the desktop protocol registration surface out of `electron/main.cjs` so the main process keeps trending toward bootstrap and coordination code instead of being the direct home for scheme registration and handler binding.
+
+### Scope
+- extract desktop protocol registration into `electron/protocols/register-desktop-protocols.cjs`
+- move the privileged scheme registration and `protocol.handle(...)` binding for `claw-local-image` and `claw-fs` behind that seam
+- keep the actual local-image and claw-fs request logic in `electron/main.cjs` for now
+- preserve current desktop protocol behavior
+
+### Deliverable
+A shared desktop protocol-registration seam that owns Electron scheme registration and handler binding while `electron/main.cjs` provides the underlying request handlers.
+
+### Done when
+- `electron/protocols/register-desktop-protocols.cjs` exists and owns the desktop protocol registration flow
+- `electron/main.cjs` no longer inlines the privileged scheme registration or the `protocol.handle(...)` bindings
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/protocols/register-desktop-protocols.cjs` as the third Track E seam
+- rewired `electron/main.cjs` to delegate privileged scheme registration and protocol handler binding there
+- kept the local-image and claw-fs request logic in `electron/main.cjs` for now, so the extraction stayed narrow and safe
+- added focused stub-based regression coverage for the protocol registration seam
+
+#### Validation status
+- `node -c electron/main.cjs` passes
+- `node -c electron/protocols/register-desktop-protocols.cjs` passes
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably to split one of the remaining protocol helper families themselves, most likely the `claw-fs` route stack or the desktop local-image transport stack, instead of reopening app bootstrap again.
+
+---
+
 # Phase 2 working tickets
 
 ## Ticket 2.1 — Drag and drop attachments

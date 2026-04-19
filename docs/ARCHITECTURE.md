@@ -600,6 +600,12 @@ The next Track E seam now also exists:
 
 Use that as the current boundary for desktop IPC registration before adding more `.handle(...)` bindings back into `electron/main.cjs`.
 
+The next Track E protocol seam now also exists:
+
+- `electron/protocols/register-desktop-protocols.cjs`
+
+Use that as the current boundary for privileged desktop scheme registration and `protocol.handle(...)` binding before adding more protocol bootstrap directly back into `electron/main.cjs`.
+
 ### Suggested structure
 ```text
 electron/
