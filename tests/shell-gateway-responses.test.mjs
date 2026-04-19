@@ -111,6 +111,27 @@ test("normalizeSessionsListResult filters invalid session rows and normalizes de
   assert.equal(normalized.sessions[0]?.responseUsage, "tokens");
 });
 
+test("normalizeSessionsListResult does not coerce blank numeric strings to zero", () => {
+  const { normalizeSessionsListResult } = loadShellGatewayResponsesModule();
+
+  const normalized = normalizeSessionsListResult({
+    defaults: {
+      context_tokens: "   ",
+    },
+    sessions: [
+      {
+        key: "agent:main:main",
+        updated_at: "  ",
+        context_tokens: "",
+      },
+    ],
+  });
+
+  assert.equal(normalized.defaults.contextTokens, null);
+  assert.equal(normalized.sessions[0]?.updatedAt, null);
+  assert.equal(normalized.sessions[0]?.contextTokens, undefined);
+});
+
 test("normalizeSessionsPreviewResult filters invalid previews and blank preview items", () => {
   const { normalizeSessionsPreviewResult } = loadShellGatewayResponsesModule();
 

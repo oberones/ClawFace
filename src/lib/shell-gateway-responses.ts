@@ -30,7 +30,11 @@ function pickNumberLike(source: Record<string, unknown>, keys: string[]): number
       return value;
     }
     if (typeof value === "string") {
-      const parsed = Number(value.trim().replace(/,/g, ""));
+      const trimmed = value.trim();
+      if (!trimmed) {
+        continue;
+      }
+      const parsed = Number(trimmed.replace(/,/g, ""));
       if (Number.isFinite(parsed)) {
         return parsed;
       }
@@ -66,28 +70,6 @@ function normalizeResponseUsage(
   return value === "on" || value === "off" || value === "tokens" || value === "full" ? value : undefined;
 }
 
-function withOptionalString<T extends object>(
-  target: T,
-  key: string,
-  value: string | null,
-): T {
-  if (!value) {
-    return target;
-  }
-  return { ...target, [key]: value };
-}
-
-function withOptionalNumber<T extends object>(
-  target: T,
-  key: string,
-  value: number | null,
-): T {
-  if (value === null) {
-    return target;
-  }
-  return { ...target, [key]: value };
-}
-
 function normalizeGatewaySessionRow(raw: unknown): GatewaySessionRow | null {
   if (!isRecord(raw)) {
     return null;
@@ -96,34 +78,103 @@ function normalizeGatewaySessionRow(raw: unknown): GatewaySessionRow | null {
   if (!key) {
     return null;
   }
-  let row: GatewaySessionRow = {
+  const row: GatewaySessionRow = {
     key,
     kind: normalizeSessionKind(pickTrimmedString(raw, ["kind"])),
     updatedAt: pickNumberLike(raw, ["updatedAt", "updated_at"]),
   };
-  row = withOptionalString(row, "label", pickTrimmedString(raw, ["label"]));
-  row = withOptionalString(row, "displayName", pickTrimmedString(raw, ["displayName", "display_name"]));
-  row = withOptionalString(row, "derivedTitle", pickTrimmedString(raw, ["derivedTitle", "derived_title"]));
-  row = withOptionalString(row, "lastMessagePreview", pickTrimmedString(raw, ["lastMessagePreview", "last_message_preview"]));
-  row = withOptionalString(row, "channel", pickTrimmedString(raw, ["channel"]));
-  row = withOptionalString(row, "subject", pickTrimmedString(raw, ["subject"]));
-  row = withOptionalString(row, "groupChannel", pickTrimmedString(raw, ["groupChannel", "group_channel"]));
-  row = withOptionalString(row, "space", pickTrimmedString(raw, ["space"]));
-  row = withOptionalString(row, "chatType", pickTrimmedString(raw, ["chatType", "chat_type"]));
-  row = withOptionalString(row, "sessionId", pickTrimmedString(raw, ["sessionId", "session_id"]));
-  row = withOptionalString(row, "thinkingLevel", pickTrimmedString(raw, ["thinkingLevel", "thinking_level"]));
-  row = withOptionalString(row, "verboseLevel", pickTrimmedString(raw, ["verboseLevel", "verbose_level"]));
-  row = withOptionalString(row, "reasoningLevel", pickTrimmedString(raw, ["reasoningLevel", "reasoning_level"]));
-  row = withOptionalString(row, "elevatedLevel", pickTrimmedString(raw, ["elevatedLevel", "elevated_level"]));
-  row = withOptionalString(row, "modelProvider", pickTrimmedString(raw, ["modelProvider", "model_provider"]));
-  row = withOptionalString(row, "model", pickTrimmedString(raw, ["model"]));
-  row = withOptionalString(row, "lastChannel", pickTrimmedString(raw, ["lastChannel", "last_channel"]));
-  row = withOptionalString(row, "lastTo", pickTrimmedString(raw, ["lastTo", "last_to"]));
-  row = withOptionalString(row, "lastAccountId", pickTrimmedString(raw, ["lastAccountId", "last_account_id"]));
-  row = withOptionalNumber(row, "inputTokens", pickNumberLike(raw, ["inputTokens", "input_tokens"]));
-  row = withOptionalNumber(row, "outputTokens", pickNumberLike(raw, ["outputTokens", "output_tokens"]));
-  row = withOptionalNumber(row, "totalTokens", pickNumberLike(raw, ["totalTokens", "total_tokens"]));
-  row = withOptionalNumber(row, "contextTokens", pickNumberLike(raw, ["contextTokens", "context_tokens"]));
+  const label = pickTrimmedString(raw, ["label"]);
+  if (label !== null) {
+    row.label = label;
+  }
+  const displayName = pickTrimmedString(raw, ["displayName", "display_name"]);
+  if (displayName !== null) {
+    row.displayName = displayName;
+  }
+  const derivedTitle = pickTrimmedString(raw, ["derivedTitle", "derived_title"]);
+  if (derivedTitle !== null) {
+    row.derivedTitle = derivedTitle;
+  }
+  const lastMessagePreview = pickTrimmedString(raw, ["lastMessagePreview", "last_message_preview"]);
+  if (lastMessagePreview !== null) {
+    row.lastMessagePreview = lastMessagePreview;
+  }
+  const channel = pickTrimmedString(raw, ["channel"]);
+  if (channel !== null) {
+    row.channel = channel;
+  }
+  const subject = pickTrimmedString(raw, ["subject"]);
+  if (subject !== null) {
+    row.subject = subject;
+  }
+  const groupChannel = pickTrimmedString(raw, ["groupChannel", "group_channel"]);
+  if (groupChannel !== null) {
+    row.groupChannel = groupChannel;
+  }
+  const space = pickTrimmedString(raw, ["space"]);
+  if (space !== null) {
+    row.space = space;
+  }
+  const chatType = pickTrimmedString(raw, ["chatType", "chat_type"]);
+  if (chatType !== null) {
+    row.chatType = chatType;
+  }
+  const sessionId = pickTrimmedString(raw, ["sessionId", "session_id"]);
+  if (sessionId !== null) {
+    row.sessionId = sessionId;
+  }
+  const thinkingLevel = pickTrimmedString(raw, ["thinkingLevel", "thinking_level"]);
+  if (thinkingLevel !== null) {
+    row.thinkingLevel = thinkingLevel;
+  }
+  const verboseLevel = pickTrimmedString(raw, ["verboseLevel", "verbose_level"]);
+  if (verboseLevel !== null) {
+    row.verboseLevel = verboseLevel;
+  }
+  const reasoningLevel = pickTrimmedString(raw, ["reasoningLevel", "reasoning_level"]);
+  if (reasoningLevel !== null) {
+    row.reasoningLevel = reasoningLevel;
+  }
+  const elevatedLevel = pickTrimmedString(raw, ["elevatedLevel", "elevated_level"]);
+  if (elevatedLevel !== null) {
+    row.elevatedLevel = elevatedLevel;
+  }
+  const modelProvider = pickTrimmedString(raw, ["modelProvider", "model_provider"]);
+  if (modelProvider !== null) {
+    row.modelProvider = modelProvider;
+  }
+  const model = pickTrimmedString(raw, ["model"]);
+  if (model !== null) {
+    row.model = model;
+  }
+  const lastChannel = pickTrimmedString(raw, ["lastChannel", "last_channel"]);
+  if (lastChannel !== null) {
+    row.lastChannel = lastChannel;
+  }
+  const lastTo = pickTrimmedString(raw, ["lastTo", "last_to"]);
+  if (lastTo !== null) {
+    row.lastTo = lastTo;
+  }
+  const lastAccountId = pickTrimmedString(raw, ["lastAccountId", "last_account_id"]);
+  if (lastAccountId !== null) {
+    row.lastAccountId = lastAccountId;
+  }
+  const inputTokens = pickNumberLike(raw, ["inputTokens", "input_tokens"]);
+  if (inputTokens !== null) {
+    row.inputTokens = inputTokens;
+  }
+  const outputTokens = pickNumberLike(raw, ["outputTokens", "output_tokens"]);
+  if (outputTokens !== null) {
+    row.outputTokens = outputTokens;
+  }
+  const totalTokens = pickNumberLike(raw, ["totalTokens", "total_tokens"]);
+  if (totalTokens !== null) {
+    row.totalTokens = totalTokens;
+  }
+  const contextTokens = pickNumberLike(raw, ["contextTokens", "context_tokens"]);
+  if (contextTokens !== null) {
+    row.contextTokens = contextTokens;
+  }
   const systemSent = pickBoolean(raw, ["systemSent", "system_sent"]);
   if (systemSent !== null) {
     row.systemSent = systemSent;
@@ -220,20 +271,26 @@ export function normalizeAgentsListResult(payload: unknown): AgentsListResult {
           return null;
         }
         const identity = isRecord(agent.identity) ? agent.identity : null;
+        const name = pickTrimmedString(agent, ["name"]);
+        const identityName = identity ? pickTrimmedString(identity, ["name"]) : null;
+        const identityTheme = identity ? pickTrimmedString(identity, ["theme"]) : null;
+        const identityEmoji = identity ? pickTrimmedString(identity, ["emoji"]) : null;
+        const identityAvatar = identity ? pickTrimmedString(identity, ["avatar"]) : null;
+        const identityAvatarUrl = identity ? pickTrimmedString(identity, ["avatarUrl", "avatar_url"]) : null;
+        const identityPayload =
+          identity && (identityName || identityTheme || identityEmoji || identityAvatar || identityAvatarUrl)
+            ? {
+                ...(identityName ? { name: identityName } : {}),
+                ...(identityTheme ? { theme: identityTheme } : {}),
+                ...(identityEmoji ? { emoji: identityEmoji } : {}),
+                ...(identityAvatar ? { avatar: identityAvatar } : {}),
+                ...(identityAvatarUrl ? { avatarUrl: identityAvatarUrl } : {}),
+              }
+            : undefined;
         return {
           id,
-          ...(pickTrimmedString(agent, ["name"]) ? { name: pickTrimmedString(agent, ["name"]) ?? undefined } : {}),
-          ...(identity
-            ? {
-                identity: {
-                  ...(pickTrimmedString(identity, ["name"]) ? { name: pickTrimmedString(identity, ["name"]) ?? undefined } : {}),
-                  ...(pickTrimmedString(identity, ["theme"]) ? { theme: pickTrimmedString(identity, ["theme"]) ?? undefined } : {}),
-                  ...(pickTrimmedString(identity, ["emoji"]) ? { emoji: pickTrimmedString(identity, ["emoji"]) ?? undefined } : {}),
-                  ...(pickTrimmedString(identity, ["avatar"]) ? { avatar: pickTrimmedString(identity, ["avatar"]) ?? undefined } : {}),
-                  ...(pickTrimmedString(identity, ["avatarUrl", "avatar_url"]) ? { avatarUrl: pickTrimmedString(identity, ["avatarUrl", "avatar_url"]) ?? undefined } : {}),
-                },
-              }
-            : {}),
+          ...(name ? { name } : {}),
+          ...(identityPayload ? { identity: identityPayload } : {}),
         };
       })
       .filter((agent): agent is NonNullable<typeof agent> => agent !== null)
@@ -260,15 +317,17 @@ export function normalizeModelsListResult(payload: unknown): ModelsListResult {
         if (!id || !provider) {
           return null;
         }
+        const name = pickTrimmedString(model, ["name"]) ?? id;
+        const contextWindow = pickNumberLike(model, ["contextWindow", "context_window"]);
+        const available = pickBoolean(model, ["available"]);
+        const local = pickBoolean(model, ["local"]);
         return {
           id,
-          name: pickTrimmedString(model, ["name"]) ?? id,
+          name,
           provider,
-          ...(pickNumberLike(model, ["contextWindow", "context_window"]) !== null
-            ? { contextWindow: pickNumberLike(model, ["contextWindow", "context_window"]) ?? undefined }
-            : {}),
-          ...(pickBoolean(model, ["available"]) !== null ? { available: pickBoolean(model, ["available"]) } : {}),
-          ...(pickBoolean(model, ["local"]) !== null ? { local: pickBoolean(model, ["local"]) } : {}),
+          ...(contextWindow !== null ? { contextWindow } : {}),
+          ...(available !== null ? { available } : {}),
+          ...(local !== null ? { local } : {}),
         };
       })
       .filter((model): model is NonNullable<typeof model> => model !== null)
