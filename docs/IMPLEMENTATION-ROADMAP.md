@@ -740,6 +740,10 @@ The next Track E seam now also exists:
 - `electron/ipc/register-desktop-ipc.cjs` owns the desktop IPC registration surface for local image reads, remote image fetches, gateway URL updates, file-server URL updates, and desktop beep behavior
 - `electron/main.cjs` now provides the underlying runtime callbacks for that seam instead of inlining the IPC `.handle(...)` registrations directly
 
+The next Track E protocol seam now also exists:
+- `electron/protocols/register-desktop-protocols.cjs` owns the privileged desktop scheme registration and `protocol.handle(...)` binding for `claw-local-image` and `claw-fs`
+- `electron/main.cjs` now provides the underlying local-image and claw-fs request handlers for that seam instead of inlining the registration/binding stack directly
+
 ---
 
 # Suggested execution order inside Milestone 1

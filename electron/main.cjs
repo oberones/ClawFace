@@ -2,6 +2,10 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { app, nativeImage, protocol } = require("electron");
 const { registerDesktopIpcHandlers } = require("./ipc/register-desktop-ipc.cjs");
+const {
+  registerDesktopProtocolSchemes,
+  registerDesktopProtocolHandlers,
+} = require("./protocols/register-desktop-protocols.cjs");
 const { createMainWindow: createDesktopWindow } = require("./window/create-window.cjs");
 
 const WINDOW_WIDTH = 1280;
@@ -236,27 +240,11 @@ function setCachedImage(pathKey, value) {
   }
 }
 
-protocol.registerSchemesAsPrivileged([
-  {
-    scheme: DESKTOP_LOCAL_IMAGE_SCHEME,
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      corsEnabled: true,
-    },
-  },
-  {
-    scheme: CLAW_FS_SCHEME,
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      corsEnabled: true,
-      stream: true,
-    },
-  },
-]);
+registerDesktopProtocolSchemes({
+  protocol,
+  localImageScheme: DESKTOP_LOCAL_IMAGE_SCHEME,
+  fsScheme: CLAW_FS_SCHEME,
+});
 
 function resolveLocalImagePathCandidates(rawPath) {
   if (typeof rawPath !== "string") {
@@ -1537,8 +1525,13 @@ app.whenReady().then(() => {
   if (process.platform === "darwin" && appIcon && app.dock) {
     app.dock.setIcon(appIcon);
   }
-  protocol.handle(DESKTOP_LOCAL_IMAGE_SCHEME, handleDesktopLocalImageRequest);
-  protocol.handle(CLAW_FS_SCHEME, handleClawFsRequest);
+  registerDesktopProtocolHandlers({
+    protocol,
+    localImageScheme: DESKTOP_LOCAL_IMAGE_SCHEME,
+    fsScheme: CLAW_FS_SCHEME,
+    handleLocalImageRequest: handleDesktopLocalImageRequest,
+    handleFsRequest: handleClawFsRequest,
+  });
   createMainWindow();
 
   app.on("activate", () => {
