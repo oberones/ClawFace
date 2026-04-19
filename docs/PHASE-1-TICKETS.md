@@ -2237,6 +2237,47 @@ If Track D continues from here, the next clean move is probably to normalize the
 
 ---
 
+## Ticket D.6 — Normalize shell-facing history response shaping
+### Goal
+Move the shell-facing `chat.history` payload shaping out of `src/app.tsx` so history timestamp inference, tool-update extraction, and attachment/message dedupe all come from one shared response seam.
+
+### Scope
+- normalize `chat.history` payloads into a shared Track D history module
+- move history timestamp inference there
+- move history tool-update extraction there
+- move history tool-attachment/message dedupe there
+- rewire `loadHistory(...)` to consume that normalized history seam while leaving active-stream/cache policy in the app
+- add focused helper-level coverage for the new history module
+
+### Deliverable
+A shared shell gateway-history module that owns shell-facing history response shaping, plus a slimmer `loadHistory(...)` path in `src/app.tsx`.
+
+### Done when
+- `src/lib/shell-gateway-history.ts` is the authoritative home for shell-facing `chat.history` payload shaping
+- `src/app.tsx` no longer parses raw history rows inline to infer timestamps, extract tool updates, or dedupe attachment messages
+- helper-level regression coverage exists for the new history seam
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `src/lib/shell-gateway-history.ts` as the shared shell history seam for:
+  - history message timestamp inference
+  - tool-update extraction from history payloads
+  - attachment/message dedupe across history rows
+- rewired `src/app.tsx` to consume the normalized history helper in `loadHistory(...)`
+- added focused helper coverage in `tests/shell-gateway-history.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues from here, the next clean move is probably to normalize any remaining shell-facing response families that still rely on ad hoc payload shaping before introducing another app-root extraction.
+
+---
+
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
 ### Goal
 Keep the architecture doc honest as refactors land.
