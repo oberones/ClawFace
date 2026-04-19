@@ -2237,6 +2237,85 @@ If Track D continues from here, the next clean move is probably to normalize the
 
 ---
 
+## Ticket D.6 — Normalize shell-facing history response shaping
+### Goal
+Move the shell-facing `chat.history` payload shaping out of `src/app.tsx` so history timestamp inference, tool-update extraction, and attachment/message dedupe all come from one shared response seam.
+
+### Scope
+- normalize `chat.history` payloads into a shared Track D history module
+- move history timestamp inference there
+- move history tool-update extraction there
+- move history tool-attachment/message dedupe there
+- rewire `loadHistory(...)` to consume that normalized history seam while leaving active-stream/cache policy in the app
+- add focused helper-level coverage for the new history module
+
+### Deliverable
+A shared shell gateway-history module that owns shell-facing history response shaping, plus a slimmer `loadHistory(...)` path in `src/app.tsx`.
+
+### Done when
+- `src/lib/shell-gateway-history.ts` is the authoritative home for shell-facing `chat.history` payload shaping
+- `src/app.tsx` no longer parses raw history rows inline to infer timestamps, extract tool updates, or dedupe attachment messages
+- helper-level regression coverage exists for the new history seam
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `src/lib/shell-gateway-history.ts` as the shared shell history seam for:
+  - history message timestamp inference
+  - tool-update extraction from history payloads
+  - attachment/message dedupe across history rows
+- rewired `src/app.tsx` to consume the normalized history helper in `loadHistory(...)`
+- added focused helper coverage in `tests/shell-gateway-history.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues from here, the next clean move is probably to normalize any remaining shell-facing response families that still rely on ad hoc payload shaping before introducing another app-root extraction.
+
+---
+
+## Ticket D.7 — Normalize shell-facing mutation response acknowledgements
+### Goal
+Move the remaining shell-facing command/mutation response shaping out of `src/app.tsx` so send/reset acknowledgement parsing no longer relies on inline optimistic casts.
+
+### Scope
+- normalize `chat.send` acknowledgement payloads into a shared Track D mutation module
+- normalize `sessions.reset` acknowledgement payloads there too
+- rewire the send, `/compact`, and `/reset` paths to consume the normalized mutation helpers
+- add focused helper-level coverage for the new mutation seam
+
+### Deliverable
+A shared shell gateway-mutation module that owns shell-facing acknowledgement parsing, plus slimmer send/reset consumers in `src/app.tsx`.
+
+### Done when
+- `src/lib/shell-gateway-mutations.ts` is the authoritative home for shell-facing `chat.send` and `sessions.reset` acknowledgement parsing
+- `src/app.tsx` no longer uses direct optimistic casts for those mutation responses
+- helper-level regression coverage exists for the new mutation seam
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `src/lib/shell-gateway-mutations.ts` as the shared shell mutation seam for:
+  - `chat.send`
+  - `sessions.reset`
+- rewired `src/app.tsx` to consume those normalized acknowledgement helpers in send, `/compact`, and `/reset`
+- added focused helper coverage in `tests/shell-gateway-mutations.test.mjs`
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track D continues from here, the next clean move is probably to pause and reassess whether there are any remaining shell-facing response families with enough density to justify another normalization seam before starting a new track.
+
+---
+
 ## Ticket P1-X2 — Add implementation notes to `ARCHITECTURE.md` if boundaries change materially
 ### Goal
 Keep the architecture doc honest as refactors land.

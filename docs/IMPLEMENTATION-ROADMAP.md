@@ -718,6 +718,16 @@ The next Track D config seam now also exists:
 - `src/app.tsx` now consumes normalized config state for model filtering, primary-session ordering, and `/status`
 - focused helper coverage for that boundary lives in `tests/shell-gateway-config.test.mjs`
 
+The next Track D history seam now also exists:
+- `src/lib/shell-gateway-history.ts` owns shell-facing `chat.history` normalization for timestamp inference, tool-update extraction, and attachment/message dedupe
+- `src/app.tsx` now consumes normalized history output in `loadHistory(...)` instead of rebuilding those response details inline
+- focused helper coverage for that boundary lives in `tests/shell-gateway-history.test.mjs`
+
+The next Track D mutation seam now also exists:
+- `src/lib/shell-gateway-mutations.ts` owns shell-facing acknowledgement parsing for `chat.send` and `sessions.reset`
+- `src/app.tsx` now consumes normalized mutation responses in the send, `/compact`, and `/reset` paths instead of relying on inline optimistic casts
+- focused helper coverage for that boundary lives in `tests/shell-gateway-mutations.test.mjs`
+
 ## Track E — Electron main-process cleanup
 Primary goal:
 - gradually decompose `electron/main.cjs` as the product expands beyond basic shell behavior
