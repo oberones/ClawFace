@@ -81,6 +81,7 @@ import {
   normalizeGatewayHelloState,
 } from "./lib/shell-gateway-state.ts";
 import {
+  mergeSessionRowsWithLocalState,
   normalizeAgentsListResult,
   normalizeModelsListResult,
   normalizeSessionsListResult,
@@ -4271,7 +4272,7 @@ export default function App() {
         includeDerivedTitles: true,
         includeLastMessage: true,
       }));
-      return res.sessions;
+      return mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
     } catch {
       return [];
     }
@@ -4286,7 +4287,7 @@ export default function App() {
         includeDerivedTitles: true,
         includeLastMessage: true,
       }));
-      allSessions = res.sessions;
+      allSessions = mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
     } catch {
       return;
     }
@@ -4363,7 +4364,8 @@ export default function App() {
       }));
       setSessionDefaults(res.defaults);
       const primarySessionKey = resolvePrimarySessionKey(agents, lastConfigStateRef.current);
-      const ordered = [...res.sessions].sort((a, b) => {
+      const mergedSessions = mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
+      const ordered = [...mergedSessions].sort((a, b) => {
         const aIsPrimary = a.key.toLowerCase() === primarySessionKey;
         const bIsPrimary = b.key.toLowerCase() === primarySessionKey;
         if (aIsPrimary !== bIsPrimary) {

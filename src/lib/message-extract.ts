@@ -10,6 +10,8 @@ const REPLY_TAG_RE = /\[\[\s*(?:reply_to_current|reply_to\s*:\s*[^\]\n]+)\s*\]\]
 // Strip everything up to and including the envelope, leaving only the user's real content.
 const OPENCLAW_ENVELOPE_RE =
   /^[\s\S]*?(?:Conversation info|Sender)\s*\(untrusted[\s\w]*\):\s*```json?\s*[\s\S]*?```\s*/i;
+const OPENCLAW_METADATA_PREFIX_RE =
+  /^(?:Conversation info|Sender)\s*\(untrusted[\s\w]*\):\s*/i;
 const TIMESTAMP_PREFIX_RE =
   /^\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}(?:\s+[^\]]+)?\]\s*/i;
 
@@ -37,6 +39,24 @@ export function sanitizeUserText(text: string): string {
   // Strip timestamp prefix like [Wed 2026-02-18 19:21 GMT+1]
   cleaned = cleaned.replace(TIMESTAMP_PREFIX_RE, "");
   return cleaned.trim();
+}
+
+export function sanitizeSessionPresentationText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return "";
+  }
+  const cleaned = sanitizeUserText(trimmed).trim();
+  if (!cleaned) {
+    return "";
+  }
+  if (OPENCLAW_METADATA_PREFIX_RE.test(cleaned)) {
+    return "";
+  }
+  if (OPENCLAW_METADATA_PREFIX_RE.test(trimmed) && cleaned === trimmed) {
+    return "";
+  }
+  return cleaned;
 }
 
 export function extractText(message: unknown): string | null {
