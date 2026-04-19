@@ -713,6 +713,11 @@ The next Track D response seam now also exists:
 - `src/app.tsx` now consumes normalized catalog/session response helpers instead of relying on optimistic result casts in those loaders
 - focused helper coverage for that boundary lives in `tests/shell-gateway-responses.test.mjs`
 
+The next Track D config seam now also exists:
+- `src/lib/shell-gateway-config.ts` owns shell-facing `config.get` normalization for configured model keys, runtime path hints, provider auth labels, queue mode, and heartbeat-session overrides
+- `src/app.tsx` now consumes normalized config state for model filtering, primary-session ordering, and `/status`
+- focused helper coverage for that boundary lives in `tests/shell-gateway-config.test.mjs`
+
 ## Track E — Electron main-process cleanup
 Primary goal:
 - gradually decompose `electron/main.cjs` as the product expands beyond basic shell behavior

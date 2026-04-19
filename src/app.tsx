@@ -88,6 +88,12 @@ import {
   normalizeSessionsPreviewResult,
 } from "./lib/shell-gateway-responses.ts";
 import {
+  normalizeShellGatewayConfigState,
+  resolvePrimarySessionKey,
+  resolveProviderApiKeyLabel,
+  type GatewayConfigState,
+} from "./lib/shell-gateway-config.ts";
+import {
   attachLifecycleErrorToToolItems,
   collectReplyPayloadMediaUrls,
   extractToolUpdatesFromMessage,
@@ -1654,18 +1660,6 @@ function getNested(source: unknown, path: string[]): unknown {
   return cursor;
 }
 
-function getNestedString(source: unknown, path: string[]): string | null {
-  const value = getNested(source, path);
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function getConfigRoot(configSnapshot: unknown): Record<string, unknown> | null {
-  if (!isRecord(configSnapshot)) {
-    return null;
-  }
-  return isRecord(configSnapshot.config) ? configSnapshot.config : configSnapshot;
-}
-
 function formatAgeFromTimestamp(updatedAt: number | null | undefined): string {
   if (!Number.isFinite(updatedAt)) {
     return "unknown";
@@ -1684,58 +1678,6 @@ function formatAgeFromTimestamp(updatedAt: number | null | undefined): string {
   }
   const days = Math.round(hours / 24);
   return `${days}d ago`;
-}
-
-function formatApiKeySnippet(apiKey: string): string {
-  const compact = apiKey.replace(/\s+/g, "");
-  if (!compact) {
-    return "unknown";
-  }
-  if (compact.includes("${")) {
-    return "configured";
-  }
-  const edge = compact.length >= 12 ? 6 : 4;
-  return `${compact.slice(0, edge)}…${compact.slice(-edge)}`;
-}
-
-function resolveProviderApiKeyLabel(configSnapshot: unknown, providerRaw: string | null): string | null {
-  const provider = providerRaw?.trim().toLowerCase();
-  if (!provider) {
-    return null;
-  }
-  const config = getConfigRoot(configSnapshot);
-  if (!config) {
-    return null;
-  }
-  const providers = getNested(config, ["models", "providers"]);
-  if (!isRecord(providers)) {
-    return null;
-  }
-  for (const [providerId, entry] of Object.entries(providers)) {
-    if (providerId.trim().toLowerCase() !== provider || !isRecord(entry)) {
-      continue;
-    }
-    const apiKey = getString(entry, ["apiKey", "api_key"]);
-    if (!apiKey) {
-      return null;
-    }
-    const snippet = formatApiKeySnippet(apiKey);
-    return `api-key ${snippet} (${providerId}:default)`;
-  }
-  return null;
-}
-
-function resolveQueueMode(configSnapshot: unknown): string {
-  const config = getConfigRoot(configSnapshot);
-  if (!config) {
-    return "collect";
-  }
-  return (
-    getNestedString(config, ["queue", "mode"]) ??
-    getNestedString(config, ["session", "queue", "mode"]) ??
-    getNestedString(config, ["agents", "defaults", "queue", "mode"]) ??
-    "collect"
-  );
 }
 
 function clearOverride<T extends string>(
@@ -1768,64 +1710,6 @@ function resolveCanonicalModelFromCatalog(
     return normalized;
   }
   return `${exact.provider}/${exact.id}`;
-}
-
-function resolveHeartbeatSessionOverride(
-  configRoot: unknown,
-  defaultAgentId: string,
-): string | null {
-  const config = getConfigRoot(configRoot);
-  if (!config) {
-    return null;
-  }
-  const agentsConfig = isRecord(config.agents) ? config.agents : null;
-  const defaults = agentsConfig && isRecord(agentsConfig.defaults) ? agentsConfig.defaults : null;
-  let sessionOverride = defaults ? getNestedString(defaults, ["heartbeat", "session"]) : null;
-
-  const list = agentsConfig && Array.isArray(agentsConfig.list) ? agentsConfig.list : [];
-  for (const entry of list) {
-    if (!isRecord(entry)) {
-      continue;
-    }
-    const id = getString(entry, ["id"])?.trim().toLowerCase();
-    if (!id || id !== defaultAgentId) {
-      continue;
-    }
-    const perAgent = getNestedString(entry, ["heartbeat", "session"]);
-    if (perAgent?.trim()) {
-      sessionOverride = perAgent;
-    }
-    break;
-  }
-
-  const normalized = sessionOverride?.trim().toLowerCase() ?? "";
-  return normalized || null;
-}
-
-function resolvePrimarySessionKey(
-  agents: AgentsListResult | null,
-  configRoot?: unknown,
-): string {
-  if (agents?.scope === "global") {
-    return "global";
-  }
-  const agentId = (agents?.defaultId ?? "main").trim().toLowerCase() || "main";
-  const mainKey = (agents?.mainKey ?? "main").trim().toLowerCase() || "main";
-  const override = resolveHeartbeatSessionOverride(configRoot, agentId);
-  if (!override || override === "main" || override === "global") {
-    return `agent:${agentId}:${mainKey}`;
-  }
-  if (override.startsWith("agent:")) {
-    return override;
-  }
-  if (override.startsWith("global")) {
-    return "global";
-  }
-  const overrideKey = override.replace(/^:+|:+$/g, "");
-  if (!overrideKey) {
-    return `agent:${agentId}:${mainKey}`;
-  }
-  return `agent:${agentId}:${overrideKey}`;
 }
 
 function resolveMainSessionFallback(agents: AgentsListResult | null): string {
@@ -1871,70 +1755,6 @@ function reconcileSelectedSessionKey(params: {
     return primaryMatch.key;
   }
   return sessions[0]!.key;
-}
-
-function collectConfiguredModelKeys(configRoot: unknown): Set<string> {
-  const keys = new Set<string>();
-  if (!isRecord(configRoot)) {
-    return keys;
-  }
-  const config = isRecord(configRoot.config) ? configRoot.config : configRoot;
-  const aliasToModelKey = new Map<string, string>();
-  const agents = isRecord(config.agents) ? config.agents : null;
-  const defaults = agents && isRecord(agents.defaults) ? agents.defaults : null;
-  if (defaults && isRecord(defaults.models)) {
-    for (const [key, value] of Object.entries(defaults.models)) {
-      const normalizedKey = normalizeModelKey(key);
-      if (normalizedKey) {
-        keys.add(normalizedKey);
-      }
-      if (!isRecord(value)) {
-        continue;
-      }
-      const alias = typeof value.alias === "string" ? normalizeModelKey(value.alias) : "";
-      if (alias && normalizedKey) {
-        aliasToModelKey.set(alias, normalizedKey);
-      }
-    }
-  }
-
-  const addModelValue = (value: unknown) => {
-    if (typeof value !== "string") {
-      return;
-    }
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return;
-    }
-    const normalized = normalizeModelKey(trimmed);
-    keys.add(normalized);
-    const mapped = aliasToModelKey.get(normalized);
-    if (mapped) {
-      keys.add(mapped);
-    }
-  };
-
-  const addModelList = (value: unknown) => {
-    if (!Array.isArray(value)) {
-      return;
-    }
-    for (const item of value) {
-      addModelValue(item);
-    }
-  };
-
-  const defaultModel = defaults && isRecord(defaults.model) ? defaults.model : null;
-  if (defaultModel) {
-    addModelValue(defaultModel.primary);
-    addModelList(defaultModel.fallbacks);
-  }
-  const defaultImageModel = defaults && isRecord(defaults.imageModel) ? defaults.imageModel : null;
-  if (defaultImageModel) {
-    addModelValue(defaultImageModel.primary);
-    addModelList(defaultImageModel.fallbacks);
-  }
-
-  return keys;
 }
 
 function filterConfiguredModels(
@@ -2093,16 +1913,6 @@ function mergeStreamingText(previous: string | null, incoming: string): string {
   return `${previous}${incoming}`;
 }
 
-function isAbsoluteFsPath(value: string): boolean {
-  const trimmed = value.trim();
-  return (
-    trimmed.startsWith("/") ||
-    trimmed.startsWith("\\\\") ||
-    /^[A-Za-z]:[\\/]/.test(trimmed) ||
-    trimmed.startsWith("~/")
-  );
-}
-
 function normalizeFsPath(value: string): string {
   return value.replace(/\\/g, "/");
 }
@@ -2187,66 +1997,8 @@ function getAttachmentParsingOptions(fallbackTimestamp?: number): {
   };
 }
 
-function collectRuntimePathHintsFromConfig(snapshot: unknown) {
-  if (!isRecord(snapshot)) {
-    return;
-  }
-  const queue: Array<{ value: unknown; keyPath: string; depth: number }> = [
-    { value: snapshot, keyPath: "", depth: 0 },
-  ];
-  let nodes = 0;
-  const MAX_NODES = 600;
-  const MAX_DEPTH = 7;
-  let workspaceCandidate = "";
-  let homeCandidate = "";
-  while (queue.length > 0 && nodes < MAX_NODES) {
-    const current = queue.shift();
-    if (!current) {
-      continue;
-    }
-    nodes += 1;
-    const { value, keyPath, depth } = current;
-    if (typeof value === "string") {
-      const trimmed = trimTrailingSlashes(value);
-      if (!trimmed) {
-        continue;
-      }
-      const lowerValue = trimmed.toLowerCase();
-      const lowerKey = keyPath.toLowerCase();
-      const isAbsoluteLike = isAbsoluteFsPath(trimmed) || trimmed.startsWith("~/");
-      if (!isAbsoluteLike) {
-        continue;
-      }
-      if (!workspaceCandidate && (lowerKey.includes("workspace") || lowerValue.includes(WORKSPACE_MARKER))) {
-        workspaceCandidate = trimmed;
-      }
-      if (!homeCandidate && lowerKey.includes("home")) {
-        homeCandidate = trimmed;
-      }
-      continue;
-    }
-    if (depth >= MAX_DEPTH) {
-      continue;
-    }
-    if (Array.isArray(value)) {
-      for (let index = 0; index < value.length; index += 1) {
-        queue.push({ value: value[index], keyPath: `${keyPath}[${index}]`, depth: depth + 1 });
-      }
-      continue;
-    }
-    if (!isRecord(value)) {
-      continue;
-    }
-    for (const [key, nested] of Object.entries(value)) {
-      const nextKeyPath = keyPath ? `${keyPath}.${key}` : key;
-      queue.push({ value: nested, keyPath: nextKeyPath, depth: depth + 1 });
-    }
-  }
-  const derivedHome = workspaceCandidate ? deriveHomeFromWorkspacePath(workspaceCandidate) : "";
-  setRuntimePathHints({
-    homeDir: homeCandidate || derivedHome || null,
-    workspaceDir: workspaceCandidate || null,
-  });
+function applyConfigRuntimePathHints(configState: GatewayConfigState | null | undefined) {
+  setRuntimePathHints(configState?.runtimePathHints ?? {});
 }
 
 function buildChatMessageDedupeKey(message: ChatMessage): string {
@@ -2514,7 +2266,7 @@ export default function App() {
   const connectionRecoveryNoticeTimerRef = useRef<number | null>(null);
   const connectionRecoveryNoticeSeqRef = useRef(0);
   const selectedSessionRef = useRef<string | null>(selectedSessionKey);
-  const lastConfigSnapshotRef = useRef<unknown>(null);
+  const lastConfigStateRef = useRef<GatewayConfigState | null>(null);
   const sessionListLimitRef = useRef<number>(sessionListLimit);
   const loadingMoreSessionsRef = useRef(false);
   const historyLimitBySessionRef = useRef<Record<string, number>>({});
@@ -4486,10 +4238,10 @@ export default function App() {
       const catalog = res.models;
       let configuredKeys = new Set<string>();
       try {
-        const configSnapshot = await client.request("config.get", {});
-        lastConfigSnapshotRef.current = configSnapshot;
-        collectRuntimePathHintsFromConfig(configSnapshot);
-        configuredKeys = collectConfiguredModelKeys(configSnapshot);
+        const configState = normalizeShellGatewayConfigState(await client.request("config.get", {}));
+        lastConfigStateRef.current = configState;
+        applyConfigRuntimePathHints(configState);
+        configuredKeys = configState.configuredModelKeys;
       } catch {
         // ignore
       }
@@ -4607,7 +4359,7 @@ export default function App() {
         includeLastMessage: true,
       }));
       setSessionDefaults(res.defaults);
-      const primarySessionKey = resolvePrimarySessionKey(agents, lastConfigSnapshotRef.current);
+      const primarySessionKey = resolvePrimarySessionKey(agents, lastConfigStateRef.current);
       const ordered = [...res.sessions].sort((a, b) => {
         const aIsPrimary = a.key.toLowerCase() === primarySessionKey;
         const bIsPrimary = b.key.toLowerCase() === primarySessionKey;
@@ -4979,7 +4731,7 @@ export default function App() {
     const slug = label ? (slugify(label) || "chat") : "chat";
     const agentId = resolveTargetAgentId(preferredAgentId);
     const key = `agent:${agentId}:ui:${slug}-${generateUUID().slice(0, 8)}`;
-    const primarySessionKey = resolvePrimarySessionKey(agents, lastConfigSnapshotRef.current);
+    const primarySessionKey = resolvePrimarySessionKey(agents, lastConfigStateRef.current);
     const previousSelectedKey = selectedSessionRef.current;
     if (previousSelectedKey && previousSelectedKey !== key) {
       saveCurrentToCache(previousSelectedKey);
@@ -5126,7 +4878,10 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [agents, connected, modelShortcutSchemes, agentSessionShortcutSchemes, appActionShortcuts, newSessionPreferredModel, uiSettings.autoHoverSidebar, switchView]);
 
-  function buildStatusCard(statusPayload: unknown, configSnapshot: unknown): string {
+  function buildStatusCard(
+    statusPayload: unknown,
+    configState: GatewayConfigState | null | undefined,
+  ): string {
     const statusSnapshot = extractGatewayStatusSnapshot(statusPayload);
     const { statusRoot, defaults, recent } = statusSnapshot;
     const activeKey = selectedSessionRef.current ?? selectedSessionKey ?? currentSession?.key ?? null;
@@ -5155,7 +4910,7 @@ export default function App() {
       modelLabel.includes("/")
         ? modelLabel.split("/")[0] ?? null
         : currentSession?.modelProvider ?? null;
-    const authLabel = resolveProviderApiKeyLabel(configSnapshot, provider);
+    const authLabel = resolveProviderApiKeyLabel(configState, provider);
     const currentInputTokens = toFiniteNumber(currentSession?.inputTokens);
     const currentOutputTokens = toFiniteNumber(currentSession?.outputTokens);
     const currentTotalTokens =
@@ -5222,7 +4977,7 @@ export default function App() {
     const queueDepth = Array.isArray(statusRoot.queuedSystemEvents)
       ? statusRoot.queuedSystemEvents.length
       : (isRecord(statusRoot.queue) ? getNumber(statusRoot.queue, ["depth"]) : null) ?? 0;
-    const queueMode = resolveQueueMode(configSnapshot);
+    const queueMode = configState?.queueMode ?? "collect";
     const version = serverInfo.version?.trim() || "dev";
     const commit = serverInfo.commit?.trim() || null;
     const { subagentsLine, taskLine } = statusSnapshot;
@@ -5470,8 +5225,9 @@ export default function App() {
             client.request("status", {}),
             client.request("config.get", {}).catch(() => null),
           ]);
-          collectRuntimePathHintsFromConfig(configSnapshot);
-          pushSystemMessage(buildStatusCard(statusRes, configSnapshot));
+          const configState = normalizeShellGatewayConfigState(configSnapshot);
+          applyConfigRuntimePathHints(configState);
+          pushSystemMessage(buildStatusCard(statusRes, configState));
           break;
         }
         case "models": {

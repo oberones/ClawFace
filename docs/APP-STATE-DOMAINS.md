@@ -324,4 +324,8 @@ The next Track D response seam now also exists:
 - `src/lib/shell-gateway-responses.ts` owns shell-facing response normalization for agents/models/sessions/session previews
 - `src/app.tsx` now consumes normalized catalog/session response helpers instead of relying on optimistic result casts in those loaders
 
-If work continues from here, the next density is more likely to be broader gateway-event normalization outside the thread/tool path rather than another state-ownership extraction inside that same subsystem.
+The next Track D config seam now also exists:
+- `src/lib/shell-gateway-config.ts` owns shell-facing `config.get` normalization for configured model keys, runtime path hints, provider auth labels, queue mode, and heartbeat-session overrides
+- `src/app.tsx` now consumes normalized config state instead of keeping its own parallel config-root scanners for those shell-facing behaviors
+
+If work continues from here, the next density is more likely to be the remaining shell-facing history response shaping rather than another state-ownership extraction inside that same subsystem.
