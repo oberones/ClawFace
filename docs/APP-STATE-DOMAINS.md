@@ -332,4 +332,8 @@ The next Track D history seam now also exists:
 - `src/lib/shell-gateway-history.ts` owns shell-facing `chat.history` normalization for timestamp inference, tool-update extraction, and attachment/message dedupe
 - `src/app.tsx` now consumes normalized history output in `loadHistory(...)` instead of rebuilding those response details inline
 
-If work continues from here, the next density is more likely to be any remaining shell-facing response families that still rely on ad hoc payload shaping rather than another state-ownership extraction inside that same subsystem.
+The next Track D mutation seam now also exists:
+- `src/lib/shell-gateway-mutations.ts` owns shell-facing acknowledgement parsing for `chat.send` and `sessions.reset`
+- `src/app.tsx` now consumes normalized mutation responses in the send/reset command paths instead of relying on inline optimistic casts
+
+If work continues from here, the next move is probably to pause and reassess whether any remaining shell-facing response family is still dense enough to justify another Track D seam before switching tracks.

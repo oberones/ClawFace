@@ -88,6 +88,10 @@ import {
 } from "./lib/shell-gateway-responses.ts";
 import { normalizeShellGatewayHistory } from "./lib/shell-gateway-history.ts";
 import {
+  normalizeChatSendResult,
+  normalizeSessionsResetResult,
+} from "./lib/shell-gateway-mutations.ts";
+import {
   normalizeShellGatewayConfigState,
   resolvePrimarySessionKey,
   resolveProviderApiKeyLabel,
@@ -5138,17 +5142,14 @@ export default function App() {
     updateSessionActivity(selectedSessionKey, { working: true, unread: false });
 
     try {
-      const sendRes = (await client.request("chat.send", {
+      const sendRes = normalizeChatSendResult(await client.request("chat.send", {
         sessionKey: selectedSessionKey,
         message: outboundMessage,
         deliver: false,
         idempotencyKey: runId,
         attachments: apiAttachments.length > 0 ? apiAttachments : undefined,
-      })) as { runId?: unknown };
-      const ackRunId =
-        typeof sendRes?.runId === "string" && sendRes.runId.trim()
-          ? sendRes.runId.trim()
-          : null;
+      }));
+      const ackRunId = sendRes.runId;
       if (ackRunId && ackRunId !== chatRunRef.current) {
         chatRunRef.current = ackRunId;
         setChatRunId(ackRunId);
@@ -5222,16 +5223,13 @@ export default function App() {
           }));
           updateSessionActivity(selectedSessionKey, { working: true, unread: false });
           pushSystemMessage("running /compact...");
-          const sendRes = (await client.request("chat.send", {
+          const sendRes = normalizeChatSendResult(await client.request("chat.send", {
             sessionKey: selectedSessionKey,
             message: commandText,
             deliver: false,
             idempotencyKey: runId,
-          })) as { runId?: unknown };
-          const ackRunId =
-            typeof sendRes?.runId === "string" && sendRes.runId.trim()
-              ? sendRes.runId.trim()
-              : null;
+          }));
+          const ackRunId = sendRes.runId;
           if (ackRunId && ackRunId !== chatRunRef.current) {
             chatRunRef.current = ackRunId;
             setChatRunId(ackRunId);
@@ -5319,13 +5317,10 @@ export default function App() {
           break;
         }
         case "reset": {
-          const resetRes = (await client.request("sessions.reset", {
+          const resetRes = normalizeSessionsResetResult(await client.request("sessions.reset", {
             key: selectedSessionKey,
-          })) as { key?: unknown };
-          const resolvedKey =
-            typeof resetRes?.key === "string" && resetRes.key.trim()
-              ? resetRes.key
-              : selectedSessionKey;
+          }));
+          const resolvedKey = resetRes.key ?? selectedSessionKey;
           if (resolvedKey !== selectedSessionKey) {
             setSelectedSessionKey(resolvedKey);
           }
