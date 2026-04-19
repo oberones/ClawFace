@@ -736,6 +736,10 @@ The first Track E seam now also exists:
 - `electron/window/create-window.cjs` owns BrowserWindow construction, blank-screen recovery, external-link handling, and basic close/closed behavior
 - `electron/main.cjs` now delegates window creation there while keeping app bootstrap, protocols, and IPC registration
 
+The next Track E seam now also exists:
+- `electron/ipc/register-desktop-ipc.cjs` owns the desktop IPC registration surface for local image reads, remote image fetches, gateway URL updates, file-server URL updates, and desktop beep behavior
+- `electron/main.cjs` now provides the underlying runtime callbacks for that seam instead of inlining the IPC `.handle(...)` registrations directly
+
 ---
 
 # Suggested execution order inside Milestone 1

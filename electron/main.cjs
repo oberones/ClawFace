@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { app, ipcMain, nativeImage, protocol } = require("electron");
+const { app, nativeImage, protocol } = require("electron");
+const { registerDesktopIpcHandlers } = require("./ipc/register-desktop-ipc.cjs");
 const { createMainWindow: createDesktopWindow } = require("./window/create-window.cjs");
 
 const WINDOW_WIDTH = 1280;
@@ -1394,16 +1395,7 @@ async function handleDesktopLocalImageRequest(request) {
   });
 }
 
-ipcMain.handle("desktop:beep", () => {
-  try {
-    shell.beep();
-    return true;
-  } catch {
-    return false;
-  }
-});
-
-ipcMain.handle("desktop:read-image-file", async (_event, rawPath) => {
+async function readDesktopImageFile(rawPath) {
   const candidates = resolveLocalImagePathCandidates(rawPath);
   if (candidates.length === 0) {
     return { ok: false, error: "invalid-path" };
@@ -1419,9 +1411,9 @@ ipcMain.handle("desktop:read-image-file", async (_event, rawPath) => {
     size: loaded.size,
     dataUrl: `data:${loaded.mimeType};base64,${loaded.data.toString("base64")}`,
   };
-});
+}
 
-ipcMain.handle("desktop:fetch-image-url", async (_event, rawUrl) => {
+async function fetchDesktopImageUrl(rawUrl) {
   if (typeof rawUrl !== "string" || !rawUrl.trim()) {
     return { ok: false, error: "invalid-url" };
   }
@@ -1446,9 +1438,9 @@ ipcMain.handle("desktop:fetch-image-url", async (_event, rawUrl) => {
     size: fetched.size,
     dataUrl: `data:${fetched.mimeType};base64,${fetched.data.toString("base64")}`,
   };
-});
+}
 
-ipcMain.handle("desktop:set-gateway-url", (_event, rawGatewayUrl) => {
+function updateDesktopGatewayUrl(rawGatewayUrl) {
   if (typeof rawGatewayUrl !== "string") {
     gatewayHttpBaseCandidates = [];
     gatewayUsesRemoteHost = false;
@@ -1462,11 +1454,18 @@ ipcMain.handle("desktop:set-gateway-url", (_event, rawGatewayUrl) => {
     remote: gatewayUsesRemoteHost,
     candidates: gatewayHttpBaseCandidates.length,
   };
-});
+}
 
-ipcMain.handle("desktop:set-fs-server-url", (_event, url) => {
+function updateDesktopFsServerUrl(url) {
   clawFsServerUrl = typeof url === "string" ? url.trim() : "";
   return { ok: true, url: clawFsServerUrl };
+}
+
+registerDesktopIpcHandlers({
+  readImageFile: readDesktopImageFile,
+  fetchImageUrl: fetchDesktopImageUrl,
+  setGatewayUrl: updateDesktopGatewayUrl,
+  setFsServerUrl: updateDesktopFsServerUrl,
 });
 
 function hasLiveMainWindow() {

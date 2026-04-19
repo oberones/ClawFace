@@ -2543,6 +2543,42 @@ If Track E continues from here, the next safest move is probably to extract one 
 
 ---
 
+## Ticket E.2 — Extract desktop IPC/runtime-config wiring from main-process bootstrap
+### Goal
+Continue Track E by moving the desktop IPC registration surface out of `electron/main.cjs` so the main process keeps trending toward bootstrap and coordination code instead of being the direct home for every handler binding.
+
+### Scope
+- extract desktop IPC registration into `electron/ipc/register-desktop-ipc.cjs`
+- move the `desktop:beep`, `desktop:read-image-file`, `desktop:fetch-image-url`, `desktop:set-gateway-url`, and `desktop:set-fs-server-url` bindings behind that seam
+- keep the underlying image/gateway/fs helper logic in `electron/main.cjs` for now
+- preserve current desktop IPC behavior
+
+### Deliverable
+A shared desktop IPC registration seam that owns Electron IPC binding while `electron/main.cjs` provides the underlying runtime callbacks.
+
+### Done when
+- `electron/ipc/register-desktop-ipc.cjs` exists and owns the desktop IPC handler registration
+- `electron/main.cjs` no longer inlines the desktop IPC `.handle(...)` registrations
+- the desktop app behavior is preserved
+
+### Status update
+This slice is now complete.
+
+#### What landed
+- added `electron/ipc/register-desktop-ipc.cjs` as the second Track E seam
+- rewired `electron/main.cjs` to delegate desktop IPC binding there
+- kept the image/gateway/fs runtime helper logic in `electron/main.cjs` for now, so the extraction stayed narrow and safe
+
+#### Validation status
+- `make test-unit` passes
+- `make typecheck` passes
+- `make build` passes
+
+#### Recommended next step
+If Track E continues from here, the next safest move is probably the protocol family: extract the `protocol.registerSchemesAsPrivileged(...)` and `protocol.handle(...)` stack out of `electron/main.cjs` without reopening the heavier file-server/media helper logic all at once.
+
+---
+
 # Phase 2 working tickets
 
 ## Ticket 2.1 — Drag and drop attachments
