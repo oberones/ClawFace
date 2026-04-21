@@ -417,6 +417,7 @@ function FileSidebar(props: {
   onToggleCollapse: () => void;
   onSetCollapsed: (v: boolean) => void;
   onSwitchToChat: () => void;
+  onSwitchToMedia?: () => void;
   onOpenSettings: () => void;
 }) {
   const fm = useFmState();
@@ -473,6 +474,11 @@ function FileSidebar(props: {
           <button type="button" onClick={props.onSwitchToChat} className="ui-btn ui-btn-light" title="Back to chat">
             {props.collapsed ? "💬" : "💬 Chat"}
           </button>
+          {props.onSwitchToMedia ? (
+            <button type="button" onClick={props.onSwitchToMedia} className="ui-btn ui-btn-light" title="Open media browser">
+              {props.collapsed ? "🖼️" : "🖼️ Media"}
+            </button>
+          ) : null}
           {!props.autoHover && (
             <button type="button" onClick={props.onToggleCollapse} className="ui-btn ui-btn-light" title="Toggle sidebar">
               {props.collapsed ? "\u203A" : "\u2039"}
@@ -793,6 +799,7 @@ export type FileManagerProps = {
   onToggleSidebarCollapse: () => void;
   onSetSidebarCollapsed: (v: boolean) => void;
   onSwitchToChat: () => void;
+  onSwitchToMedia?: () => void;
   onOpenSettings: () => void;
 };
 
@@ -817,6 +824,7 @@ export default function FileManager(props: FileManagerProps) {
         onToggleCollapse={props.onToggleSidebarCollapse}
         onSetCollapsed={props.onSetSidebarCollapsed}
         onSwitchToChat={props.onSwitchToChat}
+        onSwitchToMedia={props.onSwitchToMedia}
         onOpenSettings={props.onOpenSettings}
       />
     );

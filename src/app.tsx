@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChatView from "./components/ChatView.tsx";
 import FileManager, { FileManagerProvider } from "./components/FileManager.tsx";
+import MediaBrowser from "./components/media-browser/MediaBrowser.tsx";
 import SessionSidebar from "./components/SessionSidebar.tsx";
 import SettingsModal from "./components/SettingsModal.tsx";
 import NewSessionModal from "./components/NewSessionModal.tsx";
@@ -92,6 +93,7 @@ import {
   normalizeChatSendResult,
   normalizeSessionsResetResult,
 } from "./lib/shell-gateway-mutations.ts";
+import { buildMediaBrowserSourceData } from "./lib/media-browser-sources.ts";
 import {
   normalizeShellGatewayConfigState,
   resolvePrimarySessionKey,
@@ -2215,7 +2217,7 @@ export default function App() {
     clearAttachments,
   } = useStagedAttachments();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => loadUiSettings().autoHoverSidebar);
-  const [activeView, setActiveView] = useState<"chat" | "files">("chat");
+  const [activeView, setActiveView] = useState<"chat" | "files" | "media">("chat");
   const activeViewRef = useRef(activeView);
   activeViewRef.current = activeView;
   const [showSettings, setShowSettings] = useState(false);
@@ -2483,13 +2485,12 @@ export default function App() {
     clearInterruptedRunSnapshot(sessionKey);
   }, [clearInterruptedRunSnapshot, getInterruptedRunSnapshot]);
 
-  const switchView = useCallback((target: "chat" | "files") => {
+  const switchView = useCallback((target: "chat" | "files" | "media") => {
     if (target === activeViewRef.current) return;
     setActiveView(target);
     if (uiSettings.autoHoverSidebar) {
-      // Files view: sidebar always expanded, no auto-collapse
-      // Chat view: start collapsed (hover to expand)
-      setSidebarCollapsed(target !== "files");
+      // Auxiliary browser surfaces keep the session sidebar expanded.
+      setSidebarCollapsed(target === "chat");
     }
   }, [uiSettings.autoHoverSidebar]);
 
@@ -3696,8 +3697,8 @@ export default function App() {
 
   useEffect(() => {
     if (uiSettings.autoHoverSidebar) {
-      // Only auto-collapse in chat view; files view keeps sidebar expanded
-      setSidebarCollapsed(activeViewRef.current !== "files");
+      // Only auto-collapse in chat view; browser surfaces keep the sidebar expanded.
+      setSidebarCollapsed(activeViewRef.current === "chat");
     }
   }, [uiSettings.autoHoverSidebar]);
 
@@ -5636,6 +5637,35 @@ export default function App() {
     });
   }, [connectionState.status, selectedSessionKey, sessionActivity, sessions]);
 
+  const mediaBrowserSourceData = useMemo(() => {
+    const normalizedSessionRows =
+      Object.keys(allSessionRows).length > 0 ? Object.values(allSessionRows) : sessions;
+    const loadedHistories: Record<string, { sessionKey: string; messages: ChatMessage[] }> = {};
+
+    if (selectedSessionKey && messages.length > 0) {
+      loadedHistories[selectedSessionKey] = {
+        sessionKey: selectedSessionKey,
+        messages,
+      };
+    }
+
+    for (const [sessionKey, cached] of sessionCacheRef.current.entries()) {
+      if (sessionKey === selectedSessionKey || cached.messages.length === 0) {
+        continue;
+      }
+      loadedHistories[sessionKey] = {
+        sessionKey,
+        messages: cached.messages,
+      };
+    }
+
+    return buildMediaBrowserSourceData({
+      sessions: normalizedSessionRows,
+      sessionPreviews,
+      loadedHistories,
+    });
+  }, [allSessionRows, messages, selectedSessionKey, sessionPreviews, sessions]);
+
   return (
     <FileManagerProvider>
     <div className="app-shell">
@@ -5665,6 +5695,7 @@ export default function App() {
               allSessionRows={allSessionRows}
               onSearchGateway={searchSessionsFromGateway}
               onOpenFiles={() => switchView("files")}
+              onOpenMedia={() => switchView("media")}
             />
           </div>
           <div className="sidebar-face face-back" style={{ height: "100%" }}>
@@ -5677,6 +5708,7 @@ export default function App() {
               onToggleSidebarCollapse={() => setSidebarCollapsed((prev) => !prev)}
               onSetSidebarCollapsed={(v) => setSidebarCollapsed(v)}
               onSwitchToChat={() => switchView("chat")}
+              onSwitchToMedia={() => switchView("media")}
               onOpenSettings={() => setShowSettings(true)}
             />
           </div>
@@ -5732,7 +5764,7 @@ export default function App() {
             onResolveRemoteImage={resolveRemoteImage}
             onCompact={() => void handleSlashCommand("/compact")}
           />
-        ) : (
+        ) : activeView === "files" ? (
           <FileManager
             mode="main"
             sidebarCollapsed={sidebarCollapsed}
@@ -5742,7 +5774,18 @@ export default function App() {
             onToggleSidebarCollapse={() => setSidebarCollapsed((prev) => !prev)}
             onSetSidebarCollapsed={(v) => setSidebarCollapsed(v)}
             onSwitchToChat={() => switchView("chat")}
+            onSwitchToMedia={() => switchView("media")}
             onOpenSettings={() => setShowSettings(true)}
+          />
+        ) : (
+          <MediaBrowser
+            sourceData={mediaBrowserSourceData}
+            activeSessionKey={selectedSessionKey}
+            enableAnimations={uiSettings.enableAnimations}
+            onSwitchToChat={() => switchView("chat")}
+            onOpenFiles={() => switchView("files")}
+            onOpenSettings={() => setShowSettings(true)}
+            onResolveRemoteImage={resolveRemoteImage}
           />
         )}
       </div>

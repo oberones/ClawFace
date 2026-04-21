@@ -34,6 +34,7 @@ export type SessionSidebarProps = {
   onReachEnd?: () => void;
   onSearchGateway: (query: string) => Promise<GatewaySessionRow[]>;
   onOpenFiles: () => void;
+  onOpenMedia: () => void;
 };
 
 /** Split query into lowercase needles (space = AND). */
@@ -375,6 +376,14 @@ export default function SessionSidebar(props: SessionSidebarProps) {
             title="File manager"
           >
             {props.collapsed ? "📁" : "📁 Files"}
+          </button>
+          <button
+            type="button"
+            onClick={props.onOpenMedia}
+            className="ui-btn ui-btn-light"
+            title="Media browser"
+          >
+            {props.collapsed ? "🖼️" : "🖼️ Media"}
           </button>
           {!props.autoHover && (
             <button
