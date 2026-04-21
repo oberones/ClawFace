@@ -50,6 +50,8 @@ test("getMediaArtifactPreviewStateForV1 keeps images previewable and marks other
     mediaBrowserItems.getMediaArtifactPreviewStateForV1(createArtifact({ kind: "pdf", previewState: "ready" })),
     "unsupported",
   );
+  assert.equal(mediaBrowserItems.isMediaArtifactReusableInV1(createArtifact({ kind: "image" })), true);
+  assert.equal(mediaBrowserItems.isMediaArtifactReusableInV1(createArtifact({ kind: "video" })), false);
 });
 
 test("getVisibleMediaArtifacts applies lightweight query filtering and createdAt sorting", () => {

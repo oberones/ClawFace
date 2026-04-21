@@ -34,9 +34,9 @@
 - [X] T006 Create `src/lib/media-browser-sources.ts` to adapt normalized `sessions.list` / `sessions.preview` rows plus explicitly loaded or preloaded `chat.history` data into source-first media roots and browser-visible artifacts using `src/lib/shell-gateway-responses.ts`, `src/lib/shell-gateway-history.ts`, `src/lib/chat-message-attachments.ts`, and `src/lib/message-image-source.ts`
 - [X] T007 [P] Add focused regression coverage for `src/lib/media-browser-sources.ts` in `tests/media-browser-sources.test.mjs`
 - [X] T007A [P] Add focused remote-portability regression coverage in `tests/media-browser-sources.test.mjs` for remote-only image artifacts, portable render references, and host-path avoidance
-- [ ] T008 Create `src/hooks/useMediaBrowserController.ts` to own selected source, selected artifact, filter/sort state, preview state, and reuse state without duplicating existing remote-image or lightbox logic
-- [ ] T009 Create `src/lib/media-browser-reference.ts` to own the `DraftMediaReference` model, composer insertion/removal, serialization, and any send-time adaptation needed for the reference/link reuse contract
-- [ ] T010 [P] Add focused regression coverage for `src/lib/media-browser-reference.ts` in `tests/media-browser-reference.test.mjs`
+- [X] T008 Create `src/hooks/useMediaBrowserController.ts` to own selected source, selected artifact, filter/sort state, preview state, and reuse state without duplicating existing remote-image or lightbox logic
+- [X] T009 Create `src/lib/media-browser-reference.ts` to own the `DraftMediaReference` model, composer insertion/removal, serialization, and any send-time adaptation needed for the reference/link reuse contract
+- [X] T010 [P] Add focused regression coverage for `src/lib/media-browser-reference.ts` in `tests/media-browser-reference.test.mjs`
 
 **Checkpoint**: Shared browser shell, source adapters, controller state, and reference insertion seams are ready. User story work can now proceed independently.
 
@@ -51,16 +51,16 @@
 ### Tests for User Story 1
 
 - [X] T011 [P] [US1] Add or extend unit coverage in `tests/media-browser-sources.test.mjs` for source-root derivation such as `All media`, `Generated`, `Uploaded`, and `Session-linked`, including cache-backed behavior for preview-only sessions versus sessions whose history has been explicitly loaded
-- [ ] T012 [P] [US1] Add or extend unit coverage in `tests/media-browser-items.test.mjs` for image-only v1 visibility rules, lightweight sorting, and unsupported-media state behavior
+- [X] T012 [P] [US1] Add or extend unit coverage in `tests/media-browser-items.test.mjs` for image-only v1 visibility rules, lightweight sorting, and unsupported-media state behavior
 
 ### Implementation for User Story 1
 
-- [ ] T013 [P] [US1] Implement `src/components/media-browser/MediaBrowserEntryCard.tsx` for media-browser-specific artifact cards using the shared browser-shell language
-- [ ] T014 [P] [US1] Implement `src/components/media-browser/MediaBrowserSidebar.tsx` for source-first root switching and lightweight filter/sort controls
-- [ ] T015 [P] [US1] Implement `src/components/media-browser/MediaBrowserPreview.tsx` for preview-first image display, loading, unsupported, and error states using `src/lib/message-image-source.ts`, `src/hooks/useRemoteImageResolver.ts`, and `src/hooks/useImageLightboxController.ts`
-- [ ] T016 [US1] Implement `src/components/media-browser/MediaBrowser.tsx` to compose the sidebar, preview pane, and shared browser-shell layout around `useMediaBrowserController`
-- [ ] T017 [US1] Integrate the Media Browser into `src/app.tsx` by extending the current view switching and shell composition to add a `media` surface beside `chat` and `files`
-- [ ] T018 [US1] Add navigation affordances into the existing shell so users can open the media browser from the same product family as FileManager without inventing a disconnected route pattern
+- [X] T013 [P] [US1] Implement `src/components/media-browser/MediaBrowserEntryCard.tsx` for media-browser-specific artifact cards using the shared browser-shell language
+- [X] T014 [P] [US1] Implement `src/components/media-browser/MediaBrowserSidebar.tsx` for source-first root switching and lightweight filter/sort controls
+- [X] T015 [P] [US1] Implement `src/components/media-browser/MediaBrowserPreview.tsx` for preview-first image display, loading, unsupported, and error states using `src/lib/message-image-source.ts`, `src/hooks/useRemoteImageResolver.ts`, and `src/hooks/useImageLightboxController.ts`
+- [X] T016 [US1] Implement `src/components/media-browser/MediaBrowser.tsx` to compose the sidebar, preview pane, and shared browser-shell layout around `useMediaBrowserController`
+- [X] T017 [US1] Integrate the Media Browser into `src/app.tsx` by extending the current view switching and shell composition to add a `media` surface beside `chat` and `files`
+- [X] T018 [US1] Add navigation affordances into the existing shell so users can open the media browser from the same product family as FileManager without inventing a disconnected route pattern
 
 **Checkpoint**: User Story 1 should now provide a usable read-only source-first media browser with image preview.
 
