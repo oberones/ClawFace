@@ -118,8 +118,8 @@
 
 - [x] T034 [P] Update relevant product or architecture notes in `docs/` only if implementation materially changes shell ownership or inspector/navigation guidance
 - [x] T035 Run the automated validation set: `make test-unit`, `make typecheck`, `make build`
-- [ ] T036 Run the targeted manual validation from `specs/002-dream-visibility/quickstart.md`, including dream visibility, diary reading, grounded replay distinction, and optional cross-link navigation
-- [ ] T037 Verify existing chat shell, Files, Media, and tool activity flows still behave normally after Dream Inspector integration in `src/app.tsx`, `src/components/ChatView.tsx`, `src/components/SessionSidebar.tsx`, and `src/styles.css`
+- [x] T036 Run the targeted manual validation from `specs/002-dream-visibility/quickstart.md`, including dream visibility, diary reading, grounded replay distinction, and optional cross-link navigation
+- [x] T037 Verify existing chat shell, Files, Media, and tool activity flows still behave normally after Dream Inspector integration in `src/app.tsx`, `src/components/ChatView.tsx`, `src/components/SessionSidebar.tsx`, and `src/styles.css`
 
 ---
 
