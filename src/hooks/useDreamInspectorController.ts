@@ -111,6 +111,7 @@ export type DreamInspectorSnapshot = {
   availability: DreamInspectorAvailability;
   methods: DreamMethodSummary;
   overview: DreamOverview;
+  candidatesByKey: Record<string, DreamCandidate>;
   lanes: Record<DreamCandidateLane, DreamLane>;
   diary: DreamDiaryDocument;
   note: string | null;
@@ -167,6 +168,7 @@ function createSnapshot(params: {
   availability: DreamInspectorAvailability;
   loadedAtMs?: number | null;
   overview?: DreamOverview;
+  candidatesByKey?: Record<string, DreamCandidate>;
   lanes?: Record<DreamCandidateLane, DreamLane>;
   diary?: DreamDiaryDocument;
   note?: string | null;
@@ -178,6 +180,7 @@ function createSnapshot(params: {
     availability: params.availability,
     methods: params.methods,
     overview: params.overview ?? createEmptyOverview(),
+    candidatesByKey: params.candidatesByKey ?? {},
     lanes: params.lanes ?? createEmptyLanes(),
     diary: params.diary ?? EMPTY_DIARY,
     note: params.note ?? null,
@@ -227,14 +230,8 @@ export function useDreamInspectorController(
     if (!selectedCandidateKey) {
       return null;
     }
-    for (const lane of Object.values(snapshot.lanes)) {
-      const match = lane.items.find((candidate) => candidate.key === selectedCandidateKey);
-      if (match) {
-        return match;
-      }
-    }
-    return null;
-  }, [selectedCandidateKey, snapshot.lanes]);
+    return snapshot.candidatesByKey[selectedCandidateKey] ?? null;
+  }, [selectedCandidateKey, snapshot.candidatesByKey]);
 
   const diaryRelation = useMemo<DreamDiaryRelation | null>(() => {
     if (!selectedCandidate) {
@@ -279,6 +276,7 @@ export function useDreamInspectorController(
     const methods = normalizeDreamMethodSummary(params.gatewayMethodsRef.current);
     const client = params.clientRef.current;
     if (!params.open) {
+      loadRequestSeqRef.current += 1;
       return;
     }
 
@@ -286,6 +284,8 @@ export function useDreamInspectorController(
     const hasExistingData = existingSnapshot.loadedAtMs !== null;
 
     if (params.connectionStatus !== "connected" || !client) {
+      loadRequestSeqRef.current += 1;
+      relatedRequestSeqRef.current += 1;
       setSnapshot(
         createSnapshot({
           scope,
@@ -293,6 +293,7 @@ export function useDreamInspectorController(
           availability: "unavailable",
           loadedAtMs: existingSnapshot.loadedAtMs,
           overview: existingSnapshot.overview,
+          candidatesByKey: existingSnapshot.candidatesByKey,
           lanes: existingSnapshot.lanes,
           diary: existingSnapshot.diary,
           note: "Gateway unavailable. Reconnect to load Dream Visibility.",
@@ -304,11 +305,18 @@ export function useDreamInspectorController(
     }
 
     if (methods.status !== "supported") {
+      loadRequestSeqRef.current += 1;
+      relatedRequestSeqRef.current += 1;
       setSnapshot(
         createSnapshot({
           scope,
           methods,
           availability: "unavailable",
+          loadedAtMs: existingSnapshot.loadedAtMs,
+          overview: existingSnapshot.overview,
+          candidatesByKey: existingSnapshot.candidatesByKey,
+          lanes: existingSnapshot.lanes,
+          diary: existingSnapshot.diary,
           note: "This gateway does not advertise doctor.memory.status for Dream Visibility.",
         }),
       );
@@ -423,6 +431,7 @@ export function useDreamInspectorController(
           availability,
           loadedAtMs: Date.now(),
           overview: candidateModel.overview,
+          candidatesByKey: candidateModel.candidatesByKey,
           lanes: candidateModel.lanes,
           diary: diaryDocument,
           note,
@@ -441,6 +450,7 @@ export function useDreamInspectorController(
           availability: "unavailable",
           loadedAtMs: existingSnapshot.loadedAtMs,
           overview: existingSnapshot.overview,
+          candidatesByKey: existingSnapshot.candidatesByKey,
           lanes: existingSnapshot.lanes,
           diary: existingSnapshot.diary,
           note: "Dream Visibility could not load the current snapshot from the gateway.",
@@ -461,6 +471,8 @@ export function useDreamInspectorController(
 
   useEffect(() => {
     if (!params.open) {
+      loadRequestSeqRef.current += 1;
+      relatedRequestSeqRef.current += 1;
       setRefreshState("idle");
       setRelatedCatalog(createIdleRelatedCatalog());
       return;
@@ -557,12 +569,9 @@ export function useDreamInspectorController(
 
   const handleSelectCandidate = useCallback((candidateKey: string) => {
     setSelectedCandidateKey(candidateKey);
-    for (const lane of Object.values(snapshotRef.current.lanes)) {
-      const match = lane.items.find((candidate) => candidate.key === candidateKey);
-      if (match) {
-        setActiveLane(match.lane);
-        break;
-      }
+    const selectedCandidate = snapshotRef.current.candidatesByKey[candidateKey];
+    if (selectedCandidate) {
+      setActiveLane(selectedCandidate.lane);
     }
   }, []);
 
