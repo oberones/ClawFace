@@ -3,9 +3,13 @@ import { BrowserEmptyState } from "../browser-shell/BrowserEmptyState.tsx";
 import { useMessageImageAttachmentController } from "../../hooks/useMessageImageAttachmentController.ts";
 import type { Attachment } from "../../lib/types.ts";
 import type { MediaPreviewSelection } from "../../hooks/useMediaBrowserController.ts";
+import type { MediaReuseRequest } from "../../lib/media-browser-reference.ts";
 
 export type MediaBrowserPreviewProps = {
   previewSelection: MediaPreviewSelection | null;
+  canReuseInChat?: boolean;
+  reuseRequest?: MediaReuseRequest | null;
+  onReuseInChat?: () => void;
   onOpenImage: (attachment: Attachment) => void;
   resolveRemoteImage?: (filePath: string) => Promise<string | null>;
 };
@@ -115,6 +119,16 @@ export function MediaBrowserPreview(props: MediaBrowserPreviewProps) {
     selection.previewContentState === "error"
       ? "Recovering preview through the existing desktop/remote image path."
       : null;
+  const reuseFeedback =
+    props.reuseRequest?.artifactId === artifact.id
+      ? props.reuseRequest.status === "inserted"
+        ? "Inserted into the current chat draft."
+        : props.reuseRequest.status === "failed"
+          ? "Could not insert this image into the current chat."
+          : props.reuseRequest.status === "inserting"
+            ? "Adding image reference to the current chat draft..."
+            : null
+      : null;
 
   return (
     <div className="mb-preview-panel">
@@ -139,18 +153,30 @@ export function MediaBrowserPreview(props: MediaBrowserPreviewProps) {
             <span>{formatPreviewDate(artifact.createdAt)}</span>
           </div>
           {previewWarning ? <div className="mb-preview-warning">{previewWarning}</div> : null}
+          {reuseFeedback ? <div className="mb-preview-note">{reuseFeedback}</div> : null}
         </div>
-        {artifact.kind === "image" ? (
-          <button
-            type="button"
-            className="ui-btn ui-btn-light"
-            onClick={() => {
-              void props.onOpenImage(attachment);
-            }}
-          >
-            Open
-          </button>
-        ) : null}
+        <div className="mb-preview-actions">
+          {props.canReuseInChat && props.onReuseInChat ? (
+            <button
+              type="button"
+              className="ui-btn ui-btn-primary"
+              onClick={props.onReuseInChat}
+            >
+              Reuse In Chat
+            </button>
+          ) : null}
+          {artifact.kind === "image" ? (
+            <button
+              type="button"
+              className="ui-btn ui-btn-light"
+              onClick={() => {
+                void props.onOpenImage(attachment);
+              }}
+            >
+              Open
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mb-preview-scroll">

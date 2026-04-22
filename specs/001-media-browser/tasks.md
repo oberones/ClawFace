@@ -74,15 +74,15 @@
 
 ### Tests for User Story 2
 
-- [ ] T019 [P] [US2] Extend `tests/media-browser-reference.test.mjs` to cover draft insertion, no-active-session failure handling, and idempotent repeated insertion behavior
-- [ ] T020 [P] [US2] Add targeted unit coverage for any send-time adaptation introduced in `src/lib/media-browser-reference.ts` or `src/app.tsx`
+- [X] T019 [P] [US2] Extend `tests/media-browser-reference.test.mjs` to cover draft insertion, no-active-session failure handling, and idempotent repeated insertion behavior
+- [X] T020 [P] [US2] Add targeted unit coverage for any send-time adaptation introduced in `src/lib/media-browser-reference.ts` or `src/app.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T021 [US2] Add a media-browser-to-chat insertion callback in `src/app.tsx` that uses `src/lib/media-browser-reference.ts` to add or remove `DraftMediaReference` items instead of mutating `useStagedAttachments()` by default
-- [ ] T022 [US2] Update `src/components/media-browser/MediaBrowser.tsx` and/or `src/components/media-browser/MediaBrowserPreview.tsx` to expose the primary “reuse in chat” action only when a valid active chat context exists
-- [ ] T023 [US2] Update `src/components/Composer.tsx` and any draft-related seams only as needed to render inserted media references as removable reference pills/links, clearly distinct from staged attachments
-- [ ] T024 [US2] Implement send-time conversion in `src/app.tsx` and `src/lib/media-browser-reference.ts` so the user-facing reference/link contract remains intact even if current `chat.send` transport requires a different concrete outbound form
+- [X] T021 [US2] Add a media-browser-to-chat insertion callback in `src/app.tsx` that uses `src/lib/media-browser-reference.ts` to add or remove `DraftMediaReference` items instead of mutating `useStagedAttachments()` by default
+- [X] T022 [US2] Update `src/components/media-browser/MediaBrowser.tsx` and/or `src/components/media-browser/MediaBrowserPreview.tsx` to expose the primary “reuse in chat” action only when a valid active chat context exists
+- [X] T023 [US2] Update `src/components/Composer.tsx` and any draft-related seams only as needed to render inserted media references as removable reference pills/links, clearly distinct from staged attachments
+- [X] T024 [US2] Implement send-time conversion in `src/app.tsx` and `src/lib/media-browser-reference.ts` so the user-facing reference/link contract remains intact even if current `chat.send` transport requires a different concrete outbound form
 
 **Checkpoint**: User Story 2 should now let the user reuse images from the media browser in the active chat workflow without path copy/paste or attachment-first UX.
 

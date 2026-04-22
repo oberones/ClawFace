@@ -4,6 +4,7 @@ import { MediaBrowserSidebar } from "./MediaBrowserSidebar.tsx";
 import { MediaBrowserPreview } from "./MediaBrowserPreview.tsx";
 import { useImageLightboxController } from "../../hooks/useImageLightboxController.ts";
 import { useMediaBrowserController } from "../../hooks/useMediaBrowserController.ts";
+import { isMediaArtifactReusableInV1 } from "../../lib/media-browser-items.ts";
 import type { MediaBrowserSourceData } from "../../lib/media-browser-sources.ts";
 
 export type MediaBrowserProps = {
@@ -82,6 +83,15 @@ export default function MediaBrowser(props: MediaBrowserProps) {
 
         <MediaBrowserPreview
           previewSelection={controller.previewSelection}
+          canReuseInChat={Boolean(
+            props.activeSessionKey &&
+            controller.previewSelection?.resolvedArtifact &&
+            isMediaArtifactReusableInV1(controller.previewSelection.resolvedArtifact),
+          )}
+          reuseRequest={controller.reuseRequest}
+          onReuseInChat={() => {
+            void controller.requestReuse();
+          }}
           onOpenImage={openImageLightbox}
           resolveRemoteImage={props.onResolveRemoteImage}
         />
