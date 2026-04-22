@@ -182,13 +182,21 @@ body::before {
 .sidebar-top {
   padding: 15px 14px 12px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
+}
+
+.sidebar-top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .sidebar-title-wrap {
   min-width: 0;
+  flex: 1;
 }
 
 .sidebar-title {
@@ -205,13 +213,26 @@ body::before {
 }
 
 .sidebar-actions {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  width: 100%;
+}
+
+.sidebar-actions .ui-btn {
+  flex: 0 0 auto;
+}
+
+.sidebar-collapse-btn {
+  flex-shrink: 0;
+  min-width: 34px;
+  padding-inline: 0;
 }
 
 .sidebar-shell.is-collapsed .sidebar-top {
   padding: 12px 10px;
+  flex-direction: row;
   justify-content: center;
 }
 
