@@ -8,6 +8,15 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.11.0 (2026-04-21)
+
+### Feat
+
+- add media browser findability filters
+- add media browser chat reuse flow
+- add media browser browse and preview surface
+- scaffold media browser foundations
+
 ## v0.10.1 (2026-04-19)
 
 ### Fix
