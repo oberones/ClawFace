@@ -149,3 +149,31 @@ test("buildDreamCandidateModel ranks strongest items and explains why they are s
   assert.ok(topCandidate?.explanationCues.some((cue) => cue.label.includes("phase hit")));
   assert.ok(topCandidate?.explanationCues.some((cue) => cue.label.includes("recall")));
 });
+
+test("buildDreamCandidateModel keeps signal-only top candidates selectable via the canonical candidate map", () => {
+  const { buildDreamCandidateModel } = loadModule();
+
+  const status = createStatus();
+  status.signalEntries.unshift({
+    key: "signal-only-1",
+    path: "memory/2026-04-05.md",
+    startLine: 20,
+    endLine: 22,
+    snippet: "A high-signal insight survives aggregate trimming.",
+    recallCount: 3,
+    dailyCount: 2,
+    groundedCount: 0,
+    totalSignalCount: 5,
+    lightHits: 2,
+    remHits: 1,
+    phaseHitCount: 3,
+    promotedAt: null,
+    lastRecalledAt: "2026-04-22T10:00:00.000Z",
+  });
+
+  const model = buildDreamCandidateModel(status);
+
+  assert.equal(model.overview.topCandidates[0]?.key, "signal-only-1");
+  assert.equal(model.candidatesByKey["signal-only-1"]?.snippet, "A high-signal insight survives aggregate trimming.");
+  assert.equal(model.candidatesByKey["signal-only-1"]?.lane, "waiting");
+});

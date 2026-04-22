@@ -251,7 +251,13 @@ export function buildDreamCandidateModel(status: DreamStatusSnapshot): DreamCand
     .map((entry) => {
       const lane: DreamCandidateLane =
         entry.promotedAt ? "promoted" : entry.groundedCount > 0 ? "grounded" : "waiting";
-      return candidatesByKey.get(entry.key) ?? buildCandidate(entry, lane);
+      const existingCandidate = candidatesByKey.get(entry.key);
+      if (existingCandidate) {
+        return existingCandidate;
+      }
+      const fallbackCandidate = buildCandidate(entry, lane);
+      candidatesByKey.set(fallbackCandidate.key, fallbackCandidate);
+      return fallbackCandidate;
     })
     .filter((candidate, index, list) => list.findIndex((entry) => entry.key === candidate.key) === index)
     .sort(compareCandidates)
