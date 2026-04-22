@@ -135,6 +135,11 @@ test("buildMediaBrowserSourceData preserves portable render references for remot
   });
 
   assert.equal(sourceData.artifacts.length, 1);
+  assert.equal(sourceData.artifacts[0]?.sourceKey, "generated");
+  assert.deepEqual(sourceData.artifacts[0]?.provenance, {
+    kind: "generated",
+    label: "Remote session",
+  });
   assert.equal(
     sourceData.artifacts[0]?.renderRef.dataUrl,
     "https://gateway.example/__claw/media/artifact/remote-1",
@@ -211,4 +216,33 @@ test("buildMediaBrowserSourceData preserves session and provenance metadata need
       provenance: { kind: "uploaded", label: "Upload chat" },
     },
   );
+});
+
+test("buildMediaBrowserSourceData classifies Windows managed-media paths as generated", () => {
+  const mediaBrowserSources = loadMediaBrowserSourcesModule();
+
+  const sourceData = mediaBrowserSources.buildMediaBrowserSourceData({
+    sessions: [{ key: "windows-session", kind: "direct", label: "Windows session", updatedAt: 10 }],
+    loadedHistories: {
+      "windows-session": {
+        sessionKey: "windows-session",
+        messages: [
+          createMessage({
+            attachments: [
+              createAttachment({
+                id: "windows-generated",
+                sourcePath: "C:\\Users\\oberon\\.openclaw\\media\\generated\\artifact.png",
+              }),
+            ],
+          }),
+        ],
+      },
+    },
+  });
+
+  assert.equal(sourceData.artifacts[0]?.sourceKey, "generated");
+  assert.deepEqual(sourceData.artifacts[0]?.provenance, {
+    kind: "generated",
+    label: "Windows session",
+  });
 });

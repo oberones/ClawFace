@@ -32,6 +32,10 @@ const SOURCE_LABELS: Record<string, string> = {
   "session-linked": "Session-linked",
 };
 
+function normalizeMediaReference(value: string) {
+  return value.replace(/\\/g, "/").trim();
+}
+
 function inferMediaKind(type: string, isImage: boolean): MediaKind {
   if (isImage || type.startsWith("image/")) {
     return "image";
@@ -66,11 +70,22 @@ function deriveSessionLabel(sessionKey: string, sessionRow?: GatewaySessionRow) 
 }
 
 function isUploadedPath(value: string) {
-  return /(?:^|\/)\.openclaw\/media\/inbound\//i.test(value) || /(?:^|\/)openclaw\/media\/inbound\//i.test(value);
+  const normalized = normalizeMediaReference(value);
+  return /(?:^|\/)\.openclaw\/media\/inbound\//i.test(normalized) || /(?:^|\/)openclaw\/media\/inbound\//i.test(normalized);
 }
 
 function isManagedMediaPath(value: string) {
-  return /(?:^|\/)\.openclaw\/media\//i.test(value) || /(?:^|\/)openclaw\/media\//i.test(value);
+  const normalized = normalizeMediaReference(value);
+  return /(?:^|\/)\.openclaw\/media\//i.test(normalized) || /(?:^|\/)openclaw\/media\//i.test(normalized);
+}
+
+function isRemoteManagedMediaReference(value: string) {
+  const normalized = normalizeMediaReference(value).toLowerCase();
+  return (
+    normalized.startsWith("artifact://") ||
+    normalized.includes("/__claw/media/") ||
+    normalized.includes("/__claw/artifacts/")
+  );
 }
 
 function deriveSourceKind(
@@ -86,6 +101,10 @@ function deriveSourceKind(
   }
   if (message.role === "user") {
     return "uploaded";
+  }
+  const remoteReference = attachment.dataUrl ?? sourcePath;
+  if (remoteReference && isRemoteManagedMediaReference(remoteReference)) {
+    return "generated";
   }
   return "session-linked";
 }
