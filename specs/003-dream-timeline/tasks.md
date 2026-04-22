@@ -3,7 +3,7 @@
 **Input**: Design documents from `/specs/003-dream-timeline/`  
 **Prerequisites**: `plan.md` (required), `spec.md` (required), `research.md`, `data-model.md`, `contracts/`
 
-**Tests**: Include focused helper-level tests for the new timeline gateway seam, timeline normalization/grouping, candidate provenance, and artifact-link shaping. Manual desktop validation is also required because this feature extends the renderer shell and depends on an out-of-repo OpenClaw backend seam.
+**Tests**: Include focused helper-level tests for visible chronology derivation, candidate provenance, and artifact-link shaping. Manual desktop validation is also required because this feature extends the renderer shell and changes Dream Inspector behavior.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and validated independently.
 
@@ -15,97 +15,93 @@
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Create the Dream Timeline scaffolding in ClawFace and reserve the OpenClaw gateway touch points without introducing a detached dashboard stack.
+**Purpose**: Create the Dream Timeline scaffolding in ClawFace without introducing a detached dashboard stack or any backend dependency.
 
-- [ ] T001 Create Dream Timeline scaffolding in `src/components/dreams/`, `src/hooks/`, `src/lib/`, and `tests/`, plus reserve the new seam touch points in `/Users/oberon/Projects/coding/other/openclaw/src/gateway/server-methods/doctor.ts` and related gateway registration files from `/Users/oberon/.openclaw/workspace/ClawFace/specs/003-dream-timeline/plan.md`
-- [ ] T002 [P] Add the Dream Timeline task/design artifact references to support files only as needed, keeping `.github/copilot-instructions.md`, `.specify/feature.json`, and the feature docs aligned with the active plan
+- [ ] T001 Create Dream Timeline scaffolding in `src/components/dreams/`, `src/hooks/`, `src/lib/`, and `tests/`, keeping the feature attached to the existing Dream Inspector shell from `/Users/oberon/.openclaw/workspace/ClawFace/specs/003-dream-timeline/plan.md`
+- [ ] T002 [P] Update support files only as needed so `.github/copilot-instructions.md`, `.specify/feature.json`, and the feature docs stay aligned with the current-surface-only Dream Timeline plan
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Establish the new OpenClaw timeline seam and the renderer-side timeline domain seams before any user story UI work begins.
+**Purpose**: Establish the renderer-side timeline derivation seams on top of the existing Dream Inspector snapshot before any user story UI work begins.
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete.
 
-- [ ] T003 Create the new grouped dream timeline gateway seam in `/Users/oberon/Projects/coding/other/openclaw/src/gateway/server-methods/doctor.ts`, registering it in `/Users/oberon/Projects/coding/other/openclaw/src/gateway/server-methods-list.ts` and `/Users/oberon/Projects/coding/other/openclaw/src/gateway/method-scopes.ts` so ClawFace can request a normalized chronology method such as `doctor.memory.timeline`
-- [ ] T004 [P] Add focused backend seam coverage for the new timeline method in `/Users/oberon/Projects/coding/other/openclaw/src/gateway/server-methods/doctor.test.ts`, including stable event-group ids, timestamps, range and truncation metadata, grouped chronology, and unavailable states rather than raw event-row passthrough
-- [ ] T005 Create `src/lib/shell-gateway-memory-timeline.ts` to normalize the new timeline payload, capability availability, truncation metadata, and explicit loading/empty/unavailable/partial states into shell-facing Dream Timeline state
-- [ ] T006 [P] Add focused normalization and capability-gating coverage for `src/lib/shell-gateway-memory-timeline.ts` in `tests/shell-gateway-memory-timeline.test.mjs`, including stable ids, timestamps, and range metadata required by the renderer
-- [ ] T007 Create `src/lib/dream-timeline.ts` to derive grouped chronology, event ordering, event-group selection, and candidate-track summaries from normalized timeline payloads
-- [ ] T008 [P] Add focused grouped chronology and candidate-track coverage for `src/lib/dream-timeline.ts` in `tests/dream-timeline.test.mjs`
-- [ ] T009 Create `src/lib/dream-timeline-links.ts` to shape diary, promoted-memory, and candidate artifact links plus explicit limited-relationship states without reconstructing raw event-log semantics in UI components
-- [ ] T010 [P] Add focused artifact-link and limitation handling coverage for `src/lib/dream-timeline-links.ts` in `tests/dream-timeline-links.test.mjs`
+- [ ] T003 Create `src/lib/dream-timeline.ts` to derive grouped chronology, chronology range metadata, event ordering, and candidate-track summaries from `DreamInspectorSnapshot`, parsed diary data, and current workspace scope, keeping `loadedAtMs` as freshness metadata rather than as a timeline moment source
+- [ ] T004 [P] Add focused grouped chronology coverage for `src/lib/dream-timeline.ts` in `tests/dream-timeline.test.mjs`, including promotion grouping from `promotedAt`, replay touchpoint grouping from `lastRecalledAt`, diary-entry chronology, limited `diary-update` fallback from `updatedAtMs`, explicit sparse-data handling, and true `empty` behavior when only snapshot freshness exists
+- [ ] T005 Create `src/lib/dream-timeline-links.ts` to shape diary, candidate, Imported Insights, and Memory Palace timeline links plus explicit inferred or limited-relationship states without adding a second raw gateway parsing path, restricting related-memory links to candidate-safe moments
+- [ ] T006 [P] Add focused artifact-link and limitation handling coverage for `src/lib/dream-timeline-links.ts` in `tests/dream-timeline-links.test.mjs`
+- [ ] T007 Create `src/hooks/useDreamTimelineController.ts` to own selected moment state, candidate filtering, workspace-scope labeling, and shell-facing Dream Timeline view-model shaping on top of the existing Dream Inspector controller output
+- [ ] T008 [P] Extend `tests/dream-timeline.test.mjs` to cover workspace-scope labeling, availability states, explicit Dream Timeline `disabled` mapping, and explicit "not available from current data" behavior when exact dream-run history cannot be derived
 
-**Checkpoint**: The backend timeline seam, renderer normalization, grouped chronology derivation, and artifact-link helpers are ready. User story UI work can now proceed without duplicating gateway parsing in app surfaces.
+**Checkpoint**: Visible chronology derivation, link shaping, and controller boundaries are ready. User story UI work can now proceed without duplicating Dream Inspector parsing in app surfaces.
 
 ---
 
-## Phase 3: User Story 1 - Read Dream Chronology From Dream Inspector (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Read Visible Dream Chronology From Dream Inspector (Priority: P1) 🎯 MVP
 
-**Goal**: Deliver an adjacent Dream Timeline panel from Dream Inspector that makes recent dream runs, replay/recall waves, and promotion moments legible in chronological order.
+**Goal**: Deliver an adjacent Dream Timeline panel from Dream Inspector that makes visible promotion moments, replay touchpoints, and diary chronology legible in chronological order.
 
-**Independent Test**: Open Dream Timeline from Dream Inspector in a workspace where the timeline seam is available and confirm the user can identify recent dream runs, promotion moments, and replay-related chronology without leaving the chat shell or reading raw event logs.
+**Independent Test**: Open Dream Timeline from Dream Inspector in a workspace with timestamped dream evidence and confirm the user can identify visible promotion, replay, and diary chronology without leaving the chat shell or reading backend files.
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Extend `tests/shell-gateway-memory-timeline.test.mjs` to cover loading/empty/unavailable/partial/truncated timeline states, grouped event chronology metadata, and explicit workspace-scope labeling used by the Dream Timeline panel
-- [ ] T012 [P] [US1] Extend `tests/dream-timeline.test.mjs` to cover recent dream run ordering, replay or recall wave grouping, promotion batch grouping, and snapshot-based refresh semantics
+- [ ] T009 [P] [US1] Extend `tests/dream-timeline.test.mjs` to cover loading, empty, disabled, unavailable, and partial timeline states plus grouped chronology ordering used by the Dream Timeline panel, including the rule that snapshot freshness alone does not create timeline moments
+- [ ] T010 [P] [US1] Extend `tests/dream-timeline-links.test.mjs` to cover diary-date parsing fallback, grouped timestamp labels, limited `diary-update` copy, and timeline moments that intentionally omit unsupported chronology claims
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Create `src/hooks/useDreamTimelineController.ts` to own timeline snapshot loading, manual refresh, selected event-group state, and workspace context handoff on top of the normalized timeline seams
-- [ ] T014 [P] [US1] Implement `src/components/dreams/DreamTimelineEventGroup.tsx` for grouped chronology cards with event kind, time, phase, summary, and event-group expansion language
-- [ ] T015 [P] [US1] Implement `src/components/dreams/DreamTimelineEmptyState.tsx` for loading, empty, unavailable, partial, truncated, and limited timeline states using existing shell/browser empty-state patterns where appropriate
-- [ ] T016 [US1] Implement `src/components/dreams/DreamTimelinePanel.tsx` to compose grouped chronology, manual refresh, workspace-scope labeling, and event-group detail as Dream Inspector-adjacent context rather than as a detached dashboard
-- [ ] T017 [US1] Update `src/components/dreams/DreamInspectorPane.tsx` and `src/hooks/useDreamInspectorController.ts` to add a Dream Timeline affordance and hand off workspace context without moving timeline fetch/normalization logic into `src/app.tsx`
-- [ ] T018 [US1] Add Dream Timeline panel styling in `src/styles.css` so chronology reads like ClawFace workstation history rather than a backend log viewer
+- [ ] T011 [P] [US1] Implement `src/components/dreams/DreamTimelineEmptyState.tsx` for loading, empty, disabled, unavailable, partial, and limited timeline states using existing shell or browser empty-state patterns where appropriate
+- [ ] T012 [P] [US1] Implement `src/components/dreams/DreamTimelineEventGroup.tsx` for grouped chronology cards with visible source labels, timestamps, summaries, limitation notes, event-group expansion language, and distinct rendering for `diary-entry` versus limited `diary-update` moments
+- [ ] T013 [US1] Implement `src/components/dreams/DreamTimelinePanel.tsx` to compose grouped chronology, workspace-scope labeling, and moment detail as Dream Inspector-adjacent context rather than as a detached dashboard
+- [ ] T014 [US1] Update `src/components/dreams/DreamInspectorPane.tsx` and `src/hooks/useDreamInspectorController.ts` to add a Dream Timeline affordance and hand off current snapshot, diary, related context, and workspace scope without moving timeline derivation logic into `src/app.tsx`
+- [ ] T015 [US1] Add Dream Timeline panel styling in `src/styles.css` so chronology reads like ClawFace workstation history rather than a backend log viewer
 
-**Checkpoint**: User Story 1 should now provide a usable Dream Timeline that opens from Dream Inspector and explains recent chronology at the workspace level.
+**Checkpoint**: User Story 1 should now provide a usable Dream Timeline that opens from Dream Inspector and explains visible chronology at the workspace level.
 
 ---
 
-## Phase 4: User Story 2 - Follow Candidate Provenance Over Time (Priority: P2)
+## Phase 4: User Story 2 - Follow Candidate Evidence Over Time (Priority: P2)
 
-**Goal**: Add candidate-oriented timeline inspection so users can follow how a selected memory heated up, grounded, or promoted over multiple dream events.
+**Goal**: Add candidate-oriented timeline inspection so users can follow how a selected memory visibly heated up, got replay touchpoints, or promoted from the evidence currently available to ClawFace.
 
-**Independent Test**: Open a candidate with timeline-linked events and confirm the user can follow its visible chronology, including limited-relationship handling when provenance is incomplete.
+**Independent Test**: Open a candidate with visible timestamps and confirm the user can follow its chronology, including inferred or limited handling when provenance is incomplete.
 
 ### Tests for User Story 2
 
-- [ ] T019 [P] [US2] Extend `tests/dream-timeline.test.mjs` to cover candidate-track filtering, promotion provenance, and explicit limited candidate relationships when not every event can be mapped precisely
-- [ ] T020 [P] [US2] Extend `tests/dream-timeline-links.test.mjs` to cover candidate-linked artifact handoff metadata and limited provenance copy for candidate detail flows
+- [ ] T016 [P] [US2] Extend `tests/dream-timeline.test.mjs` to cover candidate-track filtering, current-status framing, and explicit inferred candidate relationships when chronology is derived rather than direct
+- [ ] T017 [P] [US2] Extend `tests/dream-timeline-links.test.mjs` to cover candidate-linked diary and related-context handoff metadata plus limited provenance copy for candidate detail flows
 
 ### Implementation for User Story 2
 
-- [ ] T021 [P] [US2] Implement `src/components/dreams/DreamCandidateTimeline.tsx` for selected candidate chronology, current visible status, and limited-relationship messaging
-- [ ] T022 [US2] Update `src/hooks/useDreamTimelineController.ts` to support candidate-track selection, candidate-filtered chronology, and fallback behavior when stable candidate references are incomplete
-- [ ] T023 [US2] Update `src/lib/dream-timeline.ts` and `src/lib/dream-timeline-links.ts` to preserve candidate provenance, promotion batch membership, and explicit limited mapping without inventing deterministic history
-- [ ] T024 [US2] Update `src/components/dreams/DreamTimelinePanel.tsx` and `src/components/dreams/DreamInspectorPane.tsx` to compose candidate timeline detail into the adjacent Dream Inspector flow
+- [ ] T018 [P] [US2] Implement `src/components/dreams/DreamCandidateTimeline.tsx` for selected candidate chronology, visible status, and inferred or limited-relationship messaging
+- [ ] T019 [US2] Update `src/hooks/useDreamTimelineController.ts` to support candidate-track selection, candidate-filtered chronology, and fallback behavior when a candidate lacks enough visible timestamped evidence
+- [ ] T020 [US2] Update `src/lib/dream-timeline.ts` and `src/lib/dream-timeline-links.ts` to preserve candidate provenance, grouped timestamp moments, and explicit inferred mapping without inventing deterministic history
+- [ ] T021 [US2] Update `src/components/dreams/DreamTimelinePanel.tsx` and `src/components/dreams/DreamInspectorPane.tsx` to compose candidate timeline detail into the adjacent Dream Inspector flow
 
-**Checkpoint**: User Story 2 should now let users trace a candidate over time and understand limited versus direct provenance safely.
+**Checkpoint**: User Story 2 should now let users trace a candidate over visible chronology and understand direct versus inferred evidence safely.
 
 ---
 
-## Phase 5: User Story 3 - Cross-Reference Timeline Events With Nearby Artifacts (Priority: P3)
+## Phase 5: User Story 3 - Cross-Reference Chronology With Diary And Nearby Context (Priority: P3)
 
-**Goal**: Add optional diary/promoted-memory/artifact links from timeline events and keep the chronology flow understandable when those links are unavailable or partial.
+**Goal**: Add optional diary and nearby related-context links from timeline moments and keep the chronology flow understandable when those links are unavailable or partial.
 
-**Independent Test**: Open timeline entries with artifact links and confirm the user can follow those links into nearby dream context; repeat with missing links and confirm graceful fallback.
+**Independent Test**: Open timeline moments with diary or related-context links and confirm the user can follow those links into nearby dream context; repeat with missing links and confirm graceful fallback.
 
 ### Tests for User Story 3
 
-- [ ] T025 [P] [US3] Extend `tests/shell-gateway-memory-timeline.test.mjs` to cover artifact-link availability, partial-data handling, and timeline seam unsupported states when Dream Inspector still works
-- [ ] T026 [P] [US3] Extend `tests/dream-timeline-links.test.mjs` to cover diary-link, promoted-memory-link, nearby candidate handoff shaping, and limited relationship states
+- [ ] T022 [P] [US3] Extend `tests/dream-timeline-links.test.mjs` to cover diary-entry links, selected-candidate handoff, Imported Insights and Memory Palace link shaping for candidate-safe moments only, and explicit limited relationship states
+- [ ] T023 [P] [US3] Extend `tests/dream-timeline.test.mjs` to cover partial-data handling when chronology exists but diary or nearby related-context links are unavailable
 
 ### Implementation for User Story 3
 
-- [ ] T027 [US3] Update `/Users/oberon/Projects/coding/other/openclaw/src/gateway/server-methods/doctor.ts` and `/Users/oberon/Projects/coding/other/openclaw/src/gateway/server-methods/doctor.test.ts` so the new timeline seam emits normalized diary/promoted-memory references and explicit limitation metadata where available
-- [ ] T028 [US3] Update `src/hooks/useDreamTimelineController.ts` and `src/lib/dream-timeline-links.ts` to shape adjacent artifact handoffs and preserve timeline usability when links are absent
-- [ ] T029 [P] [US3] Update `src/components/dreams/DreamTimelineEventGroup.tsx` and `src/components/dreams/DreamTimelinePanel.tsx` to render artifact links, limited relationship copy, and non-admin adjacent-context handoff affordances
-- [ ] T030 [US3] Apply lightweight polish in `src/styles.css` and touched dream timeline components so artifact-linked chronology feels integrated with Dream Inspector rather than like a filesystem or event-log browser
+- [ ] T024 [US3] Update `src/hooks/useDreamTimelineController.ts` and `src/lib/dream-timeline-links.ts` to shape adjacent artifact handoffs and preserve timeline usability when links are absent, grouped, or not safe enough for direct related-context linkage
+- [ ] T025 [P] [US3] Update `src/components/dreams/DreamTimelineEventGroup.tsx` and `src/components/dreams/DreamTimelinePanel.tsx` to render diary and nearby related-context handoffs, limiting Imported Insights and Memory Palace links to candidate-scoped timeline views
+- [ ] T026 [US3] Apply lightweight polish in `src/styles.css` and touched Dream Timeline components so artifact-linked chronology feels integrated with Dream Inspector rather than like a filesystem or event-log browser
 
-**Checkpoint**: All three user stories should now work independently, with MVP value in US1 and richer candidate/artifact context in US2 and US3.
+**Checkpoint**: All three user stories should now work independently, with MVP value in US1 and richer candidate or artifact context in US2 and US3.
 
 ---
 
@@ -113,10 +109,10 @@
 
 **Purpose**: Validation, regression protection, and documentation follow-through that affect multiple stories.
 
-- [ ] T031 [P] Update relevant product or architecture notes in `docs/ARCHITECTURE.md` or `docs/PRODUCT-BRIEF.md` only if Dream Timeline implementation materially changes inspector/navigation guidance or the expected backend seam boundary
-- [ ] T032 Run the automated validation set: `make test-unit`, `make typecheck`, `make build` in `/Users/oberon/.openclaw/workspace/ClawFace`, plus the targeted OpenClaw timeline seam tests in `/Users/oberon/Projects/coding/other/openclaw/src/gateway/server-methods/doctor.test.ts`
-- [ ] T033 Run the targeted manual validation from `specs/003-dream-timeline/quickstart.md`, including chronology rendering, candidate provenance, artifact handoffs, and unavailable-state handling
-- [ ] T034 Verify existing Dream Inspector, chat shell, Files, Media, and tool activity flows still behave normally after timeline integration in `src/components/dreams/DreamInspectorPane.tsx`, `src/hooks/useDreamInspectorController.ts`, `src/app.tsx`, and `src/styles.css`
+- [ ] T027 [P] Update relevant architecture or product notes in `docs/ARCHITECTURE.md` or `docs/PRODUCT-BRIEF.md` only if Dream Timeline implementation materially changes inspector or integration-boundary guidance
+- [ ] T028 Run the automated validation set: `make test-unit`, `make typecheck`, `make build` in `/Users/oberon/.openclaw/workspace/ClawFace`
+- [ ] T029 Run the targeted manual validation from `specs/003-dream-timeline/quickstart.md`, including chronology rendering, candidate provenance, diary or nearby-context handoffs, and sparse-data handling
+- [ ] T030 Verify existing Dream Inspector, chat shell, Files, Media, and tool activity flows still behave normally after timeline integration in `src/components/dreams/DreamInspectorPane.tsx`, `src/hooks/useDreamInspectorController.ts`, `src/app.tsx`, and `src/styles.css`
 
 ---
 
@@ -137,28 +133,28 @@
 
 ### Within Each User Story
 
-- Backend seam and renderer normalization before controller behavior
-- Controller behavior before shell/component composition
-- Event-group chronology before candidate/artifact detail composition
-- Shell/component composition before final manual validation
+- visible chronology derivation before controller behavior
+- controller behavior before shell or component composition
+- moment-group chronology before candidate or artifact detail composition
+- shell or component composition before final manual validation
 
 ### Parallel Opportunities
 
-- `T004`, `T006`, `T008`, and `T010` can run in parallel once scaffolding exists
-- `T014` and `T015` can run in parallel after the controller contract is settled
-- `T019` and `T020` can run in parallel during the candidate provenance pass
-- `T025` and `T026` can run in parallel during the artifact-link pass
-- `T031` can run in parallel with final validation if documentation changes are required
+- `T004`, `T006`, and `T008` can run in parallel once scaffolding exists
+- `T011` and `T012` can run in parallel after the controller contract is settled
+- `T016` and `T017` can run in parallel during the candidate provenance pass
+- `T022` and `T023` can run in parallel during the artifact-link pass
+- `T027` can run in parallel with final validation if documentation changes are required
 
 ---
 
 ## Parallel Example: User Story 1
 
 ```bash
-# After the timeline seam and normalization helpers are in place, these can proceed together:
+# After the timeline derivation helpers and controller are in place, these can proceed together:
 Task: "Implement src/components/dreams/DreamTimelineEventGroup.tsx"
 Task: "Implement src/components/dreams/DreamTimelineEmptyState.tsx"
-Task: "Add focused grouped chronology and timeline-state tests in tests/shell-gateway-memory-timeline.test.mjs and tests/dream-timeline.test.mjs"
+Task: "Add focused chronology and timeline-state tests in tests/dream-timeline.test.mjs and tests/dream-timeline-links.test.mjs"
 ```
 
 ---
@@ -170,18 +166,19 @@ Task: "Add focused grouped chronology and timeline-state tests in tests/shell-ga
 1. Complete Phase 1: Setup
 2. Complete Phase 2: Foundational
 3. Complete Phase 3: User Story 1
-4. Validate the timeline chronology slice independently
+4. Validate the visible chronology slice independently
 
 ### Incremental Delivery
 
 1. Deliver grouped workspace chronology first
-2. Add candidate provenance second
-3. Add optional diary/durable-memory artifact links third
+2. Add candidate evidence tracks second
+3. Add optional diary and nearby related-context links third
 4. Finish with validation and regression follow-through
 
 ### Practical Guidance
 
 - Do not read `memory/.dreams/events.jsonl` directly from ClawFace
 - Do not make Dream Timeline a detached dashboard or graph-first surface
-- Prefer grouped chronology and explicit limitation states over raw event-row rendering
-- Keep `src/app.tsx` shell-only and keep timeline fetch/normalization logic in dedicated backend/helper/controller seams
+- Prefer grouped visible chronology and explicit limitation states over raw timestamp rendering
+- Keep `src/app.tsx` shell-only and keep timeline derivation logic in dedicated helper and controller seams
+- Treat unsupported chronology claims as blockers or explicit limitations, not as hidden future backend work
