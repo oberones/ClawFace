@@ -94,6 +94,11 @@ It should evolve toward:
 - route/pane orchestration
 - high-level app state boundaries
 
+Recent shell guidance:
+- session-adjacent inspectors such as Dream Inspector should mount here as auxiliary panes
+- `src/app.tsx` should own only pane visibility/context handoff, not domain parsing or fetch orchestration
+- gateway-facing normalization and inspector-specific loading state should live in dedicated helper/controller seams
+
 ---
 
 ## 2.2 Chat surface
