@@ -457,6 +457,19 @@ Stop file/image/runtime complexity from polluting chat rendering.
 - one media resolver abstraction
 - one file operation abstraction
 
+### Current Phase 2 browser/media note
+The renderer now also has a shared browser-shell presentation seam in:
+
+- `src/components/browser-shell/`
+
+Use that as the current boundary for browse/preview-oriented shell chrome before duplicating FileManager-style layouts in more surfaces.
+
+The first dedicated Media Browser surface now lives in:
+
+- `src/components/media-browser/`
+
+That surface should continue to reuse the existing media/runtime seams (`message-image-source`, remote image resolution, and lightbox behavior) instead of growing a parallel media transport stack.
+
 ---
 
 ## Priority 3 — Normalize gateway events

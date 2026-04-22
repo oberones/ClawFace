@@ -113,8 +113,8 @@
 
 **Purpose**: Validation follow-through, documentation, and regression protection that affects multiple stories.
 
-- [ ] T030 [P] Update any affected product/architecture docs in `docs/` if the implementation materially changes browser-shell ownership or media workflow guidance
-- [ ] T031 Run the automated validation set: `make test-unit`, `make typecheck`, `make build`
+- [X] T030 [P] Update any affected product/architecture docs in `docs/` if the implementation materially changes browser-shell ownership or media workflow guidance
+- [X] T031 Run the automated validation set: `make test-unit`, `make typecheck`, `make build`
 - [ ] T032 Run the targeted manual validation from `specs/001-media-browser/quickstart.md`
 - [ ] T033 Verify the existing FileManager and current chat image flows still work after the shared browser-shell extraction
 
