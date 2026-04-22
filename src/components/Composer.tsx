@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from "react";
+import type { DraftMediaReference } from "../lib/media-browser-items.ts";
 import type { Attachment, ModelListItem, SessionInfo } from "../lib/types.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import { formatCompactTokens } from "../lib/format.ts";
 import { useAttachmentIngestion } from "../hooks/useAttachmentIngestion.ts";
+import { DraftMediaReferenceTray } from "./DraftMediaReferenceTray.tsx";
 import { StagedAttachmentTray } from "./StagedAttachmentTray.tsx";
 
 type UiSettings = {
@@ -36,6 +38,8 @@ export type ComposerProps = {
     onCompositionStart: () => void;
     onCompositionEnd: () => void;
   };
+  draftMediaReferences: DraftMediaReference[];
+  onRemoveDraftMediaReference: (artifactId: string) => void;
   stagedAttachments: StagedAttachmentsState;
   slash: {
     commandSuggestions: CommandSuggestion[];
@@ -146,6 +150,11 @@ export function Composer(props: ComposerProps) {
             </div>
           )}
         </div>
+
+        <DraftMediaReferenceTray
+          references={props.draftMediaReferences}
+          onRemoveReference={props.onRemoveDraftMediaReference}
+        />
 
         <StagedAttachmentTray
           attachments={props.stagedAttachments.attachments}

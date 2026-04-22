@@ -93,7 +93,14 @@ import {
   normalizeChatSendResult,
   normalizeSessionsResetResult,
 } from "./lib/shell-gateway-mutations.ts";
+import type { DraftMediaReference } from "./lib/media-browser-items.ts";
 import { buildMediaBrowserSourceData } from "./lib/media-browser-sources.ts";
+import {
+  buildDraftMediaReferenceSendPlan,
+  insertDraftMediaReferenceForSession,
+  removeDraftMediaReference as removeDraftMediaReferenceFromList,
+  serializeDraftMediaReferences,
+} from "./lib/media-browser-reference.ts";
 import {
   normalizeShellGatewayConfigState,
   resolvePrimarySessionKey,
@@ -1519,6 +1526,7 @@ type SessionTokenStats = {
 type SessionViewState = ThreadToolStateSnapshot & {
   draft: string;
   attachments: Attachment[];
+  mediaReferences: DraftMediaReference[];
   lastLoadedAt: number;
 };
 
@@ -2209,6 +2217,7 @@ export default function App() {
     disposeThreadToolController,
   } = threadToolController;
   const [draft, setDraft] = useState("");
+  const [draftMediaReferences, setDraftMediaReferences] = useState<DraftMediaReference[]>([]);
   const {
     attachments,
     replaceAttachments,
@@ -2216,6 +2225,12 @@ export default function App() {
     removeAttachment,
     clearAttachments,
   } = useStagedAttachments();
+  const replaceDraftMediaReferences = useCallback((next: readonly DraftMediaReference[]) => {
+    setDraftMediaReferences(serializeDraftMediaReferences(next));
+  }, []);
+  const clearDraftMediaReferences = useCallback(() => {
+    setDraftMediaReferences([]);
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => loadUiSettings().autoHoverSidebar);
   const [activeView, setActiveView] = useState<"chat" | "files" | "media">("chat");
   const activeViewRef = useRef(activeView);
@@ -2499,6 +2514,7 @@ export default function App() {
       ...createEmptyThreadToolStateSnapshot(),
       draft: "",
       attachments: [],
+      mediaReferences: [],
       lastLoadedAt: 0,
     };
   }, []);
@@ -2522,6 +2538,7 @@ export default function App() {
       ...snapshot,
       draft,
       attachments: [...attachments],
+      mediaReferences: serializeDraftMediaReferences(draftMediaReferences),
       lastLoadedAt: Date.now(),
     });
   }
@@ -2544,6 +2561,7 @@ export default function App() {
     });
     setDraft(cached.draft);
     replaceAttachments(cached.attachments);
+    replaceDraftMediaReferences(cached.mediaReferences);
     return true;
   }
 
@@ -2551,6 +2569,7 @@ export default function App() {
     clearThreadToolState();
     setDraft("");
     replaceAttachments([]);
+    clearDraftMediaReferences();
   }
 
   function updateSessionActivity(
@@ -4476,6 +4495,7 @@ export default function App() {
         thinkingLevel: resolvedThinkingLevel,
         draft: existingViewState.draft,
         attachments: existingViewState.attachments,
+        mediaReferences: existingViewState.mediaReferences,
         lastLoadedAt: Date.now(),
       });
       if (!isActiveSession) {
@@ -4654,6 +4674,56 @@ export default function App() {
     ]);
   }
 
+  function mergeDistinctAttachments(source: readonly Attachment[]): Attachment[] {
+    const seen = new Set<string>();
+    const merged: Attachment[] = [];
+    for (const attachment of source) {
+      const signature = buildAttachmentSignature(attachment.type, attachment.dataUrl);
+      if (seen.has(signature)) {
+        continue;
+      }
+      seen.add(signature);
+      merged.push(attachment);
+    }
+    return merged;
+  }
+
+  const handleReuseArtifactInChat = useCallback((artifact: {
+    id: string;
+    displayName: string;
+    sourceKey: string;
+    sourceLabel: string;
+    renderRef: Record<string, unknown>;
+  }) => {
+    const sessionKey = selectedSessionRef.current;
+    const insertion = insertDraftMediaReferenceForSession(
+      draftMediaReferences,
+      artifact,
+      sessionKey,
+    );
+    if (insertion.reuseRequest.status === "failed" || !sessionKey) {
+      throw new Error("Select an active chat session before reusing media.");
+    }
+    replaceDraftMediaReferences(insertion.references);
+    updateCacheField(sessionKey, (cached) => ({
+      ...cached,
+      mediaReferences: serializeDraftMediaReferences(insertion.references),
+    }));
+  }, [draftMediaReferences, replaceDraftMediaReferences, updateCacheField]);
+
+  const handleRemoveDraftMediaReference = useCallback((artifactId: string) => {
+    const next = removeDraftMediaReferenceFromList(draftMediaReferences, artifactId);
+    replaceDraftMediaReferences(next);
+    const sessionKey = selectedSessionRef.current;
+    if (!sessionKey) {
+      return;
+    }
+    updateCacheField(sessionKey, (cached) => ({
+      ...cached,
+      mediaReferences: serializeDraftMediaReferences(next),
+    }));
+  }, [draftMediaReferences, replaceDraftMediaReferences, updateCacheField]);
+
   function resolveTargetAgentId(preferredAgentId?: string | null): string {
     const preferred = preferredAgentId?.trim();
     if (preferred) {
@@ -4739,10 +4809,12 @@ export default function App() {
     clearThreadToolState();
     setDraft("");
     clearAttachments();
+    clearDraftMediaReferences();
     sessionCacheRef.current.set(key, {
       ...createEmptyThreadToolStateSnapshot(),
       draft: "",
       attachments: [],
+      mediaReferences: [],
       lastLoadedAt: Date.now(),
     });
     updateSessionActivity(key, { working: false, unread: false });
@@ -5003,7 +5075,7 @@ export default function App() {
       // Let OpenClaw handle slash commands that the desktop app does not intercept locally.
     }
 
-    if (!trimmed && attachments.length === 0) {
+    if (!trimmed && attachments.length === 0 && draftMediaReferences.length === 0) {
       return;
     }
 
@@ -5020,6 +5092,7 @@ export default function App() {
     const runId = generateUUID();
     const maxFrameBytes = Math.max(32 * 1024, maxPayloadBytes - WS_PAYLOAD_SAFETY_BYTES);
     const draftBeforeSend = draft;
+    const draftMediaReferencesBeforeSend = draftMediaReferences;
     const attachmentsBeforeSend = attachments;
 
     let preparedAttachments = [...attachments];
@@ -5059,9 +5132,22 @@ export default function App() {
 
     let apiAttachments = toApiAttachments(preparedAttachments);
     const fallbackText = buildFileFallbackText(preparedAttachments);
-    // Combine all text parts: user text + text file fallback + PDF file blocks
-    const messageParts = [trimmed, fallbackText, pdfBlockText].filter(Boolean);
-    const outboundMessage = messageParts.join("\n\n") || "";
+    const mediaReferencePlan = buildDraftMediaReferenceSendPlan(draftMediaReferencesBeforeSend);
+    if (mediaReferencePlan.unresolvedReferences.length > 0) {
+      const unresolvedLabel = mediaReferencePlan.unresolvedReferences
+        .map((reference) => reference.displayName)
+        .slice(0, 2)
+        .join(", ");
+      pushSystemMessage(
+        `Media reuse failed for send: ${unresolvedLabel || "selected image"} could not be converted into a portable MEDIA reference.`,
+      );
+      return;
+    }
+    const mediaReferenceBlockText = mediaReferencePlan.mediaLines.join("\n");
+    // Keep the user-visible optimistic message free of raw MEDIA transport lines.
+    const visibleMessageParts = [trimmed, fallbackText, pdfBlockText].filter(Boolean);
+    const visibleMessageText = visibleMessageParts.join("\n\n") || "";
+    const outboundMessage = [...visibleMessageParts, mediaReferenceBlockText].filter(Boolean).join("\n\n") || "";
 
     let estimate = estimateChatSendFrameBytes({
       sessionKey: selectedSessionKey,
@@ -5120,11 +5206,15 @@ export default function App() {
     }
 
     const optimisticMessageId = generateUUID();
+    const optimisticAttachments = mergeDistinctAttachments([
+      ...preparedAttachments,
+      ...mediaReferencePlan.optimisticAttachments,
+    ]);
     const userMessage: ChatMessage = {
       id: optimisticMessageId,
       role: "user",
-      text: outboundMessage,
-      attachments: preparedAttachments,
+      text: visibleMessageText,
+      attachments: optimisticAttachments.length > 0 ? optimisticAttachments : undefined,
       timestamp: Date.now(),
     };
     setMessages((prev) => [...prev, userMessage]);
@@ -5135,9 +5225,13 @@ export default function App() {
       chatRunId: runId,
       streamText: "",
       thinkingLevel: thinkingLevelRef.current,
+      draft: "",
+      attachments: [],
+      mediaReferences: [],
     }));
     setDraft("");
     clearAttachments();
+    clearDraftMediaReferences();
     chatRunRef.current = runId;
     setChatRunId(runId);
     setThinking(true);
@@ -5165,12 +5259,16 @@ export default function App() {
       setMessages((prev) => prev.filter((message) => message.id !== optimisticMessageId));
       setDraft(draftBeforeSend);
       replaceAttachments(attachmentsBeforeSend);
+      replaceDraftMediaReferences(draftMediaReferencesBeforeSend);
       updateCacheField(selectedSessionKey, (cached) => ({
         ...cached,
         messages: cached.messages.filter((message) => message.id !== optimisticMessageId),
         streamText: null,
         thinking: false,
         chatRunId: null,
+        draft: draftBeforeSend,
+        attachments: attachmentsBeforeSend,
+        mediaReferences: serializeDraftMediaReferences(draftMediaReferencesBeforeSend),
       }));
       pushSystemMessage(`Send failed: ${String(err)}`);
       setStreamTextSynced(null);
@@ -5725,7 +5823,9 @@ export default function App() {
             thinking={thinking}
             toolItems={toolItems}
             draft={draft}
+            draftMediaReferences={draftMediaReferences}
             onDraftChange={setDraft}
+            onRemoveDraftMediaReference={handleRemoveDraftMediaReference}
             stagedAttachments={{
               attachments,
               replaceAttachments,
@@ -5785,6 +5885,7 @@ export default function App() {
             onSwitchToChat={() => switchView("chat")}
             onOpenFiles={() => switchView("files")}
             onOpenSettings={() => setShowSettings(true)}
+            onReuseArtifact={handleReuseArtifactInChat}
             onResolveRemoteImage={resolveRemoteImage}
           />
         )}

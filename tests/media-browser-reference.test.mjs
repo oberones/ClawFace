@@ -59,6 +59,28 @@ test("upsertDraftMediaReference inserts new references and replaces matching art
   assert.deepEqual(updated.map((item) => item.displayName), ["Updated image", "Second image"]);
 });
 
+test("insertDraftMediaReferenceForSession preserves references and fails cleanly when no active session exists", () => {
+  const mediaBrowserReference = loadMediaBrowserReferenceModule();
+
+  const existing = [createReference()];
+  const result = mediaBrowserReference.insertDraftMediaReferenceForSession(existing, {
+    id: "artifact-2",
+    displayName: "Second image",
+    sourceKey: "generated",
+    sourceLabel: "Generated",
+    renderRef: {
+      dataUrl: "https://gateway.example/__claw/media/artifact-2",
+      sourcePath: null,
+      mimeType: "image/png",
+    },
+  }, null);
+
+  assert.deepEqual(result.references, existing);
+  assert.equal(result.reuseRequest.status, "failed");
+  assert.equal(result.reuseRequest.sessionKey, null);
+  assert.equal(result.reuseRequest.artifactId, "artifact-2");
+});
+
 test("removeDraftMediaReference drops only the requested artifact id", () => {
   const mediaBrowserReference = loadMediaBrowserReferenceModule();
 
@@ -97,4 +119,65 @@ test("serializeDraftMediaReferences and send payload helpers preserve portable r
       },
     },
   );
+});
+
+test("buildDraftMediaReferenceSendPlan produces media lines and optimistic attachments for local and remote references", () => {
+  const mediaBrowserReference = loadMediaBrowserReferenceModule();
+
+  const sendPlan = mediaBrowserReference.buildDraftMediaReferenceSendPlan([
+    createReference({
+      artifactId: "artifact-local",
+      displayName: "Local image",
+      renderRef: {
+        dataUrl: "https://gateway.example/__claw/media/artifact-local",
+        sourcePath: "/Users/oberon/.openclaw/media/artifact-local.png",
+        mimeType: "image/png",
+      },
+    }),
+    createReference({
+      artifactId: "artifact-remote",
+      displayName: "Remote image",
+      renderRef: {
+        dataUrl: "https://gateway.example/__claw/media/artifact-remote",
+        sourcePath: null,
+        mimeType: "image/png",
+      },
+    }),
+  ]);
+
+  assert.deepEqual(sendPlan.mediaLines, [
+    "MEDIA:/Users/oberon/.openclaw/media/artifact-local.png",
+    "MEDIA:https://gateway.example/__claw/media/artifact-remote",
+  ]);
+  assert.equal(sendPlan.optimisticAttachments.length, 2);
+  assert.deepEqual(sendPlan.unresolvedReferences, []);
+});
+
+test("buildDraftMediaReferenceSendPlan reports unresolved references when no portable send source can be derived", () => {
+  const mediaBrowserReference = loadMediaBrowserReferenceModule();
+
+  const unresolved = createReference({
+    artifactId: "artifact-inline",
+    renderRef: {
+      dataUrl: "data:image/png;base64,YWJjMTIz",
+      sourcePath: null,
+      mimeType: "image/png",
+    },
+  });
+
+  const sendPlan = mediaBrowserReference.buildDraftMediaReferenceSendPlan([unresolved]);
+
+  assert.deepEqual(sendPlan.mediaLines, []);
+  assert.deepEqual(sendPlan.optimisticAttachments, [
+    {
+      id: "media-ref:artifact-inline",
+      name: "Preview image",
+      size: 0,
+      type: "image/png",
+      dataUrl: "data:image/png;base64,YWJjMTIz",
+      sourcePath: undefined,
+      isImage: true,
+    },
+  ]);
+  assert.deepEqual(sendPlan.unresolvedReferences, [unresolved]);
 });
