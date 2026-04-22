@@ -17,8 +17,8 @@
 
 **Purpose**: Create the Dream Visibility scaffolding and reserve the shell integration points without building a separate dashboard stack.
 
-- [ ] T001 Create Dream Visibility scaffolding in `src/components/dreams/`, `src/hooks/`, `src/lib/`, and `tests/` for the planned files in `/Users/oberon/.openclaw/workspace/ClawFace/specs/002-dream-visibility/plan.md`
-- [ ] T002 [P] Add the Dream Visibility task/design artifact references to `specs/002-dream-visibility/tasks.md` support files only as needed, keeping `.github/copilot-instructions.md` and the feature docs aligned with the active plan
+- [x] T001 Create Dream Visibility scaffolding in `src/components/dreams/`, `src/hooks/`, `src/lib/`, and `tests/` for the planned files in `/Users/oberon/.openclaw/workspace/ClawFace/specs/002-dream-visibility/plan.md`
+- [x] T002 [P] Add the Dream Visibility task/design artifact references to `specs/002-dream-visibility/tasks.md` support files only as needed, keeping `.github/copilot-instructions.md` and the feature docs aligned with the active plan
 
 ---
 
@@ -28,14 +28,14 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete.
 
-- [ ] T003 Create `src/lib/shell-gateway-memory.ts` to normalize `doctor.memory.status`, `doctor.memory.dreamDiary`, optional `wiki.importInsights`, and optional `wiki.palace` payloads into shell-facing Dream Visibility state using existing hello/config capability inputs instead of raw UI parsing
-- [ ] T004 [P] Add focused normalization and capability-gating coverage for `src/lib/shell-gateway-memory.ts` in `tests/shell-gateway-memory.test.mjs`
-- [ ] T005 Create `src/lib/dream-candidates.ts` to derive waiting, grounded, and promoted lanes plus signal-first overview ranking and lightweight explanation cues from normalized dream snapshot data
-- [ ] T006 [P] Add focused lane-derivation and ranking coverage for `src/lib/dream-candidates.ts` in `tests/dream-candidates.test.mjs`
-- [ ] T007 Create `src/lib/dream-diary.ts` to parse dream diary snapshot content into readable diary entries and explicit limited-relationship states
-- [ ] T008 [P] Add focused diary parsing and missing/empty-state coverage for `src/lib/dream-diary.ts` in `tests/dream-diary.test.mjs`
-- [ ] T009 Create `src/lib/dream-related-context.ts` to perform best-effort imported-insight and memory-palace matching for candidate detail views without assuming deterministic backend relation ids
-- [ ] T010 [P] Add focused matching and graceful-degradation coverage for `src/lib/dream-related-context.ts` in `tests/dream-related-context.test.mjs`
+- [x] T003 Create `src/lib/shell-gateway-memory.ts` to normalize `doctor.memory.status`, `doctor.memory.dreamDiary`, optional `wiki.importInsights`, and optional `wiki.palace` payloads into shell-facing Dream Visibility state using existing hello/config capability inputs instead of raw UI parsing
+- [x] T004 [P] Add focused normalization and capability-gating coverage for `src/lib/shell-gateway-memory.ts` in `tests/shell-gateway-memory.test.mjs`
+- [x] T005 Create `src/lib/dream-candidates.ts` to derive waiting, grounded, and promoted lanes plus signal-first overview ranking and lightweight explanation cues from normalized dream snapshot data
+- [x] T006 [P] Add focused lane-derivation and ranking coverage for `src/lib/dream-candidates.ts` in `tests/dream-candidates.test.mjs`
+- [x] T007 Create `src/lib/dream-diary.ts` to parse dream diary snapshot content into readable diary entries and explicit limited-relationship states
+- [x] T008 [P] Add focused diary parsing and missing/empty-state coverage for `src/lib/dream-diary.ts` in `tests/dream-diary.test.mjs`
+- [x] T009 Create `src/lib/dream-related-context.ts` to perform best-effort imported-insight and memory-palace matching for candidate detail views without assuming deterministic backend relation ids
+- [x] T010 [P] Add focused matching and graceful-degradation coverage for `src/lib/dream-related-context.ts` in `tests/dream-related-context.test.mjs`
 
 **Checkpoint**: Dream payload normalization, lane derivation, diary parsing, and related-context helpers are ready. User story UI work can now proceed without duplicating raw parsing in app surfaces.
 
@@ -49,19 +49,19 @@
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Extend `tests/shell-gateway-memory.test.mjs` to cover signal-first overview state shaping, disabled/unavailable handling, partial-data handling, and snapshot refresh metadata used by the Dream Inspector
-- [ ] T012 [P] [US1] Extend `tests/dream-candidates.test.mjs` to cover grounded replay distinction, promoted grouping, and “why this is sticking” cue derivation based only on visible counts and phase hits
+- [x] T011 [P] [US1] Extend `tests/shell-gateway-memory.test.mjs` to cover signal-first overview state shaping, disabled/unavailable handling, partial-data handling, and snapshot refresh metadata used by the Dream Inspector
+- [x] T012 [P] [US1] Extend `tests/dream-candidates.test.mjs` to cover grounded replay distinction, promoted grouping, and “why this is sticking” cue derivation based only on visible counts and phase hits
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Create `src/hooks/useDreamInspectorController.ts` to own dream snapshot loading, capability checks, open lane, selected candidate, manual refresh state, and shell-facing Dream Inspector view-model shaping on top of the normalized dream helper seams
-- [ ] T014 [P] [US1] Implement `src/components/dreams/DreamSignalOverview.tsx` for the signal-first summary, strongest/heating-up items, and top-level availability/status presentation
-- [ ] T015 [P] [US1] Implement `src/components/dreams/DreamLaneList.tsx` for waiting, grounded, and promoted lane switching using `src/components/browser-shell/BrowserRootTabs.tsx` and `src/components/browser-shell/BrowserEmptyState.tsx` where appropriate
-- [ ] T016 [US1] Implement `src/components/dreams/DreamInspectorPane.tsx` to compose overview, lane list, snapshot refresh affordance, and primary empty/disabled/unavailable/partial-data states in a session-adjacent inspector layout
-- [ ] T017 [US1] Integrate Dream Inspector visibility and pane placement into `src/app.tsx` without extending `activeView`, passing current workspace/session context into the controller without moving gateway fetch or normalization logic into the root shell
-- [ ] T018 [US1] Update `src/components/ChatView.tsx` to add a Dream Inspector entry point in the existing header action pattern without moving domain parsing into the component
-- [ ] T019 [US1] Update `src/components/SessionSidebar.tsx` to add a shell-level Dreams shortcut alongside Files and Media while keeping dream data scoped as workspace-level context rather than per-session row state
-- [ ] T020 [US1] Add Dream Inspector shell and pane styling in `src/styles.css` so the feature reads like a ClawFace workstation surface instead of a detached dashboard
+- [x] T013 [US1] Create `src/hooks/useDreamInspectorController.ts` to own dream snapshot loading, capability checks, open lane, selected candidate, manual refresh state, and shell-facing Dream Inspector view-model shaping on top of the normalized dream helper seams
+- [x] T014 [P] [US1] Implement `src/components/dreams/DreamSignalOverview.tsx` for the signal-first summary, strongest/heating-up items, and top-level availability/status presentation
+- [x] T015 [P] [US1] Implement `src/components/dreams/DreamLaneList.tsx` for waiting, grounded, and promoted lane switching using `src/components/browser-shell/BrowserRootTabs.tsx` and `src/components/browser-shell/BrowserEmptyState.tsx` where appropriate
+- [x] T016 [US1] Implement `src/components/dreams/DreamInspectorPane.tsx` to compose overview, lane list, snapshot refresh affordance, and primary empty/disabled/unavailable/partial-data states in a session-adjacent inspector layout
+- [x] T017 [US1] Integrate Dream Inspector visibility and pane placement into `src/app.tsx` without extending `activeView`, passing current workspace/session context into the controller without moving gateway fetch or normalization logic into the root shell
+- [x] T018 [US1] Update `src/components/ChatView.tsx` to add a Dream Inspector entry point in the existing header action pattern without moving domain parsing into the component
+- [x] T019 [US1] Update `src/components/SessionSidebar.tsx` to add a shell-level Dreams shortcut alongside Files and Media while keeping dream data scoped as workspace-level context rather than per-session row state
+- [x] T020 [US1] Add Dream Inspector shell and pane styling in `src/styles.css` so the feature reads like a ClawFace workstation surface instead of a detached dashboard
 
 **Checkpoint**: User Story 1 should now provide a usable signal-first Dream Inspector with current-API snapshot loading, lane organization, and explicit availability states.
 
@@ -75,16 +75,16 @@
 
 ### Tests for User Story 2
 
-- [ ] T021 [P] [US2] Extend `tests/dream-diary.test.mjs` to cover direct diary-context matches from visible text overlap, parsed-entry navigation, and explicit limited-relationship fallback behavior
-- [ ] T022 [P] [US2] Extend `tests/dream-candidates.test.mjs` to cover candidate explanation cue formatting for recall, grounded replay, and phase-hit context shown in the detail view
+- [x] T021 [P] [US2] Extend `tests/dream-diary.test.mjs` to cover direct diary-context matches from visible text overlap, parsed-entry navigation, and explicit limited-relationship fallback behavior
+- [x] T022 [P] [US2] Extend `tests/dream-candidates.test.mjs` to cover candidate explanation cue formatting for recall, grounded replay, and phase-hit context shown in the detail view
 
 ### Implementation for User Story 2
 
-- [ ] T023 [P] [US2] Implement `src/components/dreams/DreamCandidateDetail.tsx` for candidate-first detail rendering, visible explanation cues, and relationship-limit copy
-- [ ] T024 [P] [US2] Implement `src/components/dreams/DreamDiaryPanel.tsx` for parsed diary entry rendering, diary navigation, human-readable narrative presentation, and partial-data fallback copy when diary content is unavailable independently
-- [ ] T025 [US2] Update `src/hooks/useDreamInspectorController.ts` to drive candidate selection, diary entry selection, and manual refresh behavior for detail views without introducing a live event-stream dependency
-- [ ] T026 [US2] Update `src/components/dreams/DreamInspectorPane.tsx` to compose candidate detail and diary panels into the session-adjacent inspector flow
-- [ ] T027 [US2] Update `src/hooks/useDreamInspectorController.ts` and `src/app.tsx` so diary refresh and snapshot refresh remain controller-owned and snapshot-based, with `src/app.tsx` limited to shell context handoff rather than fetch ownership
+- [x] T023 [P] [US2] Implement `src/components/dreams/DreamCandidateDetail.tsx` for candidate-first detail rendering, visible explanation cues, and relationship-limit copy
+- [x] T024 [P] [US2] Implement `src/components/dreams/DreamDiaryPanel.tsx` for parsed diary entry rendering, diary navigation, human-readable narrative presentation, and partial-data fallback copy when diary content is unavailable independently
+- [x] T025 [US2] Update `src/hooks/useDreamInspectorController.ts` to drive candidate selection, diary entry selection, and manual refresh behavior for detail views without introducing a live event-stream dependency
+- [x] T026 [US2] Update `src/components/dreams/DreamInspectorPane.tsx` to compose candidate detail and diary panels into the session-adjacent inspector flow
+- [x] T027 [US2] Update `src/hooks/useDreamInspectorController.ts` and `src/app.tsx` so diary refresh and snapshot refresh remain controller-owned and snapshot-based, with `src/app.tsx` limited to shell context handoff rather than fetch ownership
 
 **Checkpoint**: User Story 2 should now let users drill into a candidate, understand why it is sticking using current signals, and read Dream Diary narrative as contextual evidence.
 
@@ -98,15 +98,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T028 [P] [US3] Extend `tests/shell-gateway-memory.test.mjs` to cover optional `wiki.importInsights` and `wiki.palace` availability, unsupported-method handling, and lazy-load gating
-- [ ] T029 [P] [US3] Extend `tests/dream-related-context.test.mjs` to cover best-effort related-context matching, empty matches, and limited/unsupported states
+- [x] T028 [P] [US3] Extend `tests/shell-gateway-memory.test.mjs` to cover optional `wiki.importInsights` and `wiki.palace` availability, unsupported-method handling, and lazy-load gating
+- [x] T029 [P] [US3] Extend `tests/dream-related-context.test.mjs` to cover best-effort related-context matching, empty matches, and limited/unsupported states
 
 ### Implementation for User Story 3
 
-- [ ] T030 [P] [US3] Implement `src/components/dreams/DreamRelatedContextPanel.tsx` for optional imported-insight and memory-palace linkage, including unsupported and limited-state treatment
-- [ ] T031 [US3] Update `src/hooks/useDreamInspectorController.ts` to lazily load related context on candidate inspection and cache it for the current pane session
-- [ ] T032 [US3] Update `src/components/dreams/DreamCandidateDetail.tsx`, `src/components/dreams/DreamInspectorPane.tsx`, and `src/app.tsx` to compose optional related context without blocking the primary Dream Inspector flow and to route imported-insight and memory-palace handoffs through an existing ClawFace adjacent-context navigation pattern
-- [ ] T033 [US3] Apply lightweight detail polish in `src/styles.css` and any touched dream components so related context feels integrated with the existing ClawFace shell language rather than like an embedded backend wiki surface
+- [x] T030 [P] [US3] Implement `src/components/dreams/DreamRelatedContextPanel.tsx` for optional imported-insight and memory-palace linkage, including unsupported and limited-state treatment
+- [x] T031 [US3] Update `src/hooks/useDreamInspectorController.ts` to lazily load related context on candidate inspection and cache it for the current pane session
+- [x] T032 [US3] Update `src/components/dreams/DreamCandidateDetail.tsx`, `src/components/dreams/DreamInspectorPane.tsx`, and `src/app.tsx` to compose optional related context without blocking the primary Dream Inspector flow and to route imported-insight and memory-palace handoffs through an existing ClawFace adjacent-context navigation pattern
+- [x] T033 [US3] Apply lightweight detail polish in `src/styles.css` and any touched dream components so related context feels integrated with the existing ClawFace shell language rather than like an embedded backend wiki surface
 
 **Checkpoint**: All three user stories should now work independently, with MVP value in US1 and US2, and optional OpenClaw-native related-memory linkage in US3.
 
@@ -116,8 +116,8 @@
 
 **Purpose**: Validation, regression protection, and documentation follow-through that affect multiple stories.
 
-- [ ] T034 [P] Update relevant product or architecture notes in `docs/` only if implementation materially changes shell ownership or inspector/navigation guidance
-- [ ] T035 Run the automated validation set: `make test-unit`, `make typecheck`, `make build`
+- [x] T034 [P] Update relevant product or architecture notes in `docs/` only if implementation materially changes shell ownership or inspector/navigation guidance
+- [x] T035 Run the automated validation set: `make test-unit`, `make typecheck`, `make build`
 - [ ] T036 Run the targeted manual validation from `specs/002-dream-visibility/quickstart.md`, including dream visibility, diary reading, grounded replay distinction, and optional cross-link navigation
 - [ ] T037 Verify existing chat shell, Files, Media, and tool activity flows still behave normally after Dream Inspector integration in `src/app.tsx`, `src/components/ChatView.tsx`, `src/components/SessionSidebar.tsx`, and `src/styles.css`
 
@@ -127,8 +127,8 @@
 
 **Purpose**: Capture post-MVP work that would benefit from stronger OpenClaw gateway support without mixing it into the current implementation path.
 
-- [ ] T038 [P] Draft a future normalized dream event journal contract in `specs/002-dream-visibility/contracts/future-dream-timeline.md` based on OpenClaw memory host event log concepts rather than raw file access from ClawFace
-- [ ] T039 Document a future renderer-side timeline strategy in `specs/002-dream-visibility/research.md` or a follow-up artifact once a gateway seam for dream runs or event journals exists
+- [x] T038 [P] Draft a future normalized dream event journal contract in `specs/002-dream-visibility/contracts/future-dream-timeline.md` based on OpenClaw memory host event log concepts rather than raw file access from ClawFace
+- [x] T039 Document a future renderer-side timeline strategy in `specs/002-dream-visibility/research.md` or a follow-up artifact once a gateway seam for dream runs or event journals exists
 
 ---
 

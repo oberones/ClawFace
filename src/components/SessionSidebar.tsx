@@ -33,6 +33,7 @@ export type SessionSidebarProps = {
   onDelete: (key: string, opts?: { skipConfirm?: boolean }) => void;
   onReachEnd?: () => void;
   onSearchGateway: (query: string) => Promise<GatewaySessionRow[]>;
+  onOpenDreams: () => void;
   onOpenFiles: () => void;
   onOpenMedia: () => void;
 };
@@ -368,6 +369,14 @@ export default function SessionSidebar(props: SessionSidebarProps) {
           >
             <span aria-hidden="true" style={{ fontSize: "14px", lineHeight: 1 }}>+</span>
             {!props.collapsed && " New"}
+          </button>
+          <button
+            type="button"
+            onClick={props.onOpenDreams}
+            className="ui-btn ui-btn-light"
+            title="Dream Inspector"
+          >
+            {props.collapsed ? "DR" : "Dreams"}
           </button>
           <button
             type="button"

@@ -177,3 +177,15 @@ OpenClaw already records memory host dream/recall/promotion events in `memory/.d
 
 - **Read the event log file directly from ClawFace for MVP**: rejected because it leaks filesystem details and breaks remote/self-hosted portability.
 - **Pretend current status/diary payloads already support a real timeline**: rejected because they do not expose chronological event history.
+
+## Future renderer-side timeline strategy
+
+If OpenClaw exposes a future dream journal seam, ClawFace should treat it as a second-level adjunct to Dream Inspector rather than as a replacement for the signal-first pane.
+
+Recommended renderer strategy:
+
+- keep the current Dream Inspector as the default entry because overview, lanes, and diary context answer the fastest user questions
+- mount timeline/journal detail as a deeper adjacent context inside the same workstation shell, not as a detached admin dashboard
+- normalize journal payloads in a dedicated helper seam parallel to `shell-gateway-memory.ts`
+- keep candidate timelines and run/event journals optional so the MVP snapshot flow stays usable when the future seam is absent
+- prefer explicit event groups such as dream run, replay grounding, and promotion moments over raw event-log rows
