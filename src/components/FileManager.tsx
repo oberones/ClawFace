@@ -1,6 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { renderMarkdown } from "../lib/markdown.ts";
 import { useCardTilt } from "../hooks/useCardTilt.ts";
+import { BrowserBreadcrumbs } from "./browser-shell/BrowserBreadcrumbs.tsx";
+import { BrowserEmptyState } from "./browser-shell/BrowserEmptyState.tsx";
+import { BrowserRootTabs } from "./browser-shell/BrowserRootTabs.tsx";
+import { BrowserShellLayout } from "./browser-shell/BrowserShellLayout.tsx";
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -413,6 +417,7 @@ function FileSidebar(props: {
   onToggleCollapse: () => void;
   onSetCollapsed: (v: boolean) => void;
   onSwitchToChat: () => void;
+  onSwitchToMedia?: () => void;
   onOpenSettings: () => void;
 }) {
   const fm = useFmState();
@@ -469,6 +474,11 @@ function FileSidebar(props: {
           <button type="button" onClick={props.onSwitchToChat} className="ui-btn ui-btn-light" title="Back to chat">
             {props.collapsed ? "💬" : "💬 Chat"}
           </button>
+          {props.onSwitchToMedia ? (
+            <button type="button" onClick={props.onSwitchToMedia} className="ui-btn ui-btn-light" title="Open media browser">
+              {props.collapsed ? "🖼️" : "🖼️ Media"}
+            </button>
+          ) : null}
           {!props.autoHover && (
             <button type="button" onClick={props.onToggleCollapse} className="ui-btn ui-btn-light" title="Toggle sidebar">
               {props.collapsed ? "\u203A" : "\u2039"}
@@ -479,37 +489,41 @@ function FileSidebar(props: {
 
       {/* Root tabs */}
       {!props.collapsed && (
-        <div className="fm-sidebar-roots">
-          {fm.roots.map((root, i) => (
-            <button
-              key={i}
-              type="button"
-              className={`fm-root-pill${fm.activeRoot?.path === root.path ? " active" : ""}`}
-              onClick={() => fm.selectRoot(root)}
-            >
-              {root.label}
-            </button>
-          ))}
-        </div>
+        <BrowserRootTabs
+          tabs={fm.roots.map((root) => ({ key: root.path, label: root.label }))}
+          activeKey={fm.activeRoot?.path ?? null}
+          className="fm-sidebar-roots"
+          tabClassName="fm-root-pill"
+          activeTabClassName="active"
+          onSelect={(path) => {
+            const root = fm.roots.find((item) => item.path === path);
+            if (root) {
+              fm.selectRoot(root);
+            }
+          }}
+        />
       )}
 
       {/* Breadcrumb + actions */}
       {!props.collapsed && (
         <div className="fm-sidebar-nav">
-          <div className="fm-sidebar-breadcrumb">
-            {fm.breadcrumbs.map((crumb, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <span className="fm-bc-sep">/</span>}
-                <button
-                  type="button"
-                  className={`fm-bc-item${i === fm.breadcrumbs.length - 1 ? " active" : ""}`}
-                  onClick={() => { if (crumb.path !== fm.currentPath) { fm.closePreview(); void fm.loadDir(crumb.path); } }}
-                >
-                  {crumb.label}
-                </button>
-              </React.Fragment>
-            ))}
-          </div>
+          <BrowserBreadcrumbs
+            items={fm.breadcrumbs.map((crumb, index) => ({
+              key: crumb.path,
+              label: crumb.label,
+              active: index === fm.breadcrumbs.length - 1,
+            }))}
+            className="fm-sidebar-breadcrumb"
+            itemClassName="fm-bc-item"
+            activeItemClassName="active"
+            separatorClassName="fm-bc-sep"
+            onSelect={(path) => {
+              if (path !== fm.currentPath) {
+                fm.closePreview();
+                void fm.loadDir(path);
+              }
+            }}
+          />
           <div className="fm-sidebar-toolbar">
             <button type="button" className="fm-sidebar-tool" onClick={fm.navigateUp} disabled={!canGoUp} title="Go up">↑</button>
             <button type="button" className="fm-sidebar-tool" onClick={() => void fm.loadDir(fm.currentPath)} title="Refresh">↻</button>
@@ -620,28 +634,27 @@ function PreviewArea(props: {
 
   if (!entry) {
     return (
-      <section className="claw-chat-area fm-preview-area">
-        <header className="chat-header">
-          <div className="chat-header-main">
-            <div className="chat-brand-title">Files</div>
-          </div>
-          <div className="chat-header-actions">
-            <button type="button" onClick={props.onOpenSettings} className="ui-btn ui-btn-primary">
-              Settings
-            </button>
-          </div>
-        </header>
-        <div className="chat-scroll">
-          <div className="empty-state" style={{ animation: props.enableAnimations ? undefined : "none" }}>
-            <div className="empty-state-icon" style={{ fontSize: "36px" }}>📂</div>
-            <div className="empty-state-title">Select a file to preview</div>
-            <div className="empty-state-copy">
+      <BrowserShellLayout
+        areaClassName="fm-preview-area"
+        title="Files"
+        actions={(
+          <button type="button" onClick={props.onOpenSettings} className="ui-btn ui-btn-primary">
+            Settings
+          </button>
+        )}
+      >
+        <BrowserEmptyState
+          icon={<span style={{ fontSize: "36px" }}>📂</span>}
+          title="Select a file to preview"
+          copy={(
+            <>
               Choose a file from the sidebar to view its contents here.
               <br />Supports Markdown, text, images, and PDFs.
-            </div>
-          </div>
-        </div>
-      </section>
+            </>
+          )}
+          disableAnimation={!props.enableAnimations}
+        />
+      </BrowserShellLayout>
     );
   }
 
@@ -649,29 +662,33 @@ function PreviewArea(props: {
   const canEdit = isEditableText(entry.mime);
 
   return (
-    <section className="claw-chat-area fm-preview-area">
-      <header className="chat-header">
-        <div className="chat-header-main">
-          <div className="chat-brand-title">
-            <span style={{ marginRight: "8px" }}>{getFileIcon(entry)}</span>
-            {entry.name}
-            {fm.editing && fm.editDirty && <span className="fm-unsaved-dot" title="Unsaved changes">●</span>}
-          </div>
-          <div className="topbar-status">
-            <span>{getFileDescription(entry)}</span>
-            <span style={{ margin: "0 4px" }}>·</span>
-            <span>{formatSize(entry.size)}</span>
-            <span style={{ margin: "0 4px" }}>·</span>
-            <span>{formatDate(entry.mtime)}</span>
-          </div>
-        </div>
-        <div className="chat-header-actions">
-          {canEdit && !fm.editing && (
+    <BrowserShellLayout
+      areaClassName="fm-preview-area"
+      scrollClassName="fm-preview-scroll"
+      title={(
+        <>
+          <span style={{ marginRight: "8px" }}>{getFileIcon(entry)}</span>
+          {entry.name}
+          {fm.editing && fm.editDirty ? <span className="fm-unsaved-dot" title="Unsaved changes">●</span> : null}
+        </>
+      )}
+      meta={(
+        <>
+          <span>{getFileDescription(entry)}</span>
+          <span style={{ margin: "0 4px" }}>·</span>
+          <span>{formatSize(entry.size)}</span>
+          <span style={{ margin: "0 4px" }}>·</span>
+          <span>{formatDate(entry.mtime)}</span>
+        </>
+      )}
+      actions={(
+        <>
+          {canEdit && !fm.editing ? (
             <button type="button" className="ui-btn ui-btn-light" onClick={fm.startEditing}>
               ✏️ Edit
             </button>
-          )}
-          {fm.editing && (
+          ) : null}
+          {fm.editing ? (
             <>
               <button
                 type="button"
@@ -685,7 +702,7 @@ function PreviewArea(props: {
                 Cancel
               </button>
             </>
-          )}
+          ) : null}
           <button type="button" className="ui-btn ui-btn-light" onClick={() => fm.handleDownload(entry)}>
             ↓ Download
           </button>
@@ -695,10 +712,9 @@ function PreviewArea(props: {
           <button type="button" onClick={props.onOpenSettings} className="ui-btn ui-btn-primary">
             Settings
           </button>
-        </div>
-      </header>
-
-      <div className="chat-scroll fm-preview-scroll">
+        </>
+      )}
+    >
         <div className="chat-thread" style={{ maxWidth: "980px" }}>
           {loading && (
             <div className="message-row assistant" style={{ animation: "fade-up 260ms ease" }}>
@@ -768,8 +784,7 @@ function PreviewArea(props: {
             </div>
           )}
         </div>
-      </div>
-    </section>
+    </BrowserShellLayout>
   );
 }
 
@@ -784,6 +799,7 @@ export type FileManagerProps = {
   onToggleSidebarCollapse: () => void;
   onSetSidebarCollapsed: (v: boolean) => void;
   onSwitchToChat: () => void;
+  onSwitchToMedia?: () => void;
   onOpenSettings: () => void;
 };
 
@@ -808,6 +824,7 @@ export default function FileManager(props: FileManagerProps) {
         onToggleCollapse={props.onToggleSidebarCollapse}
         onSetCollapsed={props.onSetSidebarCollapsed}
         onSwitchToChat={props.onSwitchToChat}
+        onSwitchToMedia={props.onSwitchToMedia}
         onOpenSettings={props.onOpenSettings}
       />
     );

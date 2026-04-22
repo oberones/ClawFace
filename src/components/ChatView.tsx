@@ -11,6 +11,7 @@ import type {
   SessionTransitionState,
   ToolItem,
 } from "../lib/types.ts";
+import type { DraftMediaReference } from "../lib/media-browser-items.ts";
 import type { StagedAttachmentsState } from "../lib/staged-attachments.ts";
 import type { BackgroundSessionNotice } from "../lib/background-session-visibility.ts";
 import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
@@ -36,7 +37,9 @@ type ChatViewProps = {
   thinking: boolean;
   toolItems: ToolItem[];
   draft: string;
+  draftMediaReferences: DraftMediaReference[];
   onDraftChange: (value: string) => void;
+  onRemoveDraftMediaReference: (artifactId: string) => void;
   stagedAttachments: StagedAttachmentsState;
   onSend: () => void;
   onAbort: () => void;
@@ -1404,6 +1407,8 @@ export default function ChatView(props: ChatViewProps) {
             isComposingRef.current = false;
           },
         }}
+        draftMediaReferences={props.draftMediaReferences}
+        onRemoveDraftMediaReference={props.onRemoveDraftMediaReference}
         stagedAttachments={props.stagedAttachments}
         slash={{
           commandSuggestions,

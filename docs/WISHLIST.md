@@ -1,4 +1,3 @@
-* clickable button for exec/tool approvals rather than /approve
 * custom backgrounds/textures for chat
 * show size of workspace and media folders
 * show media folder in same way as workspace
