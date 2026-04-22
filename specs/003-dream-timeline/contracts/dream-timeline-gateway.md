@@ -1,123 +1,106 @@
-# Contract: Dream Timeline Gateway Seam
+# Contract: Dream Timeline Current-Surface Boundary
 
 ## Purpose
 
-Define the frontend-ready OpenClaw gateway seam needed for ClawFace Dream Timeline.
+Define the current integration boundary for Dream Timeline inside ClawFace.
 
-This contract intentionally replaces direct renderer access to `memory/.dreams/events.jsonl` with a normalized journal response that ClawFace can render safely and portably.
+This contract intentionally **does not** introduce a new OpenClaw gateway seam. Instead, it documents which existing gateway surfaces Dream Timeline may use and which chronology claims are blocked because current data does not support them.
 
-## Why a new seam is required
+## Allowed source surfaces
 
-The raw memory host event log already captures useful backend events:
+Dream Timeline v1 may derive its chronology only from:
 
-- `memory.recall.recorded`
-- `memory.dream.completed`
-- `memory.promotion.applied`
+- `doctor.memory.status`
+- `doctor.memory.dreamDiary`
+- `wiki.importInsights`
+- `wiki.palace`
 
-But the raw log is not sufficient as a UI contract because it:
+The timeline renderer should consume those sources through existing Dream Inspector normalization and helper seams, not through new raw gateway parsing inside components.
 
-- is filesystem-based rather than gateway-exposed
-- does not group events into workstation-readable moments
-- does not consistently provide candidate, diary, or durable-memory links
-- would force ClawFace to reconstruct chronology from backend rows
+## Visible evidence available today
 
-## Proposed seam
+The current surfaces expose enough information to derive:
 
-Illustrative method names:
+- promotion moments from candidate `promotedAt`
+- replay touchpoints from candidate `lastRecalledAt`
+- diary chronology from parsed diary entry dates or diary update metadata
+- candidate status framing from current Dream Inspector lanes
+- optional adjacent links into diary, Imported Insights, and Memory Palace context
 
-- `doctor.memory.timeline`
-- `doctor.memory.events`
+## Blocked chronology claims
 
-The exact name is less important than the shape of the response.
+The current surfaces do **not** expose enough data to support:
 
-## Required response qualities
+- exact dream-run completion history
+- exact replay wave journals beyond visible recall touchpoints
+- backend-stable event ids
+- authoritative event ordering across every dream artifact
+- a current gateway method such as `doctor.memory.timeline`
 
-The seam should provide:
+When those missing capabilities matter, the feature must:
 
-- stable timeline event-group ids
-- event timestamps
-- explicit grouped event kinds such as `dream-run`, `promotion-batch`, `recall-wave`, or `diary-entry`
-- optional dreaming phase labels such as `light`, `deep`, or `rem`
-- user-safe headline and summary fields
-- optional stable candidate references shared with Dream Inspector status surfaces where possible
-- optional diary-entry and promoted-memory links where available
-- truncation metadata so the UI can explain when older history was omitted
-- limitation metadata when relationships are partial
+- omit that chronology type
+- or label it as unavailable from current data
 
-## Response sketch
+It must not fabricate that history or assume companion OpenClaw work as part of the slice.
+
+## Derived model sketch
 
 ```ts
-type DoctorMemoryTimelinePayload = {
-  workspaceScope: {
-    agentId: string;
-    label: string;
-  };
-  generatedAt: string;
+type DerivedDreamTimelineModel = {
+  workspaceScopeLabel: string;
+  workspaceScopeDetail: string;
+  loadedAtMs: number | null;
+  availability: "loading" | "ready" | "empty" | "disabled" | "unavailable" | "partial";
   range: {
     startAt?: string;
     endAt?: string;
-    truncated: boolean;
-    limit?: number;
-  };
-  supportsCandidateTracks: boolean;
-  eventGroups: Array<{
+    derivedFrom: Array<"promotedAt" | "lastRecalledAt" | "diaryDate" | "diaryUpdatedAt">;
+  } | null;
+  momentGroups: Array<{
     id: string;
-    kind: "dream-run" | "promotion-batch" | "recall-wave" | "diary-entry" | "mixed";
+    kind: "promotion" | "replay" | "diary-entry" | "diary-update" | "mixed" | "limited";
     headline: string;
     summary: string;
-    startedAt: string;
-    endedAt?: string;
-    phase?: "light" | "deep" | "rem";
-    rawEventCount: number;
+    timestamp: string;
+    sourceKinds: Array<"promotedAt" | "lastRecalledAt" | "diaryDate" | "diaryUpdatedAt">;
     limitationNote?: string;
     candidateRefs: Array<{
       candidateKey?: string;
-      path?: string;
-      startLine?: number;
-      endLine?: number;
       label: string;
-      relationship: "direct" | "batched" | "inferred" | "limited";
-      status?: "heating" | "grounded" | "promoted";
+      relationship: "direct" | "grouped" | "inferred" | "limited";
+      status?: "waiting" | "grounded" | "promoted";
     }>;
     artifactLinks: Array<{
-      kind: "diary-entry" | "promoted-memory" | "dream-candidate";
+      kind: "diary-entry" | "dream-candidate" | "related-insight" | "related-palace";
       targetId?: string;
       label: string;
-      detail?: string;
-      relationship: "direct" | "nearby" | "limited";
+      relationship: "direct" | "nearby" | "inferred" | "limited";
     }>;
   }>;
-  candidateTracks?: Array<{
+  candidateTracks: Array<{
     candidateKey: string;
     headline: string;
     currentStatus?: "waiting" | "grounded" | "promoted";
-    eventGroupIds: string[];
+    momentGroupIds: string[];
     limitationNote?: string;
   }>;
 };
 ```
 
-## Backend shaping guidance
-
-The seam should prefer:
-
-- grouped chronology over raw log rows
-- explicit limitation flags over implicit missingness
-- stable identifiers over string-only matching when possible
-- user-safe summaries over hidden score internals
-
-The seam should avoid:
-
-- exposing raw filesystem paths as the main relationship mechanism
-- mixing repair/admin commands into the same response
-- requiring ClawFace to merge unrelated raw events into meaningful runs
-- implying deterministic candidate provenance when only loose correlation exists
-
 ## ClawFace renderer expectations
 
-When this seam exists, ClawFace should:
+ClawFace should:
 
-- normalize it in `shell-gateway-memory-timeline.ts`
+- reuse the existing Dream Inspector snapshot as the source of truth
+- normalize and group visible chronology in `src/lib/dream-timeline.ts`
+- keep link shaping and limitation handling in `src/lib/dream-timeline-links.ts`
 - mount Dream Timeline as adjacent context from Dream Inspector
-- keep timeline refresh snapshot-based in the first slice
 - preserve Dream Inspector as the default dream landing surface
+
+ClawFace should not:
+
+- read `memory/.dreams/events.jsonl` directly
+- depend on unavailable gateway seams
+- treat `loadedAtMs` as a timeline moment source
+- imply that the UI is showing a complete backend dream-event journal

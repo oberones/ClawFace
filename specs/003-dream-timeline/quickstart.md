@@ -2,14 +2,14 @@
 
 ## Goal
 
-Validate Dream Timeline as a ClawFace-native chronological extension to Dream Inspector that explains dream runs, replay grounding, and promotion moments over time.
+Validate Dream Timeline as a ClawFace-native chronological extension to Dream Inspector that explains visible promotion, replay, and diary chronology from the data ClawFace already has today.
 
 ## Prerequisites
 
 - ClawFace desktop app running locally
 - OpenClaw gateway available
-- An OpenClaw build that exposes the new dream timeline seam
-- A workspace with enough dream history to show at least one dream run and one promotion or replay-related moment
+- A workspace with enough dream evidence to show at least one visible promotion moment, replay touchpoint, or diary entry chronology
+- No OpenClaw backend changes are required for this slice
 
 ## Automated Validation
 
@@ -31,36 +31,37 @@ make build
 4. Open Dream Timeline from within the dream surface.
 5. Confirm the UI stays in the same workstation shell instead of switching to a detached admin page.
 
-### 2. Validate chronology and grouped event meaning
+### 2. Validate visible chronology meaning
 
-1. Confirm recent timeline entries appear in chronological order.
-2. Confirm at least one dream run or phase completion moment is readable.
-3. Confirm at least one promotion or replay-related moment is readable when present.
-4. Confirm the copy summarizes chronology rather than exposing raw JSON-like log rows.
+1. Confirm visible timeline entries appear in chronological order.
+2. Confirm promotion moments are readable when `promotedAt` data is present.
+3. Confirm replay touchpoints are readable when `lastRecalledAt` data is present.
+4. Confirm diary chronology appears when diary dates can be parsed.
+5. Confirm the copy presents evidence-based chronology rather than pretending to show a full backend event journal.
 
 ### 3. Validate candidate provenance
 
-1. Open a timeline event with candidate references.
+1. Open a candidate with visible timestamps.
 2. Confirm the candidate detail or candidate-filtered track is understandable.
-3. Confirm limited relationship copy appears when candidate linkage is incomplete.
+3. Confirm inferred or limited relationship copy appears when chronology cannot be tied directly.
 
 ### 4. Validate adjacent artifact handoffs
 
-1. Open a timeline event with a diary or promoted-memory link.
+1. Open a timeline moment with a diary or nearby related-context link.
 2. Confirm the handoff moves into nearby dream context rather than a backend-style debug page.
 
-### 5. Validate unavailable and empty states
+### 5. Validate sparse and empty states
 
-1. Test a workspace or gateway without the timeline seam.
-2. Confirm Dream Inspector still works and the timeline affordance explains why chronology is unavailable.
-3. Test a workspace with the seam enabled but no relevant history.
-4. Confirm empty state is distinct from unavailable.
+1. Test a workspace where Dream Inspector works but there is not enough timestamped evidence for a meaningful timeline.
+2. Confirm the timeline explains why chronology is limited or empty.
+3. Test a workspace with only one visible chronology type, such as promotions but no replay touchpoints.
+4. Confirm the missing chronology type is omitted or labeled as unavailable from current data rather than fabricated.
 
 ### 6. Validate snapshot semantics
 
-1. Note the loaded-at state.
-2. Trigger manual refresh.
-3. Confirm the timeline updates as a snapshot rather than implying a live stream.
+1. Note the loaded-at state in Dream Inspector.
+2. Trigger the existing manual refresh.
+3. Confirm the timeline updates as derived snapshot history rather than implying a live stream.
 
 ### 7. Regression checks
 
