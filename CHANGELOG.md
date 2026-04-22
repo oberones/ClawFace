@@ -8,6 +8,12 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.12.0 (2026-04-22)
+
+### Fix
+
+- tighten media browser source classification
+
 ## v0.11.0 (2026-04-21)
 
 ### Feat
