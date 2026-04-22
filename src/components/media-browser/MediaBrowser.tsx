@@ -66,6 +66,9 @@ export default function MediaBrowser(props: MediaBrowserProps) {
           visibleArtifacts={controller.visibleArtifacts}
           selectedArtifactId={controller.selectedArtifactId}
           filterState={controller.filterState}
+          sessionFilterOptions={controller.sessionFilterOptions}
+          provenanceFilterOptions={controller.provenanceFilterOptions}
+          hasActiveFilters={controller.hasActiveFilters}
           enableAnimations={props.enableAnimations}
           onSelectRoot={controller.selectRoot}
           onSelectArtifact={controller.selectArtifact}
@@ -78,6 +81,8 @@ export default function MediaBrowser(props: MediaBrowserProps) {
                 : "desc";
             controller.setSort(sortKey, nextDir);
           }}
+          onSetSessionFilter={controller.setSessionFilter}
+          onSetProvenanceFilter={controller.setProvenanceFilter}
           onClearFilters={controller.clearFilters}
         />
 

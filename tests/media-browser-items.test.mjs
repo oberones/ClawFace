@@ -72,6 +72,81 @@ test("getVisibleMediaArtifacts applies lightweight query filtering and createdAt
   assert.deepEqual(visible.map((artifact) => artifact.id), ["artifact-3"]);
 });
 
+test("getVisibleMediaArtifacts supports session and provenance narrowing plus name sorting", () => {
+  const mediaBrowserItems = loadMediaBrowserItemsModule();
+
+  const artifacts = [
+    createArtifact({
+      id: "artifact-1",
+      displayName: "Zebra",
+      sessionKey: "session-1",
+      provenance: { kind: "generated", label: "Morning run" },
+    }),
+    createArtifact({
+      id: "artifact-2",
+      displayName: "Alpha",
+      sessionKey: "session-2",
+      provenance: { kind: "uploaded", label: "Upload thread" },
+      sourceKey: "uploaded",
+      sourceLabel: "Uploaded",
+    }),
+    createArtifact({
+      id: "artifact-3",
+      displayName: "Bravo",
+      sessionKey: "session-1",
+      provenance: { kind: "generated", label: "Morning run" },
+    }),
+  ];
+
+  const visible = mediaBrowserItems.getVisibleMediaArtifacts(artifacts, {
+    sessionKey: "session-1",
+    provenance: "generated",
+    sortKey: "name",
+    sortDir: "asc",
+  });
+
+  assert.deepEqual(visible.map((artifact) => artifact.id), ["artifact-3", "artifact-1"]);
+});
+
+test("media browser item helpers expose session and provenance filter options with stable labels", () => {
+  const mediaBrowserItems = loadMediaBrowserItemsModule();
+
+  const artifacts = [
+    createArtifact({
+      id: "artifact-1",
+      sessionKey: "session-2",
+      provenance: { kind: "uploaded", label: "Upload thread" },
+      sourceKey: "uploaded",
+      sourceLabel: "Uploaded",
+    }),
+    createArtifact({
+      id: "artifact-2",
+      sessionKey: "session-1",
+      provenance: { kind: "generated", label: "Morning run" },
+    }),
+    createArtifact({
+      id: "artifact-3",
+      sessionKey: "session-1",
+      provenance: { kind: "generated", label: "Morning run" },
+    }),
+  ];
+
+  assert.deepEqual(
+    mediaBrowserItems.getMediaArtifactSessionFilterOptions(artifacts),
+    [
+      { key: "session-1", label: "Morning run", count: 2 },
+      { key: "session-2", label: "Upload thread", count: 1 },
+    ],
+  );
+  assert.deepEqual(
+    mediaBrowserItems.getMediaArtifactProvenanceFilterOptions(artifacts),
+    [
+      { key: "generated", label: "Generated", count: 2 },
+      { key: "uploaded", label: "Uploaded", count: 1 },
+    ],
+  );
+});
+
 test("dedupeMediaArtifacts drops later duplicates with the same artifact kind and id", () => {
   const mediaBrowserItems = loadMediaBrowserItemsModule();
 

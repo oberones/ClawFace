@@ -141,3 +141,74 @@ test("buildMediaBrowserSourceData preserves portable render references for remot
   );
   assert.equal(sourceData.artifacts[0]?.renderRef.sourcePath, null);
 });
+
+test("buildMediaBrowserSourceData preserves session and provenance metadata needed for source-specific narrowing", () => {
+  const mediaBrowserSources = loadMediaBrowserSourcesModule();
+
+  const sourceData = mediaBrowserSources.buildMediaBrowserSourceData({
+    sessions: [
+      { key: "session-generated", kind: "direct", label: "Generator chat", updatedAt: 10 },
+      { key: "session-upload", kind: "direct", label: "Upload chat", updatedAt: 20 },
+    ],
+    loadedHistories: {
+      "session-generated": {
+        sessionKey: "session-generated",
+        messages: [
+          createMessage({
+            attachments: [
+              createAttachment({
+                id: "generated-asset",
+                name: "generated.png",
+                sourcePath: "/Users/oberon/.openclaw/media/generated.png",
+              }),
+            ],
+          }),
+        ],
+      },
+      "session-upload": {
+        sessionKey: "session-upload",
+        messages: [
+          createMessage({
+            id: "message-upload",
+            role: "user",
+            attachments: [
+              createAttachment({
+                id: "uploaded-asset",
+                name: "uploaded.png",
+                sourcePath: "/Users/oberon/.openclaw/media/inbound/uploaded.png",
+              }),
+            ],
+          }),
+        ],
+      },
+    },
+  });
+
+  const generated = sourceData.artifacts.find((artifact) => artifact.id.includes("generated-asset"));
+  const uploaded = sourceData.artifacts.find((artifact) => artifact.id.includes("uploaded-asset"));
+
+  assert.deepEqual(
+    {
+      sessionKey: generated?.sessionKey,
+      sourceKey: generated?.sourceKey,
+      provenance: generated?.provenance,
+    },
+    {
+      sessionKey: "session-generated",
+      sourceKey: "generated",
+      provenance: { kind: "generated", label: "Generator chat" },
+    },
+  );
+  assert.deepEqual(
+    {
+      sessionKey: uploaded?.sessionKey,
+      sourceKey: uploaded?.sourceKey,
+      provenance: uploaded?.provenance,
+    },
+    {
+      sessionKey: "session-upload",
+      sourceKey: "uploaded",
+      provenance: { kind: "uploaded", label: "Upload chat" },
+    },
+  );
+});
