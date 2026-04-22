@@ -18,6 +18,7 @@ import {
   type NormalizedChatEvent as ThreadToolNormalizedChatEvent,
   type ToolUpdate as ThreadToolEventToolUpdate,
 } from "../lib/thread-tool-domain-events.ts";
+import type { DraftMediaReference } from "../lib/media-browser-items.ts";
 import { extractText, isToolMessage } from "../lib/message-extract.ts";
 import type {
   Attachment,
@@ -30,6 +31,7 @@ import type { ThreadToolStateSnapshot } from "../lib/thread-tool-state.ts";
 type ThreadToolSessionCacheState = ThreadToolStateSnapshot & {
   draft: string;
   attachments: Attachment[];
+  mediaReferences: DraftMediaReference[];
   lastLoadedAt: number;
 };
 
