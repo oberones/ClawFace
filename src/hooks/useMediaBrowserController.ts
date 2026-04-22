@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  getMediaArtifactProvenanceFilterOptions,
+  getMediaArtifactSessionFilterOptions,
   getVisibleMediaArtifacts,
   isMediaArtifactReusableInV1,
   type MediaArtifact,
   type MediaBrowserFilterState,
+  type MediaBrowserFilterOption,
   type MediaBrowserSortDir,
   type MediaBrowserSortKey,
   type MediaPreviewState,
@@ -33,6 +36,9 @@ export type MediaBrowserControllerState = {
   activeRoot: MediaSourceRoot | null;
   selectRoot: (rootKey: string) => void;
   filterState: MediaBrowserFilterState;
+  sessionFilterOptions: MediaBrowserFilterOption[];
+  provenanceFilterOptions: MediaBrowserFilterOption[];
+  hasActiveFilters: boolean;
   setQuery: (query: string) => void;
   setSort: (sortKey: MediaBrowserSortKey, sortDir?: MediaBrowserSortDir) => void;
   setSessionFilter: (sessionKey: string | null) => void;
@@ -116,6 +122,41 @@ export function useMediaBrowserController(
     () => getVisibleMediaArtifacts(rootScopedArtifacts, filterState),
     [filterState, rootScopedArtifacts],
   );
+
+  const sessionFilterOptions = useMemo(
+    () => getMediaArtifactSessionFilterOptions(rootScopedArtifacts),
+    [rootScopedArtifacts],
+  );
+
+  const provenanceFilterOptions = useMemo(
+    () => getMediaArtifactProvenanceFilterOptions(rootScopedArtifacts),
+    [rootScopedArtifacts],
+  );
+
+  const hasActiveFilters = Boolean(
+    filterState.query ||
+    filterState.sessionKey ||
+    filterState.provenance,
+  );
+
+  useEffect(() => {
+    setFilterState((current) => {
+      const hasSessionFilter =
+        !current.sessionKey ||
+        sessionFilterOptions.some((option) => option.key === current.sessionKey);
+      const hasProvenanceFilter =
+        !current.provenance ||
+        provenanceFilterOptions.some((option) => option.key === current.provenance);
+      if (hasSessionFilter && hasProvenanceFilter) {
+        return current;
+      }
+      return {
+        ...current,
+        sessionKey: hasSessionFilter ? current.sessionKey ?? null : null,
+        provenance: hasProvenanceFilter ? current.provenance ?? null : null,
+      };
+    });
+  }, [provenanceFilterOptions, sessionFilterOptions]);
 
   useEffect(() => {
     if (visibleArtifacts.length === 0) {
@@ -252,6 +293,9 @@ export function useMediaBrowserController(
     activeRoot,
     selectRoot,
     filterState,
+    sessionFilterOptions,
+    provenanceFilterOptions,
+    hasActiveFilters,
     setQuery,
     setSort,
     setSessionFilter,

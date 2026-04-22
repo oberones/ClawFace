@@ -96,14 +96,14 @@
 
 ### Tests for User Story 3
 
-- [ ] T025 [P] [US3] Extend `tests/media-browser-items.test.mjs` to cover the final lightweight filter/grouping rules
-- [ ] T026 [P] [US3] Extend `tests/media-browser-sources.test.mjs` to cover session provenance filtering and source-specific narrowing behavior
+- [X] T025 [P] [US3] Extend `tests/media-browser-items.test.mjs` to cover the final lightweight filter/grouping rules
+- [X] T026 [P] [US3] Extend `tests/media-browser-sources.test.mjs` to cover session provenance filtering and source-specific narrowing behavior
 
 ### Implementation for User Story 3
 
-- [ ] T027 [US3] Finalize lightweight filter/grouping controls in `src/components/media-browser/MediaBrowserSidebar.tsx`
-- [ ] T028 [US3] Implement controller-side filter/grouping application in `src/hooks/useMediaBrowserController.ts`
-- [ ] T029 [US3] Surface artifact context in `src/components/media-browser/MediaBrowserEntryCard.tsx` and `src/components/media-browser/MediaBrowserPreview.tsx` so users can distinguish generated, uploaded, and session-linked items without exposing raw backend path noise
+- [X] T027 [US3] Finalize lightweight filter/grouping controls in `src/components/media-browser/MediaBrowserSidebar.tsx`
+- [X] T028 [US3] Implement controller-side filter/grouping application in `src/hooks/useMediaBrowserController.ts`
+- [X] T029 [US3] Surface artifact context in `src/components/media-browser/MediaBrowserEntryCard.tsx` and `src/components/media-browser/MediaBrowserPreview.tsx` so users can distinguish generated, uploaded, and session-linked items without exposing raw backend path noise
 
 **Checkpoint**: All three user stories should now work independently, with P1 browse/preview, P2 chat reuse, and P3 lightweight findability.
 

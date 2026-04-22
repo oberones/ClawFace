@@ -1,6 +1,10 @@
 import React from "react";
 import { useCardTilt } from "../../hooks/useCardTilt.ts";
-import type { MediaArtifact } from "../../lib/media-browser-items.ts";
+import {
+  getMediaArtifactProvenanceLabel,
+  getMediaArtifactSessionLabel,
+  type MediaArtifact,
+} from "../../lib/media-browser-items.ts";
 
 export type MediaBrowserEntryCardProps = {
   artifact: MediaArtifact;
@@ -53,6 +57,8 @@ function getArtifactIcon(artifact: MediaArtifact): string {
 
 export function MediaBrowserEntryCard(props: MediaBrowserEntryCardProps) {
   const { onMouseMove, onMouseLeave } = useCardTilt();
+  const sessionLabel = getMediaArtifactSessionLabel(props.artifact);
+  const provenanceLabel = getMediaArtifactProvenanceLabel(props.artifact);
   const previewStateLabel =
     props.artifact.previewState === "unsupported"
       ? "Unsupported"
@@ -88,11 +94,11 @@ export function MediaBrowserEntryCard(props: MediaBrowserEntryCardProps) {
         <div className="fm-card-info">
           <div className="fm-card-name">{props.artifact.displayName}</div>
           <div className="fm-card-meta">
-            <span>{props.artifact.sourceLabel}</span>
-            {props.artifact.provenance?.label ? (
+            <span>{provenanceLabel}</span>
+            {sessionLabel ? (
               <>
                 <span>·</span>
-                <span>{props.artifact.provenance.label}</span>
+                <span>From {sessionLabel}</span>
               </>
             ) : null}
             {props.artifact.createdAt ? (
@@ -102,10 +108,10 @@ export function MediaBrowserEntryCard(props: MediaBrowserEntryCardProps) {
               </>
             ) : null}
           </div>
-          {props.artifact.sessionKey || previewStateLabel ? (
+          {props.artifact.runId || previewStateLabel ? (
             <div className="mb-entry-tags">
-              {props.artifact.sessionKey ? (
-                <span className="mb-entry-tag">Session {props.artifact.sessionKey}</span>
+              {props.artifact.runId ? (
+                <span className="mb-entry-tag">Run {props.artifact.runId}</span>
               ) : null}
               {previewStateLabel ? (
                 <span className="mb-entry-tag is-warning">{previewStateLabel}</span>

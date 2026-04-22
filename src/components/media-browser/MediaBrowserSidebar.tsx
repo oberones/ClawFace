@@ -5,6 +5,7 @@ import { MediaBrowserEntryCard } from "./MediaBrowserEntryCard.tsx";
 import type {
   MediaArtifact,
   MediaBrowserFilterState,
+  MediaBrowserFilterOption,
   MediaBrowserSortKey,
   MediaSourceRoot,
 } from "../../lib/media-browser-items.ts";
@@ -16,11 +17,16 @@ export type MediaBrowserSidebarProps = {
   visibleArtifacts: MediaArtifact[];
   selectedArtifactId: string | null;
   filterState: MediaBrowserFilterState;
+  sessionFilterOptions: MediaBrowserFilterOption[];
+  provenanceFilterOptions: MediaBrowserFilterOption[];
+  hasActiveFilters: boolean;
   enableAnimations?: boolean;
   onSelectRoot: (rootKey: string) => void;
   onSelectArtifact: (artifactId: string) => void;
   onSetQuery: (query: string) => void;
   onSetSort: (sortKey: MediaBrowserSortKey) => void;
+  onSetSessionFilter: (sessionKey: string | null) => void;
+  onSetProvenanceFilter: (provenance: MediaBrowserFilterState["provenance"]) => void;
   onClearFilters: () => void;
 };
 
@@ -79,6 +85,48 @@ export function MediaBrowserSidebar(props: MediaBrowserSidebarProps) {
           />
         </div>
 
+        {props.sessionFilterOptions.length > 0 ? (
+          <div className="mb-filter-row">
+            <label className="mb-filter-label" htmlFor="media-browser-session-filter">
+              Session
+            </label>
+            <select
+              id="media-browser-session-filter"
+              className="ui-input mb-filter-select"
+              value={props.filterState.sessionKey ?? ""}
+              onChange={(event) => props.onSetSessionFilter(event.target.value || null)}
+            >
+              <option value="">All sessions</option>
+              {props.sessionFilterOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label} ({option.count})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        {props.provenanceFilterOptions.length > 0 ? (
+          <div className="mb-filter-row">
+            <div className="mb-filter-label">Context</div>
+            <div className="mb-filter-chip-list">
+              {props.provenanceFilterOptions.map((option) => {
+                const active = props.filterState.provenance === option.key;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    className={`mb-filter-chip${active ? " is-active" : ""}`}
+                    onClick={() => props.onSetProvenanceFilter(active ? null : option.key as MediaBrowserFilterState["provenance"])}
+                  >
+                    {option.label} ({option.count})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
         <div className="fm-sidebar-toolbar">
           <button
             type="button"
@@ -100,7 +148,7 @@ export function MediaBrowserSidebar(props: MediaBrowserSidebarProps) {
             type="button"
             className="fm-sidebar-tool"
             onClick={props.onClearFilters}
-            disabled={!props.filterState.query && !props.filterState.sessionKey && !props.filterState.provenance}
+            disabled={!props.hasActiveFilters}
             title="Clear filters"
           >
             Clear

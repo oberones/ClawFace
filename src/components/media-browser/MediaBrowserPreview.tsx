@@ -1,6 +1,10 @@
 import React, { useMemo } from "react";
 import { BrowserEmptyState } from "../browser-shell/BrowserEmptyState.tsx";
 import { useMessageImageAttachmentController } from "../../hooks/useMessageImageAttachmentController.ts";
+import {
+  getMediaArtifactProvenanceLabel,
+  getMediaArtifactSessionLabel,
+} from "../../lib/media-browser-items.ts";
 import type { Attachment } from "../../lib/types.ts";
 import type { MediaPreviewSelection } from "../../hooks/useMediaBrowserController.ts";
 import type { MediaReuseRequest } from "../../lib/media-browser-reference.ts";
@@ -109,6 +113,8 @@ export function MediaBrowserPreview(props: MediaBrowserPreviewProps) {
   }
 
   const artifact = selection.resolvedArtifact;
+  const sessionLabel = getMediaArtifactSessionLabel(artifact);
+  const provenanceLabel = getMediaArtifactProvenanceLabel(artifact);
   const unsupportedReason =
     artifact.kind !== "image"
       ? `${artifact.kind.toUpperCase()} preview is out of scope for v1.`
@@ -136,17 +142,17 @@ export function MediaBrowserPreview(props: MediaBrowserPreviewProps) {
         <div className="mb-preview-copy">
           <div className="mb-preview-title">{artifact.displayName}</div>
           <div className="mb-preview-meta">
-            <span>{artifact.sourceLabel}</span>
-            {artifact.provenance?.label ? (
+            <span>{provenanceLabel}</span>
+            {sessionLabel ? (
               <>
                 <span>·</span>
-                <span>{artifact.provenance.label}</span>
+                <span>From {sessionLabel}</span>
               </>
             ) : null}
-            {artifact.sessionKey ? (
+            {artifact.runId ? (
               <>
                 <span>·</span>
-                <span>Session {artifact.sessionKey}</span>
+                <span>Run {artifact.runId}</span>
               </>
             ) : null}
             <span>·</span>
