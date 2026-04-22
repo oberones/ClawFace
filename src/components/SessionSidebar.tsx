@@ -33,6 +33,7 @@ export type SessionSidebarProps = {
   onDelete: (key: string, opts?: { skipConfirm?: boolean }) => void;
   onReachEnd?: () => void;
   onSearchGateway: (query: string) => Promise<GatewaySessionRow[]>;
+  onOpenDreams: () => void;
   onOpenFiles: () => void;
   onOpenMedia: () => void;
 };
@@ -353,49 +354,108 @@ export default function SessionSidebar(props: SessionSidebarProps) {
       onMouseLeave={handleSidebarMouseLeave}
     >
       <div className="sidebar-top">
-        {!props.collapsed && (
-          <div className="sidebar-title-wrap">
-            <div className="sidebar-title">Sessions</div>
-            <div className="sidebar-subtitle">{props.sessions.length} total</div>
-          </div>
-        )}
-        <div className="sidebar-actions">
-          <button
-            type="button"
-            onClick={props.onCreate}
-            className="ui-btn ui-btn-light"
-            title="New session"
-          >
-            <span aria-hidden="true" style={{ fontSize: "14px", lineHeight: 1 }}>+</span>
-            {!props.collapsed && " New"}
-          </button>
-          <button
-            type="button"
-            onClick={props.onOpenFiles}
-            className="ui-btn ui-btn-light"
-            title="File manager"
-          >
-            {props.collapsed ? "📁" : "📁 Files"}
-          </button>
-          <button
-            type="button"
-            onClick={props.onOpenMedia}
-            className="ui-btn ui-btn-light"
-            title="Media browser"
-          >
-            {props.collapsed ? "🖼️" : "🖼️ Media"}
-          </button>
-          {!props.autoHover && (
+        {!props.collapsed ? (
+          <>
+            <div className="sidebar-top-bar">
+              <div className="sidebar-title-wrap">
+                <div className="sidebar-title">Sessions</div>
+                <div className="sidebar-subtitle">{props.sessions.length} total</div>
+              </div>
+              {!props.autoHover && (
+                <button
+                  type="button"
+                  onClick={props.onToggleCollapse}
+                  className="ui-btn ui-btn-light sidebar-collapse-btn"
+                  title="Collapse sidebar"
+                  aria-label="Collapse sidebar"
+                >
+                  {"\u2039"}
+                </button>
+              )}
+            </div>
+            <div className="sidebar-actions">
+              <button
+                type="button"
+                onClick={props.onCreate}
+                className="ui-btn ui-btn-light"
+                title="New session"
+              >
+                <span aria-hidden="true" style={{ fontSize: "14px", lineHeight: 1 }}>+</span>
+                {" New"}
+              </button>
+              <button
+                type="button"
+                onClick={props.onOpenFiles}
+                className="ui-btn ui-btn-light"
+                title="File manager"
+              >
+                📁 Files
+              </button>
+              <button
+                type="button"
+                onClick={props.onOpenMedia}
+                className="ui-btn ui-btn-light"
+                title="Media browser"
+              >
+                🖼️ Media
+              </button>
+              <button
+                type="button"
+                onClick={props.onOpenDreams}
+                className="ui-btn ui-btn-light"
+                title="Dream Inspector"
+              >
+                Dreams
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="sidebar-actions">
             <button
               type="button"
-              onClick={props.onToggleCollapse}
+              onClick={props.onCreate}
               className="ui-btn ui-btn-light"
-              title="Toggle sidebar"
+              title="New session"
             >
-              {props.collapsed ? "\u203A" : "\u2039"}
+              <span aria-hidden="true" style={{ fontSize: "14px", lineHeight: 1 }}>+</span>
             </button>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={props.onOpenFiles}
+              className="ui-btn ui-btn-light"
+              title="File manager"
+            >
+              📁
+            </button>
+            <button
+              type="button"
+              onClick={props.onOpenMedia}
+              className="ui-btn ui-btn-light"
+              title="Media browser"
+            >
+              🖼️
+            </button>
+            <button
+              type="button"
+              onClick={props.onOpenDreams}
+              className="ui-btn ui-btn-light"
+              title="Dream Inspector"
+            >
+              DR
+            </button>
+            {!props.autoHover && (
+              <button
+                type="button"
+                onClick={props.onToggleCollapse}
+                className="ui-btn ui-btn-light"
+                title="Expand sidebar"
+                aria-label="Expand sidebar"
+              >
+                {"\u203A"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {!props.collapsed && (

@@ -5,6 +5,7 @@ import MediaBrowser from "./components/media-browser/MediaBrowser.tsx";
 import SessionSidebar from "./components/SessionSidebar.tsx";
 import SettingsModal from "./components/SettingsModal.tsx";
 import NewSessionModal from "./components/NewSessionModal.tsx";
+import DreamInspectorPane from "./components/dreams/DreamInspectorPane.tsx";
 import { GatewayClient } from "./lib/gateway.ts";
 import {
   type AgentsListResult,
@@ -121,6 +122,7 @@ import {
   type ThreadToolStateSnapshot,
 } from "./lib/thread-tool-state.ts";
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
+import { useDreamInspectorController } from "./hooks/useDreamInspectorController.ts";
 import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 import { useThreadToolEventController } from "./hooks/useThreadToolEventController.ts";
@@ -2233,6 +2235,7 @@ export default function App() {
   }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => loadUiSettings().autoHoverSidebar);
   const [activeView, setActiveView] = useState<"chat" | "files" | "media">("chat");
+  const [showDreamInspector, setShowDreamInspector] = useState(false);
   const activeViewRef = useRef(activeView);
   activeViewRef.current = activeView;
   const [showSettings, setShowSettings] = useState(false);
@@ -4166,6 +4169,16 @@ export default function App() {
     () => normalizeThinkingValue(sessionInfo.thinkingLevel),
     [sessionInfo.thinkingLevel],
   );
+  const dreamInspectorVisible = activeView === "chat" && showDreamInspector;
+  const dreamInspectorController = useDreamInspectorController({
+    open: dreamInspectorVisible,
+    connectionStatus: connectionState.status,
+    selectedSessionKey,
+    sessionInfo,
+    clientRef,
+    gatewayMethodsRef,
+    gatewayConfigStateRef: lastConfigStateRef,
+  });
 
   const appActionShortcutEntries = useMemo(
     () => [
@@ -5792,6 +5805,10 @@ export default function App() {
               sessionPreviews={sessionPreviews}
               allSessionRows={allSessionRows}
               onSearchGateway={searchSessionsFromGateway}
+              onOpenDreams={() => {
+                switchView("chat");
+                setShowDreamInspector(true);
+              }}
               onOpenFiles={() => switchView("files")}
               onOpenMedia={() => switchView("media")}
             />
@@ -5816,54 +5833,64 @@ export default function App() {
       {/* Main content area */}
       <div className="main-shell">
         {activeView === "chat" ? (
-          <ChatView
-            sessionKey={selectedSessionKey}
-            messages={messages}
-            streamText={streamText}
-            thinking={thinking}
-            toolItems={toolItems}
-            draft={draft}
-            draftMediaReferences={draftMediaReferences}
-            onDraftChange={setDraft}
-            onRemoveDraftMediaReference={handleRemoveDraftMediaReference}
-            stagedAttachments={{
-              attachments,
-              replaceAttachments,
-              appendAttachments,
-              removeAttachment,
-              clearAttachments,
-            }}
-            onSend={() => void handleSend()}
-            onAbort={() => void handleSlashCommand("/abort")}
-            canAbort={Boolean(chatRunId)}
-            connected={connected}
-            connectionStatus={connectionState.status}
-            connectionRecoveryNotice={connectionRecoveryNotice}
-            interruptedRunBanner={activeInterruptedRunBanner}
-            backgroundSessionNotice={backgroundSessionNotice}
-            pendingApproval={activePendingApproval}
-            resolvingApprovalDecision={
-              activePendingApproval ? (resolvingApprovalIds[activePendingApproval.id] ?? null) : null
-            }
-            disabledReason={disabledReason}
-            sessionInfo={sessionInfo}
-            models={models}
-            uiSettings={uiSettings}
-            canLoadOlder={canLoadMoreHistory}
-            loadingOlder={loadingOlderHistory}
-            isCurrentSessionLoading={isCurrentSessionLoading}
-            sessionTransitionState={transitionState}
-            onLoadOlder={() => void handleLoadOlderHistory()}
-            onRefreshSession={() => void handleRefreshCurrentSession()}
-            onResolveApproval={(approval, decision) => void handleResolvePendingApproval(approval, decision)}
-            onModelSelect={(model) => void handleSelectModel(model)}
-            onThinkingSelect={(level) => void handleSelectThinking(level)}
-            onCreateSession={() => setShowNewSession(true)}
-            onOpenSettings={() => setShowSettings(true)}
-            onOpenFiles={() => switchView("files")}
-            onResolveRemoteImage={resolveRemoteImage}
-            onCompact={() => void handleSlashCommand("/compact")}
-          />
+          <div className={`chat-workstation-shell${dreamInspectorVisible ? " is-dream-inspector-open" : ""}`}>
+            <ChatView
+              sessionKey={selectedSessionKey}
+              messages={messages}
+              streamText={streamText}
+              thinking={thinking}
+              toolItems={toolItems}
+              draft={draft}
+              draftMediaReferences={draftMediaReferences}
+              onDraftChange={setDraft}
+              onRemoveDraftMediaReference={handleRemoveDraftMediaReference}
+              stagedAttachments={{
+                attachments,
+                replaceAttachments,
+                appendAttachments,
+                removeAttachment,
+                clearAttachments,
+              }}
+              onSend={() => void handleSend()}
+              onAbort={() => void handleSlashCommand("/abort")}
+              canAbort={Boolean(chatRunId)}
+              connected={connected}
+              connectionStatus={connectionState.status}
+              connectionRecoveryNotice={connectionRecoveryNotice}
+              interruptedRunBanner={activeInterruptedRunBanner}
+              backgroundSessionNotice={backgroundSessionNotice}
+              pendingApproval={activePendingApproval}
+              resolvingApprovalDecision={
+                activePendingApproval ? (resolvingApprovalIds[activePendingApproval.id] ?? null) : null
+              }
+              disabledReason={disabledReason}
+              sessionInfo={sessionInfo}
+              models={models}
+              uiSettings={uiSettings}
+              canLoadOlder={canLoadMoreHistory}
+              loadingOlder={loadingOlderHistory}
+              isCurrentSessionLoading={isCurrentSessionLoading}
+              sessionTransitionState={transitionState}
+              onLoadOlder={() => void handleLoadOlderHistory()}
+              onRefreshSession={() => void handleRefreshCurrentSession()}
+              onResolveApproval={(approval, decision) => void handleResolvePendingApproval(approval, decision)}
+              onModelSelect={(model) => void handleSelectModel(model)}
+              onThinkingSelect={(level) => void handleSelectThinking(level)}
+              onCreateSession={() => setShowNewSession(true)}
+              onOpenSettings={() => setShowSettings(true)}
+              dreamInspectorOpen={dreamInspectorVisible}
+              onToggleDreamInspector={() => setShowDreamInspector((prev) => !prev)}
+              onOpenFiles={() => switchView("files")}
+              onResolveRemoteImage={resolveRemoteImage}
+              onCompact={() => void handleSlashCommand("/compact")}
+            />
+            {dreamInspectorVisible ? (
+              <DreamInspectorPane
+                controller={dreamInspectorController}
+                onClose={() => setShowDreamInspector(false)}
+              />
+            ) : null}
+          </div>
         ) : activeView === "files" ? (
           <FileManager
             mode="main"
