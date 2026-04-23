@@ -6432,6 +6432,179 @@ body::before {
   background: rgba(248, 252, 255, 0.88);
 }
 
+.dream-timeline-panel {
+  gap: 14px;
+}
+
+.dream-timeline-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, white);
+  background: rgba(248, 252, 255, 0.88);
+  color: var(--claw-text-soft);
+  font-size: 12px;
+}
+
+.dream-timeline-range strong {
+  color: var(--claw-text);
+  font-size: 13px;
+}
+
+.dream-timeline-list,
+.dream-timeline-artifacts,
+.dream-timeline-track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dream-timeline-card,
+.dream-timeline-detail-card,
+.dream-timeline-artifact-link,
+.dream-timeline-track-item {
+  width: 100%;
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, white);
+  border-radius: 16px;
+  background: rgba(250, 253, 255, 0.92);
+  padding: 12px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.dream-timeline-card:hover,
+.dream-timeline-detail-card:hover,
+.dream-timeline-artifact-link:hover,
+.dream-timeline-track-item:hover {
+  border-color: color-mix(in srgb, var(--claw-accent) 30%, var(--claw-border));
+  box-shadow: 0 10px 22px rgba(49, 73, 104, 0.08);
+  transform: translateY(-1px);
+}
+
+.dream-timeline-card.is-selected,
+.dream-timeline-track-item.is-selected {
+  border-color: color-mix(in srgb, var(--claw-accent) 44%, white);
+  background: color-mix(in srgb, var(--claw-accent-soft) 72%, white);
+  box-shadow: 0 10px 24px rgba(50, 75, 106, 0.12);
+}
+
+.dream-timeline-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dream-timeline-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dream-timeline-source {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, white);
+  background: rgba(246, 250, 255, 0.92);
+  color: var(--claw-text-soft);
+}
+
+.dream-timeline-source.is-promotion {
+  color: #166534;
+  background: color-mix(in srgb, #f0fdf4 88%, white);
+  border-color: color-mix(in srgb, #86efac 38%, white);
+}
+
+.dream-timeline-source.is-replay {
+  color: #1d4ed8;
+  background: color-mix(in srgb, #eff6ff 88%, white);
+  border-color: color-mix(in srgb, #60a5fa 38%, white);
+}
+
+.dream-timeline-source.is-diary-entry,
+.dream-timeline-source.is-diary-update {
+  color: #7c3aed;
+  background: color-mix(in srgb, #f5f3ff 88%, white);
+  border-color: color-mix(in srgb, #c4b5fd 40%, white);
+}
+
+.dream-timeline-card-title,
+.dream-timeline-detail-title,
+.dream-timeline-artifact-title,
+.dream-timeline-track-label {
+  color: var(--claw-text);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.dream-timeline-card-summary,
+.dream-timeline-artifact-detail,
+.dream-timeline-track-meta {
+  color: var(--claw-text-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dream-timeline-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dream-timeline-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dream-timeline-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dream-timeline-detail-label,
+.dream-timeline-artifact-kind {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--claw-text-muted);
+}
+
+.dream-timeline-detail-path {
+  font-size: 11px;
+  color: var(--claw-text-muted);
+  word-break: break-word;
+}
+
+.dream-timeline-artifact-link {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dream-timeline-track-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 @media (max-width: 1120px) {
   .dream-inspector-shell {
     width: min(380px, 42vw);
@@ -6450,5 +6623,9 @@ body::before {
     max-height: 48%;
     border-left: none;
     border-top: 1px solid color-mix(in srgb, var(--claw-border) 86%, white);
+  }
+
+  .dream-timeline-detail-grid {
+    grid-template-columns: 1fr;
   }
 }

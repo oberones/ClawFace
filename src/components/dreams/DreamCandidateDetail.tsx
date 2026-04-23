@@ -17,7 +17,7 @@ function renderCount(label: string, value: number) {
 export default function DreamCandidateDetail(props: DreamCandidateDetailProps) {
   if (!props.candidate) {
     return (
-      <section className="dream-panel-section">
+      <section id="dream-candidate-detail-panel" className="dream-panel-section">
         <div className="dream-panel-heading dream-panel-heading-inline">
           <h3 className="dream-section-title">Candidate detail</h3>
         </div>
@@ -27,7 +27,7 @@ export default function DreamCandidateDetail(props: DreamCandidateDetailProps) {
   }
 
   return (
-    <section className="dream-panel-section">
+    <section id="dream-candidate-detail-panel" className="dream-panel-section">
       <div className="dream-panel-heading dream-panel-heading-inline">
         <div>
           <h3 className="dream-section-title">Candidate detail</h3>
