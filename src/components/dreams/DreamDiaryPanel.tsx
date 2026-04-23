@@ -12,7 +12,7 @@ export default function DreamDiaryPanel(props: DreamDiaryPanelProps) {
   const selectedEntry = props.selectedEntry;
 
   return (
-    <section className="dream-panel-section">
+    <section id="dream-diary-panel" className="dream-panel-section">
       <div className="dream-panel-heading dream-panel-heading-inline">
         <h3 className="dream-section-title">Dream Diary</h3>
         <span className="dream-panel-meta">{props.diary.path}</span>
