@@ -7,6 +7,8 @@ import type {
 
 type DreamRelatedContextPanelProps = {
   relatedContext: DreamRelatedContext;
+  requestedSelectionKey?: string | null;
+  requestedSelectionNonce?: number;
 };
 
 function selectionKey(item: DreamRelatedInsightMatch | DreamRelatedPalaceMatch): string {
@@ -22,6 +24,16 @@ export default function DreamRelatedContextPanel(props: DreamRelatedContextPanel
   const selectedItem = items.find((item) => selectionKey(item) === selectedKey) ?? items[0] ?? null;
 
   useEffect(() => {
+    const requestedSelectionKey = props.requestedSelectionKey;
+    if (!requestedSelectionKey) {
+      return;
+    }
+    if (items.some((item) => selectionKey(item) === requestedSelectionKey)) {
+      setSelectedKey((current) => current === requestedSelectionKey ? current : requestedSelectionKey);
+    }
+  }, [items, props.requestedSelectionKey, props.requestedSelectionNonce]);
+
+  useEffect(() => {
     if (!selectedItem) {
       setSelectedKey(null);
       return;
@@ -32,7 +44,7 @@ export default function DreamRelatedContextPanel(props: DreamRelatedContextPanel
   }, [items, selectedItem, selectedKey]);
 
   return (
-    <section className="dream-panel-section">
+    <section id="dream-related-context-panel" className="dream-panel-section">
       <div className="dream-panel-heading dream-panel-heading-inline">
         <h3 className="dream-section-title">Related memory context</h3>
       </div>
