@@ -1,115 +1,39 @@
-<p align="center">
-  <h1 align="center">ClawFace</h1>
-  <p align="center">
-    A desktop-native OpenClaw client built to make sessions, tools, media, and future OpenClaw-native capabilities feel like first-class parts of the experience.
-  </p>
-</p>
+# ClawFace
 
-<p align="center">
-  <img src="./public/ClawFace0.4.2.png" alt="ClawFace application preview" width="900" />
-</p>
+ClawFace is a desktop-first frontend for OpenClaw. The goal is simple: make OpenClaw feel like a real personal AI workstation on your machine, not just a backend with a chat window or a bundle of admin pages in your browser.
 
-> **Note:** The project has been rebranded in the docs as **ClawFace**, but some existing package/build/release metadata may still use the legacy **ClawUI** name until the rename is completed across the codebase.
-ClawFace is a fork-forward continuation of an abandoned OpenClaw desktop/web client experiment.
-It is now being repositioned as a **desktop-first frontend product for OpenClaw**, not a generic chatbot shell and not a replacement for OpenClaw’s backend management/configuration surfaces.
+## What ClawFace Is
 
-## Project direction
+ClawFace is built for people already running OpenClaw locally or on self-hosted infrastructure who want a better everyday desktop experience.
 
-ClawFace exists to be the best way to *use* OpenClaw day to day on a desktop machine.
+- **OpenClaw-native** rather than a generic multi-provider shell
+- **desktop-first** rather than a web-first collaboration app
+- **conversation-centered** with first-class sessions, tools, files, media, and memory visibility
+- **frontend-focused**, while OpenClaw remains the backend management and capability plane
 
-The product direction is:
-- **OpenClaw-native**, not provider-native
-- **desktop-first**, not web-first team collaboration
-- **conversational at the center**, but with room for tools, sessions, tasks, media, and devices as first-class experiences
-- **frontend-focused**, while OpenClaw itself remains the backend management and capability plane
+## What You Can Do Today
 
-### What ClawFace is not
+ClawFace already includes a usable first pass of the core workstation surfaces:
 
-ClawFace is **not** intended to become:
-- a generic multi-provider chatbot shell
-- a team collaboration workspace
-- a prettier copy of OpenClaw’s backend config/admin UI
-- just another settings panel with a chat window attached
+- **Session-centered desktop chat** with streaming replies, connection feedback, model/thinking controls, and session activity visibility
+- **Desktop attachment workflows** including drag/drop, paste-image handling, staged attachments, local image rendering, and image lightbox support
+- **Tool activity visibility** in the conversation flow so OpenClaw actions are easier to follow than raw trace output
+- **Dedicated Files and Media surfaces** for browsing workspace files and reusable media artifacts inside the app shell
+- **Dream Inspector** for signal-first visibility into waiting, grounded, and promoted memory candidates plus Dream Diary and nearby memory context
+- **Dream Timeline** for evidence-derived chronology from currently exposed memory data, including promotion moments, replay touchpoints, dated diary entries, and candidate-scoped related-context handoffs
+- **Desktop-oriented settings and compatibility support** including path-prefix mappings for shared-volume/container installs
 
-## Current product thesis
+## Current Boundaries
 
-> ClawFace should make OpenClaw feel like a real personal AI workstation, not just a backend with a chat window.
+ClawFace intentionally stays on top of the OpenClaw gateway surfaces that already exist today.
 
-## Why this project exists
+- It **does not** make backend changes to OpenClaw from this repo.
+- If a capability is not exposed by the current gateway, ClawFace should surface that as a limitation instead of quietly depending on companion backend work.
+- Dream Timeline is therefore a **visible-evidence timeline**, not a raw memory event-log viewer.
 
-OpenClaw already has powerful capabilities across:
-- sessions
-- tools
-- media analysis
-- browser/canvas flows
-- nodes/devices
-- background work and orchestration
-- local/self-hosted workflows
+## Why It Exists
 
-But those capabilities are currently spread across multiple surfaces.
-ClawFace is intended to unify the everyday *desktop experience* of OpenClaw without trying to replace every backend/admin surface.
-
-## High-level goals
-
-Near-term priorities for ClawFace are:
-- strong desktop chat UX
-- stable session navigation and switching
-- excellent drag-and-drop / paste workflows for images and files
-- visible tool activity and better legibility around actionful work
-- enough architectural cleanup to support future OpenClaw-native expansion
-
-Longer-term opportunities include:
-- approvals
-- background tasks and subagents
-- node/device surfaces
-- richer browser/canvas/computer-use UX
-- stronger artifact/media handling
-
-## Current status
-
-This codebase is **worth continuing**, but it is not treated as finished or production-ready architecture.
-
-The current strategy is:
-- salvage the valuable protocol/UI groundwork
-- refactor the overloaded architecture
-- expand deliberately in OpenClaw-native directions
-
-In plain English:
-- do **not** rewrite from scratch immediately
-- do **not** keep piling features into giant central files
-- proceed through staged refactoring and vertical product slices
-
-## Working in this repo
-
-If you are a coding agent or are onboarding quickly, start with:
-
-- [`AGENTS.md`](./AGENTS.md) — bootstrap guide for repo orientation, doc reading order, architecture hotspots, and working conventions
-- [`docs/DEVELOPMENT_CONSTRAINTS.md`](./docs/DEVELOPMENT_CONSTRAINTS.md) — pinned Node/npm versions, `npm ci`, required checks, and the concrete run/build expectations for local development
-
-## Planning docs
-
-The repo now includes project-planning docs to guide the modernization effort:
-
-- [`ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — architecture inventory and refactor plan
-- [`PRODUCT-BRIEF.md`](./docs/PRODUCT-BRIEF.md) — product vision, principles, and differentiators
-- [`MILESTONE-1.md`](./docs/MILESTONE-1.md) — first serious milestone definition
-- [`IMPLEMENTATION-ROADMAP.md`](./docs/IMPLEMENTATION-ROADMAP.md) — phased roadmap with vertical slices
-
-If you are working on the app, start with those docs before making major architectural changes.
-
-## Milestone 1 summary
-
-Milestone 1 is focused on shipping the first version of ClawFace that is genuinely worth using every day as an OpenClaw desktop frontend.
-
-Milestone 1 focuses on:
-- connection reliability
-- session shell stability
-- thread rendering and streaming cleanup
-- composer cleanup
-- drag/drop and paste workflows for media/files
-- attachment previews and rendering polish
-- basic tool activity visibility
-- initial architecture cleanup around chat, state, and platform/media boundaries
+OpenClaw already has powerful capabilities across sessions, tools, media analysis, browser/canvas flows, background work, and local/self-hosted workflows. ClawFace brings more of that day-to-day experience into a single desktop app without trying to replace every backend surface OpenClaw already has.
 
 ## Technology stack
 
@@ -119,7 +43,14 @@ Current stack includes:
 - Vite
 - Electron
 
-This remains a reasonable baseline for the product.
+## For Contributors
+
+If you are contributing to the app or onboarding quickly, start with:
+
+- [`AGENTS.md`](./AGENTS.md) — repo bootstrap guide, working conventions, and architecture hotspots
+- [`docs/DEVELOPMENT_CONSTRAINTS.md`](./docs/DEVELOPMENT_CONSTRAINTS.md) — pinned Node/npm versions and required local checks
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — current architecture inventory and guidance
+- [`docs/PRODUCT-BRIEF.md`](./docs/PRODUCT-BRIEF.md) — product framing and principles
 
 ## Install
 
@@ -223,11 +154,15 @@ The Makefile wraps the commands that are actually present in the repo today, plu
 - path prefix mapping for shared-volume/container installs
 - generated-image source resolution into `~/.openclaw/media`
 - renderer image source selection when both pretty filenames and concrete UUID media paths are present
+- Dream Inspector helper logic such as candidate shaping, diary parsing, and related-context matching
+- Dream Timeline helper logic such as chronology derivation, empty/disabled handling, and artifact-link shaping
 
 For media-related work, the practical validation stack is:
 - `make test-unit` for helper-level regressions
 - `make typecheck` for renderer/app safety
 - `make build` for the final production bundling check
+
+For Dream Inspector or Dream Timeline work, use that same validation stack and add a desktop visual pass because those features rely on adjacent pane composition and shell interaction details.
 
 ## Runtime expectations
 
