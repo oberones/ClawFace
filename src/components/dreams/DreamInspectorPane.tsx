@@ -57,7 +57,10 @@ function renderStateBody(
 export default function DreamInspectorPane(props: DreamInspectorPaneProps) {
   const { controller } = props;
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [requestedRelatedSelectionKey, setRequestedRelatedSelectionKey] = useState<string | null>(null);
+  const [requestedRelatedSelection, setRequestedRelatedSelection] = useState<{
+    key: string;
+    nonce: number;
+  } | null>(null);
   const timelineController = useDreamTimelineController({
     snapshot: controller.snapshot,
     selectedCandidate: controller.selectedCandidate,
@@ -99,7 +102,11 @@ export default function DreamInspectorPane(props: DreamInspectorPaneProps) {
       return;
     }
     if ((link.kind === "related-insight" || link.kind === "related-palace") && link.targetId) {
-      setRequestedRelatedSelectionKey(link.targetId);
+      const targetKey = link.targetId;
+      setRequestedRelatedSelection((current) => ({
+        key: targetKey,
+        nonce: (current?.nonce ?? 0) + 1,
+      }));
       scrollTo("dream-related-context-panel");
     }
   }, [controller]);
@@ -181,7 +188,8 @@ export default function DreamInspectorPane(props: DreamInspectorPaneProps) {
             />
             <DreamRelatedContextPanel
               relatedContext={controller.relatedContext}
-              requestedSelectionKey={requestedRelatedSelectionKey}
+              requestedSelectionKey={requestedRelatedSelection?.key ?? null}
+              requestedSelectionNonce={requestedRelatedSelection?.nonce ?? 0}
             />
           </>
         )}
