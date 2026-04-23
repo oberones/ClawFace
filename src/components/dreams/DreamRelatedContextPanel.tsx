@@ -8,6 +8,7 @@ import type {
 type DreamRelatedContextPanelProps = {
   relatedContext: DreamRelatedContext;
   requestedSelectionKey?: string | null;
+  requestedSelectionNonce?: number;
 };
 
 function selectionKey(item: DreamRelatedInsightMatch | DreamRelatedPalaceMatch): string {
@@ -23,13 +24,14 @@ export default function DreamRelatedContextPanel(props: DreamRelatedContextPanel
   const selectedItem = items.find((item) => selectionKey(item) === selectedKey) ?? items[0] ?? null;
 
   useEffect(() => {
-    if (!props.requestedSelectionKey) {
+    const requestedSelectionKey = props.requestedSelectionKey;
+    if (!requestedSelectionKey) {
       return;
     }
-    if (items.some((item) => selectionKey(item) === props.requestedSelectionKey) && props.requestedSelectionKey !== selectedKey) {
-      setSelectedKey(props.requestedSelectionKey);
+    if (items.some((item) => selectionKey(item) === requestedSelectionKey)) {
+      setSelectedKey((current) => current === requestedSelectionKey ? current : requestedSelectionKey);
     }
-  }, [items, props.requestedSelectionKey, selectedKey]);
+  }, [items, props.requestedSelectionKey, props.requestedSelectionNonce]);
 
   useEffect(() => {
     if (!selectedItem) {
