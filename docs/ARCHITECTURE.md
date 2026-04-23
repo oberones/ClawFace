@@ -98,6 +98,7 @@ Recent shell guidance:
 - session-adjacent inspectors such as Dream Inspector should mount here as auxiliary panes
 - `src/app.tsx` should own only pane visibility/context handoff, not domain parsing or fetch orchestration
 - gateway-facing normalization and inspector-specific loading state should live in dedicated helper/controller seams
+- Dream Timeline should stay a Dream Inspector-adjacent surface derived from existing inspector snapshots via renderer-side helpers such as `src/lib/dream-timeline.ts` and `src/hooks/useDreamTimelineController.ts`, rather than becoming a separate dashboard stack
 
 ---
 

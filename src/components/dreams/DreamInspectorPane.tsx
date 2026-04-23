@@ -1,11 +1,14 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { BrowserEmptyState } from "../browser-shell/BrowserEmptyState.tsx";
 import DreamCandidateDetail from "./DreamCandidateDetail.tsx";
 import DreamDiaryPanel from "./DreamDiaryPanel.tsx";
 import DreamLaneList from "./DreamLaneList.tsx";
 import DreamRelatedContextPanel from "./DreamRelatedContextPanel.tsx";
 import DreamSignalOverview from "./DreamSignalOverview.tsx";
+import DreamTimelinePanel from "./DreamTimelinePanel.tsx";
 import type { DreamInspectorControllerModel } from "../../hooks/useDreamInspectorController.ts";
+import { useDreamTimelineController } from "../../hooks/useDreamTimelineController.ts";
+import type { DreamTimelineArtifactLink } from "../../lib/dream-timeline.ts";
 
 type DreamInspectorPaneProps = {
   controller: DreamInspectorControllerModel;
@@ -53,12 +56,53 @@ function renderStateBody(
 
 export default function DreamInspectorPane(props: DreamInspectorPaneProps) {
   const { controller } = props;
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [requestedRelatedSelectionKey, setRequestedRelatedSelectionKey] = useState<string | null>(null);
+  const timelineController = useDreamTimelineController({
+    snapshot: controller.snapshot,
+    selectedCandidate: controller.selectedCandidate,
+    selectedDiaryEntry: controller.selectedDiaryEntry,
+    diaryRelation: controller.diaryRelation,
+    relatedContext: controller.relatedContext,
+  });
   const stateBody = renderStateBody(
     controller.snapshot.availability,
     controller.snapshot.note,
     controller.snapshot.error,
     controller.onRefresh,
   );
+  const canOpenTimeline = !stateBody;
+
+  useEffect(() => {
+    if (!canOpenTimeline && timelineOpen) {
+      setTimelineOpen(false);
+    }
+  }, [canOpenTimeline, timelineOpen]);
+
+  const timelineButtonLabel = timelineOpen ? "Hide Timeline" : "Open Timeline";
+
+  const openArtifactLink = useCallback((link: DreamTimelineArtifactLink) => {
+    const scrollTo = (id: string) => {
+      document.getElementById(id)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+
+    if (link.kind === "dream-candidate" && link.targetId) {
+      controller.onSelectCandidate(link.targetId);
+      scrollTo("dream-candidate-detail-panel");
+      return;
+    }
+    if (link.kind === "diary-entry") {
+      if (link.targetId) {
+        controller.onSelectDiaryEntry(link.targetId);
+      }
+      scrollTo("dream-diary-panel");
+      return;
+    }
+    if ((link.kind === "related-insight" || link.kind === "related-palace") && link.targetId) {
+      setRequestedRelatedSelectionKey(link.targetId);
+      scrollTo("dream-related-context-panel");
+    }
+  }, [controller]);
 
   return (
     <aside className="dream-inspector-shell">
@@ -73,6 +117,15 @@ export default function DreamInspectorPane(props: DreamInspectorPaneProps) {
           </div>
         </div>
         <div className="dream-inspector-header-actions">
+          {canOpenTimeline ? (
+            <button
+              type="button"
+              className={`ui-btn ui-btn-light${timelineOpen ? " is-active" : ""}`}
+              onClick={() => setTimelineOpen((value) => !value)}
+            >
+              {timelineButtonLabel}
+            </button>
+          ) : null}
           <button
             type="button"
             className="ui-btn ui-btn-light"
@@ -105,6 +158,13 @@ export default function DreamInspectorPane(props: DreamInspectorPaneProps) {
               selectedCandidateKey={controller.selectedCandidate?.key ?? null}
               onSelectCandidate={controller.onSelectCandidate}
             />
+            {timelineOpen ? (
+              <DreamTimelinePanel
+                controller={timelineController}
+                selectedCandidate={controller.selectedCandidate}
+                onOpenArtifactLink={openArtifactLink}
+              />
+            ) : null}
             <DreamLaneList
               lanes={controller.snapshot.lanes}
               activeLane={controller.activeLane}
@@ -119,7 +179,10 @@ export default function DreamInspectorPane(props: DreamInspectorPaneProps) {
               selectedEntry={controller.selectedDiaryEntry}
               onSelectEntry={controller.onSelectDiaryEntry}
             />
-            <DreamRelatedContextPanel relatedContext={controller.relatedContext} />
+            <DreamRelatedContextPanel
+              relatedContext={controller.relatedContext}
+              requestedSelectionKey={requestedRelatedSelectionKey}
+            />
           </>
         )}
       </div>
