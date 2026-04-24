@@ -29,7 +29,7 @@ test("normalizeDreamMethodSummary derives support for dream and wiki methods", (
   );
 });
 
-test("resolveDreamWorkspaceScope keeps the inspector honest about workspace scope", () => {
+test("resolveDreamWorkspaceScope keeps the Dreams surface honest about workspace scope", () => {
   const { resolveDreamWorkspaceScope } = loadModule();
 
   const scope = resolveDreamWorkspaceScope({

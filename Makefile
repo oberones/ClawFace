@@ -3,7 +3,7 @@ SHELL := /bin/sh
 NPM := npm
 TSCP := ./node_modules/.bin/tsc --noEmit
 
-.PHONY: help install dev build preview typecheck test-unit check-runtime check-rollup-linux check-env verify desktop-build-web desktop-dev desktop-pack desktop-dist-mac desktop-dist-win desktop-dist-linux hooks-install clean
+.PHONY: help install dev build preview typecheck test-unit check-runtime check-rollup-linux check-env verify desktop-build-web desktop-dev desktop-pack desktop-dist-mac desktop-dist-mac-x64 desktop-dist-win desktop-dist-linux hooks-install clean
 
 help:
 	@echo "ClawFace Make targets:"
@@ -20,7 +20,8 @@ help:
 	@echo "  make desktop-build-web  Build renderer assets for desktop packaging"
 	@echo "  make desktop-dev        Start Vite + Electron for desktop development"
 	@echo "  make desktop-pack       Build unpacked Electron app"
-	@echo "  make desktop-dist-mac   Build macOS distributables"
+	@echo "  make desktop-dist-mac   Build macOS arm64 distributables"
+	@echo "  make desktop-dist-mac-x64 Build macOS x64 distributables"
 	@echo "  make desktop-dist-win   Build Windows distributables"
 	@echo "  make desktop-dist-linux Build Linux distributables"
 	@echo "  make hooks-install      Install repo git hooks"
@@ -67,6 +68,9 @@ desktop-pack:
 
 desktop-dist-mac:
 	$(NPM) run desktop:dist:mac
+
+desktop-dist-mac-x64:
+	$(NPM) run desktop:dist:mac:x64
 
 desktop-dist-win:
 	$(NPM) run desktop:dist:win

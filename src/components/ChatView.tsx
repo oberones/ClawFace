@@ -66,8 +66,8 @@ type ChatViewProps = {
   onThinkingSelect: (level: string) => void;
   onCreateSession: () => void;
   onOpenSettings: () => void;
-  dreamInspectorOpen?: boolean;
-  onToggleDreamInspector?: () => void;
+  dreamsOpen?: boolean;
+  onToggleDreams?: () => void;
   onOpenFiles: () => void;
   onResolveRemoteImage?: (filePath: string) => Promise<string | null>;
   onCompact?: () => void;
@@ -1121,9 +1121,9 @@ export default function ChatView(props: ChatViewProps) {
               &#9632; Stop
             </button>
           )}
-          {props.onToggleDreamInspector ? (
-            <button type="button" onClick={props.onToggleDreamInspector} className="ui-btn ui-btn-light">
-              {props.dreamInspectorOpen ? "Hide Dreams" : "Dreams"}
+          {props.onToggleDreams ? (
+            <button type="button" onClick={props.onToggleDreams} className="ui-btn ui-btn-light">
+              {props.dreamsOpen ? "Hide Dreams" : "Dreams"}
             </button>
           ) : null}
           <button type="button" onClick={props.onCreateSession} className="ui-btn ui-btn-light">

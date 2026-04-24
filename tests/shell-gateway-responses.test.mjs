@@ -130,6 +130,46 @@ test("normalizeSessionsListResult sanitizes derived titles and previews that con
   assert.equal(normalized.sessions[0]?.lastMessagePreview, "Real preview");
 });
 
+test("normalizeSessionsListResult hides OpenClaw dream narrative sessions from the workstation session list", () => {
+  const { normalizeSessionsListResult } = loadShellGatewayResponsesModule();
+
+  const normalized = normalizeSessionsListResult({
+    count: 4,
+    sessions: [
+      {
+        key: "agent:main:main",
+        kind: "direct",
+        updated_at: 1800,
+        derived_title: "Daily work session",
+      },
+      {
+        key: "agent:main:dreaming-narrative-light-c17d738737c1-1776913200144",
+        kind: "direct",
+        updated_at: 1900,
+        derived_title: "Write a dream diary entry from these memory fragments",
+      },
+      {
+        key: "agent:main:dreaming-narrative-rem-c17d738737c1-1776913200144",
+        kind: "direct",
+        updated_at: 2000,
+        last_message_preview: "Tonight I kept finding the same small word under every stone.",
+      },
+      {
+        key: "agent:main:codex-acp-review",
+        kind: "direct",
+        updated_at: 1700,
+        derived_title: "Review branch feedback",
+      },
+    ],
+  });
+
+  assert.deepEqual(normalized.sessions.map((session) => session.key), [
+    "agent:main:main",
+    "agent:main:codex-acp-review",
+  ]);
+  assert.equal(normalized.count, 2);
+});
+
 test("mergeSessionRowsWithLocalState preserves an existing explicit label when a refreshed row omits it", () => {
   const { mergeSessionRowsWithLocalState } = loadShellGatewayResponsesModule();
 

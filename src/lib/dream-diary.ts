@@ -1,61 +1,87 @@
-import type { DreamCandidate } from "./dream-candidates.ts";
 import type { DreamDiarySource } from "./shell-gateway-memory.ts";
-
-const DIARY_STOP_WORDS = new Set([
-  "about",
-  "again",
-  "also",
-  "been",
-  "from",
-  "into",
-  "just",
-  "more",
-  "only",
-  "that",
-  "their",
-  "there",
-  "these",
-  "they",
-  "this",
-  "were",
-  "with",
-]);
 
 function normalizeLineBreaks(value: string): string {
   return value.replace(/\r\n/g, "\n");
 }
 
 function buildEntryId(seed: string, index: number): string {
-  return `${seed || "entry"}:${index}`;
-}
-
-function tokenize(value: string): string[] {
-  return value
+  const normalizedSeed = seed
     .toLowerCase()
-    .replace(/[^a-z0-9\s/._-]/g, " ")
-    .split(/\s+/)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 4 && !DIARY_STOP_WORDS.has(token));
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return `${normalizedSeed || "entry"}:${index}`;
 }
 
-function parseEntryHeading(line: string): string | null {
+function stripMarkdownEmphasis(value: string): string {
+  const trimmed = value.trim();
+  const strongMatch = trimmed.match(/^\*\*(.+)\*\*$/) ?? trimmed.match(/^__(.+)__$/);
+  if (strongMatch?.[1]?.trim()) {
+    return strongMatch[1].trim();
+  }
+  const emphasisMatch = trimmed.match(/^\*(.+)\*$/) ?? trimmed.match(/^_(.+)_$/);
+  if (emphasisMatch?.[1]?.trim()) {
+    return emphasisMatch[1].trim();
+  }
+  return trimmed;
+}
+
+function parseDateLabel(value: string): string | null {
+  const trimmed = stripMarkdownEmphasis(value);
+  const isoDate = trimmed.match(
+    /^(\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:\s*(?:Z|[+-]\d{2}:?\d{2}|[A-Z]{2,5}|GMT[+-]\d{1,2}(?::\d{2})?))?)?)(?:\b|$)/,
+  );
+  if (isoDate?.[1]) {
+    return isoDate[1].trim();
+  }
+  const monthDate = trimmed.match(
+    /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}(?:(?:,\s+|\s+at\s+)\d{1,2}:\d{2}\s+(?:AM|PM)(?:\s*(?:[A-Z]{2,5}|GMT[+-]\d{1,2}(?::\d{2})?))?)?$/i,
+  );
+  return monthDate ? trimmed.replace(/\b(AM|PM)([A-Z]{2,5}\b)/i, "$1 $2") : null;
+}
+
+function isDiaryTitle(line: string): boolean {
+  return /^#\s+Dream Diary\s*$/i.test(line.trim());
+}
+
+function isDiaryComment(line: string): boolean {
+  return /^<!--[\s\S]*-->$/.test(line.trim());
+}
+
+function isDiarySeparator(line: string): boolean {
+  return /^-{3,}$/.test(line.trim());
+}
+
+function parseEntryHeading(line: string): { label: string; kind: DreamDiaryEntryKind } | null {
   const trimmed = line.trim();
   if (!trimmed) {
     return null;
   }
   const headingMatch = trimmed.match(/^#{1,3}\s+(.+)$/);
   if (headingMatch?.[1]?.trim()) {
-    return headingMatch[1].trim();
+    const label = headingMatch[1].trim();
+    return {
+      label,
+      kind: parseDateLabel(label) ? "dated" : "heading",
+    };
   }
-  const isoMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})(?:\b|$)/);
-  if (isoMatch?.[1]) {
-    return isoMatch[1];
+  const dateLabel = parseDateLabel(trimmed);
+  if (dateLabel) {
+    return {
+      label: dateLabel,
+      kind: "dated",
+    };
   }
   return null;
 }
 
+function shouldSkipDiaryLine(line: string): boolean {
+  return isDiaryTitle(line) || isDiaryComment(line) || isDiarySeparator(line);
+}
+
 function finalizeEntry(params: {
   id: string;
+  kind: DreamDiaryEntryKind;
   dateLabel: string | null;
   lines: string[];
   startLine: number;
@@ -72,6 +98,7 @@ function finalizeEntry(params: {
     .filter((entry) => entry.length > 0);
   return {
     id: params.id,
+    kind: params.kind,
     dateLabel: params.dateLabel,
     body: normalizedBody,
     paragraphs,
@@ -91,7 +118,8 @@ function fallbackDiaryEntry(content: string): DreamDiaryEntry | null {
     return null;
   }
   return {
-    id: "entry:0",
+    id: "limited:0",
+    kind: "limited",
     dateLabel: null,
     body: content.trim(),
     paragraphs,
@@ -102,17 +130,11 @@ function fallbackDiaryEntry(content: string): DreamDiaryEntry | null {
   };
 }
 
-function candidateTokens(candidate: DreamCandidate): string[] {
-  const pathBits = candidate.path.replace(/\\/g, "/").split("/").pop() ?? candidate.path;
-  return Array.from(new Set(tokenize(`${candidate.snippet} ${pathBits.replace(/\.[a-z0-9]+$/i, "")}`)));
-}
-
-function entryTokens(entry: DreamDiaryEntry): string[] {
-  return Array.from(new Set(tokenize(`${entry.dateLabel ?? ""} ${entry.body}`)));
-}
+export type DreamDiaryEntryKind = "dated" | "heading" | "limited";
 
 export type DreamDiaryEntry = {
   id: string;
+  kind: DreamDiaryEntryKind;
   dateLabel: string | null;
   body: string;
   paragraphs: string[];
@@ -129,13 +151,6 @@ export type DreamDiaryDocument = {
   content: string | null;
   entries: DreamDiaryEntry[];
   error: string | null;
-};
-
-export type DreamDiaryRelation = {
-  status: "direct" | "limited";
-  entryId: string | null;
-  matchedTerms: string[];
-  note: string;
 };
 
 export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefined): DreamDiaryDocument {
@@ -164,12 +179,15 @@ export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefi
   const lines = content.split("\n");
   const entries: DreamDiaryEntry[] = [];
   let currentLabel: string | null = null;
+  let currentKind: DreamDiaryEntryKind = "limited";
   let currentLines: string[] = [];
   let currentStartLine = 1;
 
   const flushEntry = (endLine: number) => {
+    const seed = currentLabel ?? currentKind;
     const entry = finalizeEntry({
-      id: buildEntryId(currentLabel ?? "entry", entries.length),
+      id: buildEntryId(seed, entries.length),
+      kind: currentKind,
       dateLabel: currentLabel,
       lines: currentLines,
       startLine: currentStartLine,
@@ -178,17 +196,26 @@ export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefi
     if (entry) {
       entries.push(entry);
     }
+    currentLabel = null;
+    currentKind = "limited";
     currentLines = [];
   };
 
   for (let index = 0; index < lines.length; index += 1) {
     const rawLine = lines[index] ?? "";
+    if (shouldSkipDiaryLine(rawLine)) {
+      if (currentLabel === null && currentLines.length === 0) {
+        currentStartLine = index + 2;
+      }
+      continue;
+    }
     const heading = parseEntryHeading(rawLine);
     if (heading) {
       if (currentLines.length > 0 || currentLabel !== null) {
         flushEntry(index);
       }
-      currentLabel = heading;
+      currentLabel = heading.label;
+      currentKind = heading.kind;
       currentStartLine = index + 1;
       currentLines = [];
       continue;
@@ -234,55 +261,4 @@ export function getDreamDiaryEntryById(
     return null;
   }
   return document.entries.find((entry) => entry.id === entryId) ?? null;
-}
-
-export function relateDreamDiaryToCandidate(
-  document: DreamDiaryDocument,
-  candidate: DreamCandidate | null,
-): DreamDiaryRelation {
-  if (!candidate || document.entries.length === 0) {
-    return {
-      status: "limited",
-      entryId: null,
-      matchedTerms: [],
-      note: "No diary entry is available to relate to this candidate yet.",
-    };
-  }
-
-  const tokens = candidateTokens(candidate);
-  if (tokens.length === 0) {
-    return {
-      status: "limited",
-      entryId: document.entries[0]?.id ?? null,
-      matchedTerms: [],
-      note: "Dream Diary is available as nearby narrative context, but relationship detail is limited.",
-    };
-  }
-
-  let bestEntry: DreamDiaryEntry | null = null;
-  let bestMatches: string[] = [];
-
-  for (const entry of document.entries) {
-    const matches = tokens.filter((token) => entryTokens(entry).includes(token));
-    if (matches.length > bestMatches.length) {
-      bestEntry = entry;
-      bestMatches = matches;
-    }
-  }
-
-  if (bestEntry && bestMatches.length >= 2) {
-    return {
-      status: "direct",
-      entryId: bestEntry.id,
-      matchedTerms: bestMatches.slice(0, 4),
-      note: `Related from visible overlap: ${bestMatches.slice(0, 3).join(", ")}.`,
-    };
-  }
-
-  return {
-    status: "limited",
-    entryId: bestEntry?.id ?? document.entries[0]?.id ?? null,
-    matchedTerms: bestMatches.slice(0, 4),
-    note: "Dream Diary is available as nearby narrative context, but relationship detail is limited.",
-  };
 }
