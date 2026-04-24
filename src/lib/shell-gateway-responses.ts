@@ -71,6 +71,10 @@ function normalizeResponseUsage(
   return value === "on" || value === "off" || value === "tokens" || value === "full" ? value : undefined;
 }
 
+function isDreamNarrativeSessionKey(key: string): boolean {
+  return /(?:^|:)dreaming-narrative-(?:light|rem|deep)-/i.test(key);
+}
+
 function normalizeGatewaySessionRow(raw: unknown): GatewaySessionRow | null {
   if (!isRecord(raw)) {
     return null;
@@ -228,11 +232,12 @@ export function normalizeSessionsListResult(payload: unknown): SessionsListResul
     ? root.sessions
       .map(normalizeGatewaySessionRow)
       .filter((row): row is GatewaySessionRow => row !== null)
+      .filter((row) => !isDreamNarrativeSessionKey(row.key))
     : [];
   return {
     ts: pickNumberLike(root, ["ts"]) ?? 0,
     path: pickTrimmedString(root, ["path"]) ?? "",
-    count: pickNumberLike(root, ["count"]) ?? sessions.length,
+    count: sessions.length,
     defaults: {
       modelProvider: pickTrimmedString(defaults, ["modelProvider", "model_provider"]),
       model: pickTrimmedString(defaults, ["model"]),

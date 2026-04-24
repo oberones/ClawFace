@@ -403,7 +403,7 @@ export default function SessionSidebar(props: SessionSidebarProps) {
                 type="button"
                 onClick={props.onOpenDreams}
                 className="ui-btn ui-btn-light"
-                title="Dream Inspector"
+                title="Dream Diary"
               >
                 Dreams
               </button>
@@ -439,7 +439,7 @@ export default function SessionSidebar(props: SessionSidebarProps) {
               type="button"
               onClick={props.onOpenDreams}
               className="ui-btn ui-btn-light"
-              title="Dream Inspector"
+              title="Dream Diary"
             >
               DR
             </button>

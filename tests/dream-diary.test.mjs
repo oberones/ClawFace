@@ -11,29 +11,7 @@ function loadModule() {
   return loader.loadModule(path.join(repoRoot, "src/lib/dream-diary.ts"));
 }
 
-function createCandidate(snippet) {
-  return {
-    key: "candidate-1",
-    lane: "waiting",
-    path: "memory/2026-04-03.md",
-    startLine: 4,
-    endLine: 6,
-    snippet,
-    recallCount: 2,
-    dailyCount: 1,
-    groundedCount: 0,
-    totalSignalCount: 3,
-    lightHits: 1,
-    remHits: 1,
-    phaseHitCount: 2,
-    promotedAt: null,
-    lastRecalledAt: "2026-04-22T09:00:00.000Z",
-    originLabel: "Heating up from current signals",
-    explanationCues: [],
-  };
-}
-
-test("parseDreamDiarySnapshot splits diary content into readable entries", () => {
+test("parseDreamDiarySnapshot splits dated diary content into readable entries", () => {
   const { parseDreamDiarySnapshot } = loadModule();
 
   const document = parseDreamDiarySnapshot({
@@ -53,55 +31,189 @@ test("parseDreamDiarySnapshot splits diary content into readable entries", () =>
   });
 
   assert.equal(document.entries.length, 2);
+  assert.equal(document.entries[0]?.kind, "dated");
   assert.equal(document.entries[0]?.dateLabel, "2026-04-22");
   assert.equal(document.entries[0]?.paragraphs[0], "Emma prefers shorter, lower-pressure check-ins.");
 });
 
-test("relateDreamDiaryToCandidate marks direct matches when visible text overlaps", () => {
-  const { parseDreamDiarySnapshot, relateDreamDiaryToCandidate } = loadModule();
+test("parseDreamDiarySnapshot splits OpenClaw managed diary timestamps into entries", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
 
   const document = parseDreamDiarySnapshot({
     found: true,
     path: "DREAMS.md",
     content: [
-      "## 2026-04-22",
+      "# Dream Diary",
       "",
-      "Emma prefers shorter, lower-pressure check-ins and that preference kept resurfacing.",
+      "<!-- openclaw:dreaming:diary:start -->",
+      "---",
+      "",
+      "*April 11, 2026, 8:00 AM UTC*",
+      "",
+      "The server room smelled like rain.",
+      "",
+      "---",
+      "",
+      "*April 11, 2026, 8:30 AM UTC*",
+      "",
+      "<!-- transient comment -->",
+      "",
+      "A fresh signal arrived after the cleanup started.",
+      "",
+      "<!-- openclaw:dreaming:diary:end -->",
+      "",
     ].join("\n"),
     updatedAtMs: 1234,
     error: null,
   });
 
-  const relation = relateDreamDiaryToCandidate(
-    document,
-    createCandidate("Emma prefers shorter, lower-pressure check-ins."),
-  );
-
-  assert.equal(relation.status, "direct");
-  assert.equal(relation.entryId, document.entries[0]?.id);
-  assert.ok(relation.matchedTerms.length >= 2);
+  assert.equal(document.entries.length, 2);
+  assert.equal(document.entries[0]?.kind, "dated");
+  assert.equal(document.entries[0]?.dateLabel, "April 11, 2026, 8:00 AM UTC");
+  assert.deepEqual(document.entries[0]?.paragraphs, ["The server room smelled like rain."]);
+  assert.equal(document.entries[1]?.kind, "dated");
+  assert.equal(document.entries[1]?.dateLabel, "April 11, 2026, 8:30 AM UTC");
+  assert.deepEqual(document.entries[1]?.paragraphs, ["A fresh signal arrived after the cleanup started."]);
 });
 
-test("relateDreamDiaryToCandidate falls back to limited context when overlap is weak", () => {
-  const { parseDreamDiarySnapshot, relateDreamDiaryToCandidate } = loadModule();
+test("parseDreamDiarySnapshot splits OpenClaw at-form diary timestamps into separate entries", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
 
   const document = parseDreamDiarySnapshot({
     found: true,
     path: "DREAMS.md",
     content: [
-      "## 2026-04-22",
+      "# Dream Diary",
       "",
-      "The dreaming run focused on scheduling and follow-up cadence.",
+      "<!-- openclaw:dreaming:diary:start -->",
+      "---",
+      "",
+      "*April 23, 2026 at 3:00 AM UTC*",
+      "",
+      "First dream from this hour.",
+      "",
+      "---",
+      "",
+      "*April 23, 2026 at 3:00 AMUTC*",
+      "",
+      "Second dream from this hour.",
+      "",
+      "<!-- openclaw:dreaming:diary:end -->",
     ].join("\n"),
     updatedAtMs: 1234,
     error: null,
   });
 
-  const relation = relateDreamDiaryToCandidate(
-    document,
-    createCandidate("Emma prefers shorter, lower-pressure check-ins."),
-  );
+  assert.equal(document.entries.length, 2);
+  assert.equal(document.entries[0]?.kind, "dated");
+  assert.equal(document.entries[0]?.dateLabel, "April 23, 2026 at 3:00 AM UTC");
+  assert.deepEqual(document.entries[0]?.paragraphs, ["First dream from this hour."]);
+  assert.equal(document.entries[1]?.kind, "dated");
+  assert.equal(document.entries[1]?.dateLabel, "April 23, 2026 at 3:00 AM UTC");
+  assert.deepEqual(document.entries[1]?.paragraphs, ["Second dream from this hour."]);
+});
 
-  assert.equal(relation.status, "limited");
-  assert.match(relation.note, /relationship detail is limited/i);
+test("parseDreamDiarySnapshot preserves backfill diary dates as individual entries", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
+
+  const document = parseDreamDiarySnapshot({
+    found: true,
+    path: "DREAMS.md",
+    content: [
+      "# Dream Diary",
+      "",
+      "<!-- openclaw:dreaming:diary:start -->",
+      "*January 1, 2026*",
+      "",
+      "<!-- openclaw:dreaming:backfill-entry day=2026-01-01 source=memory/2026-01-01.md -->",
+      "",
+      "What Happened",
+      "",
+      "1. First pass.",
+      "",
+      "*January 2, 2026*",
+      "",
+      "<!-- openclaw:dreaming:backfill-entry day=2026-01-02 source=memory/2026-01-02.md -->",
+      "",
+      "Reflections",
+      "",
+      "1. Second pass.",
+      "",
+      "<!-- openclaw:dreaming:diary:end -->",
+    ].join("\n"),
+    updatedAtMs: 1234,
+    error: null,
+  });
+
+  assert.equal(document.entries.length, 2);
+  assert.equal(document.entries[0]?.dateLabel, "January 1, 2026");
+  assert.equal(document.entries[0]?.paragraphs.includes("1. First pass."), true);
+  assert.equal(document.entries[1]?.dateLabel, "January 2, 2026");
+  assert.equal(document.entries[1]?.paragraphs.includes("1. Second pass."), true);
+});
+
+test("parseDreamDiarySnapshot preserves heading-only entries without inventing dates", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
+
+  const document = parseDreamDiarySnapshot({
+    found: true,
+    path: "DREAMS.md",
+    content: [
+      "## Memory drift",
+      "",
+      "The dream kept circling back to lower-pressure check-ins.",
+      "",
+      "## Follow-up tone",
+      "",
+      "A quieter cadence remained the strongest narrative thread.",
+    ].join("\n"),
+    updatedAtMs: 4321,
+    error: null,
+  });
+
+  assert.equal(document.entries.length, 2);
+  assert.equal(document.entries[0]?.kind, "heading");
+  assert.equal(document.entries[0]?.dateLabel, "Memory drift");
+  assert.equal(document.entries[1]?.kind, "heading");
+  assert.equal(document.updatedAtMs, 4321);
+});
+
+test("parseDreamDiarySnapshot falls back to a limited readable entry for unstructured content", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
+
+  const document = parseDreamDiarySnapshot({
+    found: true,
+    path: "DREAMS.md",
+    content: [
+      "The dream diary exists, but this content has no clear dated heading.",
+      "",
+      "It should remain readable instead of disappearing.",
+    ].join("\n"),
+    updatedAtMs: 9876,
+    error: null,
+  });
+
+  assert.equal(document.entries.length, 1);
+  assert.equal(document.entries[0]?.kind, "limited");
+  assert.equal(document.entries[0]?.dateLabel, null);
+  assert.deepEqual(document.entries[0]?.paragraphs, [
+    "The dream diary exists, but this content has no clear dated heading.",
+    "It should remain readable instead of disappearing.",
+  ]);
+});
+
+test("parseDreamDiarySnapshot returns empty entries when diary content is unavailable", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
+
+  const document = parseDreamDiarySnapshot({
+    found: false,
+    path: "DREAMS.md",
+    content: null,
+    updatedAtMs: 1111,
+    error: "not found",
+  });
+
+  assert.equal(document.found, false);
+  assert.equal(document.entries.length, 0);
+  assert.equal(document.error, "not found");
 });
