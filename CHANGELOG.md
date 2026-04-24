@@ -8,6 +8,12 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.15.1 (2026-04-24)
+
+### Fix
+
+- update package log with newer dependencies
+
 ## v0.15.0 (2026-04-24)
 
 ### Feat
