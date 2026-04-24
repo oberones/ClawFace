@@ -1,60 +1,45 @@
 # ClawFace
 
-ClawFace is a desktop-first frontend for OpenClaw. The goal is simple: make OpenClaw feel like a real personal AI workstation on your machine, not just a backend with a chat window or a bundle of admin pages in your browser.
+Desktop-first OpenClaw client for people who want sessions, tools, files, media, and memory visibility to feel like part of one real desktop app instead of scattered backend surfaces.
+
+![ClawFace application preview](./public/ClawFace0.4.2.png)
+
+> Compatibility note: some package/build metadata may still use the legacy name `ClawUI` while the rename to `ClawFace` finishes across the repo.
 
 ## What ClawFace Is
 
-ClawFace is built for people already running OpenClaw locally or on self-hosted infrastructure who want a better everyday desktop experience.
+ClawFace is the desktop frontend for OpenClaw users who already run OpenClaw locally or on self-hosted infrastructure and want a better day-to-day interface.
 
-- **OpenClaw-native** rather than a generic multi-provider shell
-- **desktop-first** rather than a web-first collaboration app
-- **conversation-centered** with first-class sessions, tools, files, media, and memory visibility
-- **frontend-focused**, while OpenClaw remains the backend management and capability plane
+- OpenClaw-native rather than a generic multi-provider chat shell
+- Desktop-first rather than a web-first collaboration app
+- Conversation-centered, with first-class sessions, tools, files, media, and memory visibility
+- Focused on using OpenClaw, not replacing OpenClaw's backend admin/config surfaces
 
 ## What You Can Do Today
 
-ClawFace already includes a usable first pass of the core workstation surfaces:
+- Use **session-centered desktop chat** with streaming replies, connection feedback, model/thinking controls, and session activity visibility
+- Work with **desktop attachments** through drag/drop, paste-image handling, staged attachments, local image rendering, and image lightbox support
+- Follow **tool activity** in the conversation flow instead of digging through raw trace output
+- Browse **Files** and **Media** inside dedicated app surfaces
+- Open **Dream Inspector** to see waiting, grounded, and promoted memory candidates, Dream Diary context, and nearby related memory context
+- Open **Dream Timeline** to see evidence-derived chronology from visible promotion timestamps, replay touchpoints, and Dream Diary timing
+- Use **desktop-oriented settings** such as path-prefix mappings for shared-volume/container installs
 
-- **Session-centered desktop chat** with streaming replies, connection feedback, model/thinking controls, and session activity visibility
-- **Desktop attachment workflows** including drag/drop, paste-image handling, staged attachments, local image rendering, and image lightbox support
-- **Tool activity visibility** in the conversation flow so OpenClaw actions are easier to follow than raw trace output
-- **Dedicated Files and Media surfaces** for browsing workspace files and reusable media artifacts inside the app shell
-- **Dream Inspector** for signal-first visibility into waiting, grounded, and promoted memory candidates plus Dream Diary and nearby memory context
-- **Dream Timeline** for evidence-derived chronology from currently exposed memory data, including promotion moments, replay touchpoints, dated diary entries, and candidate-scoped related-context handoffs
-- **Desktop-oriented settings and compatibility support** including path-prefix mappings for shared-volume/container installs
-
-## Current Boundaries
-
-ClawFace intentionally stays on top of the OpenClaw gateway surfaces that already exist today.
-
-- It **does not** make backend changes to OpenClaw from this repo.
-- If a capability is not exposed by the current gateway, ClawFace should surface that as a limitation instead of quietly depending on companion backend work.
-- Dream Timeline is therefore a **visible-evidence timeline**, not a raw memory event-log viewer.
-
-## Why It Exists
-
-OpenClaw already has powerful capabilities across sessions, tools, media analysis, browser/canvas flows, background work, and local/self-hosted workflows. ClawFace brings more of that day-to-day experience into a single desktop app without trying to replace every backend surface OpenClaw already has.
-
-## Technology stack
-
-Current stack includes:
-- React
-- TypeScript
-- Vite
-- Electron
-
-## For Contributors
-
-If you are contributing to the app or onboarding quickly, start with:
-
-- [`AGENTS.md`](./AGENTS.md) — repo bootstrap guide, working conventions, and architecture hotspots
-- [`docs/DEVELOPMENT_CONSTRAINTS.md`](./docs/DEVELOPMENT_CONSTRAINTS.md) — pinned Node/npm versions and required local checks
-- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — current architecture inventory and guidance
-- [`docs/PRODUCT-BRIEF.md`](./docs/PRODUCT-BRIEF.md) — product framing and principles
-
-## Install
+## Quick Start
 
 ClawFace currently works best as a desktop app pointed at an OpenClaw gateway you already have running.
+
+```bash
+npm ci
+npm run desktop:dev
+```
+
+Use the pinned runtime for source builds:
+
+- Node.js `22.22.0`
+- npm `10.9.4`
+
+## Install
 
 ### macOS
 
@@ -132,50 +117,18 @@ Notes:
 - Linux support is currently best treated as a source-run workflow.
 - If Electron reports missing system libraries on your distro, install the usual desktop GUI dependencies required by Electron and retry.
 
-## Common development commands
+## Notes
 
-A `Makefile` is available for common local tasks.
+### Current Boundaries
 
-Examples:
+- ClawFace works on top of the OpenClaw gateway surfaces that already exist today.
+- This repo does **not** make backend OpenClaw changes.
+- Some memory features are intentionally evidence-based because raw backend event logs are not exposed to the frontend.
+- Dream Timeline is therefore a visible-evidence timeline, not a raw memory event-log viewer.
 
-```bash
-make help
-make install
-make dev
-make build
-make typecheck
-make test-unit
-make verify
-```
+### Media Path Mapping
 
-The Makefile wraps the commands that are actually present in the repo today, plus a small number of sensible extras like `typecheck`, `test-unit`, and `clean`.
-
-`make test-unit` runs the focused Node-based regression checks that currently cover:
-- path prefix mapping for shared-volume/container installs
-- generated-image source resolution into `~/.openclaw/media`
-- renderer image source selection when both pretty filenames and concrete UUID media paths are present
-- Dream Inspector helper logic such as candidate shaping, diary parsing, and related-context matching
-- Dream Timeline helper logic such as chronology derivation, empty/disabled handling, and artifact-link shaping
-
-For media-related work, the practical validation stack is:
-- `make test-unit` for helper-level regressions
-- `make typecheck` for renderer/app safety
-- `make build` for the final production bundling check
-
-For Dream Inspector or Dream Timeline work, use that same validation stack and add a desktop visual pass because those features rely on adjacent pane composition and shell interaction details.
-
-## Runtime expectations
-
-ClawFace is currently pinned to a **Node 22** development/runtime target.
-
-If you see `EBADENGINE` warnings on Node 20, that is expected with the current repo constraints rather than a sign that the repo is intended to support both lines equally.
-Some parts of the current Electron/tooling dependency chain now also require Node 22+.
-
-Use the pinned runtime described in [`docs/DEVELOPMENT_CONSTRAINTS.md`](./docs/DEVELOPMENT_CONSTRAINTS.md) before treating install or validation failures as application-code regressions.
-
-## Media path mapping
-
-ClawFace can render OpenClaw-generated images and other local media in a few different deployment shapes, but the path resolution strategy depends on where OpenClaw is running.
+ClawFace can render OpenClaw-generated images and other local media in several deployment shapes, but the path resolution strategy depends on where OpenClaw is running.
 
 - **OpenClaw on the host machine**: media paths usually resolve directly.
 - **OpenClaw in a local container with shared volumes**: use **Settings -> Path Prefix Mappings** to map container paths to host paths.
@@ -188,35 +141,50 @@ The most common Docker mapping looks like:
 /home/node/.openclaw/workspace => ~/.openclaw/workspace
 ```
 
-Notes:
-- Path mappings are applied when ClawFace needs to turn backend filesystem paths into local renderable image sources.
-- This makes shared-volume container installs much more practical without hardcoding Docker-specific paths into the app.
-- For community-facing portability, local path mapping should be treated as a compatibility layer; truly remote installs still benefit from gateway-served media access.
+## For Contributors
 
-## Development status and expectations
+If you are contributing to the app or onboarding quickly, start with:
 
-This repo is under active repositioning and architectural cleanup.
+- [`AGENTS.md`](./AGENTS.md) for repo bootstrap guidance and working conventions
+- [`docs/DEVELOPMENT_CONSTRAINTS.md`](./docs/DEVELOPMENT_CONSTRAINTS.md) for pinned runtime details and required checks
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for current architecture boundaries and refactor guidance
+- [`docs/PRODUCT-BRIEF.md`](./docs/PRODUCT-BRIEF.md) for product framing
 
-Expect:
-- moving boundaries
-- refactors before major new features
-- some legacy complexity from the abandoned predecessor
-- planning docs that may be more accurate than older implementation assumptions
+### Common Development Commands
 
-## Practical development guidance
+```bash
+make help
+make install
+make dev
+make build
+make typecheck
+make test-unit
+make verify
+```
 
-When working in this repo:
-- do not treat current giant components as the final architecture
-- prefer extracting clear boundaries over adding more logic to overloaded files
-- align product changes with the roadmap’s vertical slices
-- keep OpenClaw-native capability exposure central to the product direction
+`make test-unit` currently covers:
 
-## Original project note
+- path prefix mapping for shared-volume/container installs
+- generated-image source resolution into `~/.openclaw/media`
+- renderer image source selection when both pretty filenames and concrete UUID media paths are present
+- Dream Inspector helper logic such as candidate shaping, diary parsing, and related-context matching
+- Dream Timeline helper logic such as chronology derivation, empty/disabled handling, and artifact-link shaping
 
-This repo began as a more generic “modern chat client for OpenClaw Gateway” effort under a different project identity.
-That framing is no longer sufficient for where the project is headed.
+Practical validation guidance:
 
-The new direction is intentional: ClawFace should become a true desktop frontend for OpenClaw’s richer ecosystem of sessions, tools, media, and future operator surfaces.
+- `make test-unit` for helper-level regressions
+- `make typecheck` for renderer/app safety
+- `make build` for the production bundling check
+- add a desktop visual pass for Dream Inspector and Dream Timeline changes because they rely on adjacent pane composition and shell interaction details
+
+### Runtime Expectations
+
+ClawFace is currently pinned to:
+
+- Node.js `22.22.0`
+- npm `10.9.4`
+
+If you see `EBADENGINE` warnings on Node 20, treat that as a runtime mismatch rather than as supported dual-runtime behavior.
 
 ## License
 
