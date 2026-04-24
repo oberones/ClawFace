@@ -100,6 +100,7 @@ export function useDreamDiaryTimelineController(
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const snapshotRef = useRef(snapshot);
   const selectedEntryIdRef = useRef<string | null>(selectedEntryId);
+  const selectedSessionKeyRef = useRef<string | null>(params.selectedSessionKey);
   const loadRequestSeqRef = useRef(0);
 
   useEffect(() => {
@@ -119,6 +120,15 @@ export function useDreamDiaryTimelineController(
       setSelectedEntryId(nextEntryId);
     }
   }, [selectedEntryId, snapshot.entriesById, snapshot.latestEntryId, snapshot.selectedEntryId]);
+
+  useEffect(() => {
+    if (selectedSessionKeyRef.current === params.selectedSessionKey) {
+      return;
+    }
+    selectedSessionKeyRef.current = params.selectedSessionKey;
+    selectedEntryIdRef.current = null;
+    setSelectedEntryId(null);
+  }, [params.selectedSessionKey]);
 
   const loadSnapshot = useCallback(async (mode: "auto" | "manual" = "auto") => {
     const scope = buildScope(params.sessionInfo, params.gatewayConfigStateRef);
@@ -222,15 +232,16 @@ export function useDreamDiaryTimelineController(
 
     const diaryDocument = parseDreamDiarySnapshot(diarySource);
     const hasLoadedEntries = diaryDocument.entries.length > 0;
-    const document = diaryError && !hasLoadedEntries && hasExistingEntries ? existingDocument : diaryDocument;
+    const usingCachedDocument = Boolean(diaryError && !hasLoadedEntries && hasExistingEntries);
+    const document = usingCachedDocument ? existingDocument : diaryDocument;
     const nextSnapshot = createTimelineSnapshot({
       document,
       scope,
-      loadedAtMs: Date.now(),
+      loadedAtMs: diaryError ? existingSnapshot.loadedAtMs : Date.now(),
       selectedEntryId: selectedEntryIdRef.current,
       disabled,
-      unavailable: Boolean(diaryError && !hasLoadedEntries && !hasExistingEntries),
-      note: diaryError && hasExistingEntries
+      unavailable: Boolean(diaryError && !hasLoadedEntries),
+      note: usingCachedDocument
         ? "Could not refresh the Dream Diary. Showing the last readable snapshot."
         : null,
       error: diaryError,
@@ -238,7 +249,7 @@ export function useDreamDiaryTimelineController(
 
     setSnapshot(nextSnapshot);
     setSelectedEntryId(nextSnapshot.selectedEntryId);
-    setRefreshState(diaryError && !hasExistingEntries ? "failed" : "idle");
+    setRefreshState(diaryError ? "failed" : "idle");
   }, [
     params.clientRef,
     params.connectionStatus,
