@@ -226,7 +226,7 @@ export function setAppearanceMode<T extends AppearanceSettings>(
   };
 }
 
-/** Patches only the currently active palette so inactive custom colors are preserved. */
+/** Patches only the active palette and keeps in-progress color text editable. */
 export function patchActiveAppearancePalette<T extends AppearanceSettings>(
   settings: T,
   patch: Partial<AppearancePalette>,
@@ -236,7 +236,10 @@ export function patchActiveAppearancePalette<T extends AppearanceSettings>(
   const nextPalette = { ...current };
   for (const key of COLOR_SETTING_KEYS) {
     if (Object.prototype.hasOwnProperty.call(patch, key)) {
-      nextPalette[key] = normalizeAppearanceColor(patch[key], current[key]);
+      const nextValue = patch[key];
+      if (typeof nextValue === "string") {
+        nextPalette[key] = nextValue;
+      }
     }
   }
   return {
@@ -268,9 +271,21 @@ export function resetActiveAppearanceMarkdown<T extends AppearanceSettings>(sett
   return patchActiveAppearancePalette(settings, patch);
 }
 
+/** Filters unfinished color drafts before values are applied to CSS custom properties. */
+function getSafeActiveAppearancePalette(settings: AppearanceSettings): AppearancePalette {
+  const mode = normalizeAppearanceMode(settings.appearanceMode);
+  const palette = getActiveAppearancePalette(settings);
+  const fallback = DEFAULT_APPEARANCE_PALETTES[mode];
+  const safePalette = { ...fallback };
+  for (const key of COLOR_SETTING_KEYS) {
+    safePalette[key] = normalizeAppearanceColor(palette[key], fallback[key]);
+  }
+  return safePalette;
+}
+
 /** Maps the active palette to root CSS variables in one testable place. */
 export function deriveAppearanceCssVariables(settings: AppearanceSettings): Record<string, string> {
-  const palette = getActiveAppearancePalette(settings);
+  const palette = getSafeActiveAppearancePalette(settings);
   return {
     "--claw-bg": palette.backgroundColor,
     "--claw-bg-elevated": palette.backgroundElevatedColor,

@@ -70,9 +70,11 @@ test("setAppearanceMode and patchActiveAppearancePalette preserve inactive palet
 
   const dark = setAppearanceMode(original, "dark");
   const patched = patchActiveAppearancePalette(dark, { accentColor: "#abcdef" });
+  const partialDraft = patchActiveAppearancePalette(dark, { accentColor: "#" });
 
   assert.equal(patched.fontFamily, "Manrope");
   assert.equal(patched.appearancePalettes.dark.accentColor, "#abcdef");
+  assert.equal(partialDraft.appearancePalettes.dark.accentColor, "#");
   assert.equal(patched.appearancePalettes.light.accentColor, DEFAULT_APPEARANCE_PALETTES.light.accentColor);
   assert.equal(original.appearancePalettes.dark.accentColor, DEFAULT_APPEARANCE_PALETTES.dark.accentColor);
 });
@@ -143,6 +145,37 @@ test("deriveAppearanceCssVariables maps active palette values to root tokens", (
   assert.equal(
     variables["--frost-warm-active"],
     `color-mix(in srgb, ${DEFAULT_APPEARANCE_PALETTES.dark.accentSoftColor} 88%, ${DEFAULT_APPEARANCE_PALETTES.dark.surfaceColor})`,
+  );
+});
+
+test("deriveAppearanceCssVariables falls back safely for partial color drafts", () => {
+  const {
+    DEFAULT_APPEARANCE_PALETTES,
+    deriveAppearanceCssVariables,
+    patchActiveAppearancePalette,
+  } = loadAppearanceModeModule();
+
+  const settings = {
+    appearanceMode: "dark",
+    appearancePalettes: {
+      light: { ...DEFAULT_APPEARANCE_PALETTES.light },
+      dark: { ...DEFAULT_APPEARANCE_PALETTES.dark },
+    },
+  };
+
+  const draft = patchActiveAppearancePalette(settings, {
+    accentColor: "#",
+    surfaceColor: "rgb(",
+  });
+  const variables = deriveAppearanceCssVariables(draft);
+
+  assert.equal(draft.appearancePalettes.dark.accentColor, "#");
+  assert.equal(draft.appearancePalettes.dark.surfaceColor, "rgb(");
+  assert.equal(variables["--claw-accent"], DEFAULT_APPEARANCE_PALETTES.dark.accentColor);
+  assert.equal(variables["--claw-surface"], DEFAULT_APPEARANCE_PALETTES.dark.surfaceColor);
+  assert.equal(
+    variables["--frost-warm-border"],
+    `color-mix(in srgb, ${DEFAULT_APPEARANCE_PALETTES.dark.accentColor} 46%, ${DEFAULT_APPEARANCE_PALETTES.dark.borderColor})`,
   );
 });
 
