@@ -1,14 +1,20 @@
 import React from "react";
 import type { UiSettings } from "../../lib/ui-settings.ts";
+import type { AppearanceMode, AppearancePalette } from "../../lib/appearance-mode.ts";
 import { ColorField, NumberField } from "./SettingsFieldControls.tsx";
 
 type ColorSystemSectionProps = {
+  appearanceMode: AppearanceMode;
+  palette: AppearancePalette;
   uiSettings: UiSettings;
-  onPatch: (next: Partial<UiSettings>) => void;
+  onSettingsPatch: (next: Partial<UiSettings>) => void;
+  onPalettePatch: (next: Partial<AppearancePalette>) => void;
   onReset: () => void;
 };
 
+/** Renders global visual controls plus active-mode palette controls in one settings card. */
 export function ColorSystemSection(props: ColorSystemSectionProps) {
+  const modeLabel = props.appearanceMode === "dark" ? "dark" : "light";
   return (
     <section className="setting-card">
       <div className="setting-head">
@@ -21,6 +27,7 @@ export function ColorSystemSection(props: ColorSystemSectionProps) {
           Reset Section
         </button>
       </div>
+      <p className="setting-helper-text">Editing {modeLabel} colors. Other mode colors are preserved.</p>
       <div className="setting-fields">
         <NumberField
           label="Panel opacity"
@@ -29,7 +36,7 @@ export function ColorSystemSection(props: ColorSystemSectionProps) {
           max={100}
           step={1}
           suffix="%"
-          onChange={(value) => props.onPatch({ panelOpacity: value })}
+          onChange={(value) => props.onSettingsPatch({ panelOpacity: value })}
         />
         <NumberField
           label="Background pattern strength"
@@ -38,28 +45,68 @@ export function ColorSystemSection(props: ColorSystemSectionProps) {
           max={100}
           step={1}
           suffix="%"
-          onChange={(value) => props.onPatch({ backgroundPatternStrength: value })}
+          onChange={(value) => props.onSettingsPatch({ backgroundPatternStrength: value })}
         />
 
         <ColorField
+          label="Background"
+          value={props.palette.backgroundColor}
+          onChange={(value) => props.onPalettePatch({ backgroundColor: value })}
+        />
+        <ColorField
+          label="Elevated background"
+          value={props.palette.backgroundElevatedColor}
+          onChange={(value) => props.onPalettePatch({ backgroundElevatedColor: value })}
+        />
+        <ColorField
+          label="Surface"
+          value={props.palette.surfaceColor}
+          onChange={(value) => props.onPalettePatch({ surfaceColor: value })}
+        />
+        <ColorField
+          label="Border"
+          value={props.palette.borderColor}
+          onChange={(value) => props.onPalettePatch({ borderColor: value })}
+        />
+        <ColorField
+          label="Strong border"
+          value={props.palette.borderStrongColor}
+          onChange={(value) => props.onPalettePatch({ borderStrongColor: value })}
+        />
+        <ColorField
+          label="Primary text"
+          value={props.palette.textColor}
+          onChange={(value) => props.onPalettePatch({ textColor: value })}
+        />
+        <ColorField
+          label="Secondary text"
+          value={props.palette.textSoftColor}
+          onChange={(value) => props.onPalettePatch({ textSoftColor: value })}
+        />
+        <ColorField
+          label="Muted text"
+          value={props.palette.textMutedColor}
+          onChange={(value) => props.onPalettePatch({ textMutedColor: value })}
+        />
+        <ColorField
           label="Accent"
-          value={props.uiSettings.accentColor}
-          onChange={(value) => props.onPatch({ accentColor: value })}
+          value={props.palette.accentColor}
+          onChange={(value) => props.onPalettePatch({ accentColor: value })}
         />
         <ColorField
           label="Accent soft"
-          value={props.uiSettings.accentSoftColor}
-          onChange={(value) => props.onPatch({ accentSoftColor: value })}
+          value={props.palette.accentSoftColor}
+          onChange={(value) => props.onPalettePatch({ accentSoftColor: value })}
         />
         <ColorField
           label="User bubble"
-          value={props.uiSettings.userBubbleColor}
-          onChange={(value) => props.onPatch({ userBubbleColor: value })}
+          value={props.palette.userBubbleColor}
+          onChange={(value) => props.onPalettePatch({ userBubbleColor: value })}
         />
         <ColorField
           label="Assistant bubble"
-          value={props.uiSettings.assistantBubbleColor}
-          onChange={(value) => props.onPatch({ assistantBubbleColor: value })}
+          value={props.palette.assistantBubbleColor}
+          onChange={(value) => props.onPalettePatch({ assistantBubbleColor: value })}
         />
       </div>
     </section>
