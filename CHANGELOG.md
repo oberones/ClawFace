@@ -8,6 +8,16 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.14.0 (2026-04-24)
+
+### Feat
+
+- **dreams**: replace inspector with diary timeline reader
+
+### Fix
+
+- **dreams**: surface stale diary refreshes
+
 ## v0.13.0 (2026-04-22)
 
 ## v0.12.0 (2026-04-22)
