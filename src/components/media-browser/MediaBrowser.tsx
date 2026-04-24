@@ -6,11 +6,15 @@ import { useImageLightboxController } from "../../hooks/useImageLightboxControll
 import { useMediaBrowserController } from "../../hooks/useMediaBrowserController.ts";
 import { isMediaArtifactReusableInV1 } from "../../lib/media-browser-items.ts";
 import type { MediaBrowserSourceData } from "../../lib/media-browser-sources.ts";
+import type { AppearanceMode } from "../../lib/appearance-mode.ts";
+import { AppearanceModeToggle } from "../AppearanceModeToggle.tsx";
 
 export type MediaBrowserProps = {
   sourceData: MediaBrowserSourceData;
   activeSessionKey?: string | null;
   enableAnimations?: boolean;
+  appearanceMode: AppearanceMode;
+  onToggleAppearanceMode: () => void;
   onSwitchToChat?: () => void;
   onOpenFiles?: () => void;
   onOpenSettings?: () => void;
@@ -18,6 +22,7 @@ export type MediaBrowserProps = {
   onResolveRemoteImage?: (filePath: string) => Promise<string | null>;
 };
 
+/** Renders the media browser and shared shell actions without owning app-level settings. */
 export default function MediaBrowser(props: MediaBrowserProps) {
   const controller = useMediaBrowserController({
     sourceData: props.sourceData,
@@ -50,6 +55,10 @@ export default function MediaBrowser(props: MediaBrowserProps) {
               Files
             </button>
           ) : null}
+          <AppearanceModeToggle
+            mode={props.appearanceMode}
+            onToggle={props.onToggleAppearanceMode}
+          />
           {props.onOpenSettings ? (
             <button type="button" className="ui-btn ui-btn-primary" onClick={props.onOpenSettings}>
               Settings

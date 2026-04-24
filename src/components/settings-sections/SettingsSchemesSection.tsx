@@ -13,6 +13,7 @@ type SettingsSchemesSectionProps = {
   onDeleteUiSettingsScheme: (schemeId: string) => void;
 };
 
+/** Renders saved UI schemes and explains their appearance-mode scope. */
 export function SettingsSchemesSection(props: SettingsSchemesSectionProps) {
   const canOverwriteOrDeleteScheme = props.activeUiSettingsSchemeId !== props.builtinSchemeId;
   const canSaveScheme = props.schemeNameDraft.trim().length > 0;
@@ -31,6 +32,7 @@ export function SettingsSchemesSection(props: SettingsSchemesSectionProps) {
       <div className="setting-head">
         <h3 className="setting-title">Settings Schemes</h3>
       </div>
+      <p className="setting-helper-text">Schemes include appearance mode and both light/dark color palettes.</p>
       <div className="setting-fields">
         <label className="field-block">
           <span className="field-label">Apply saved scheme</span>

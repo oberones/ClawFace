@@ -32,6 +32,11 @@ import {
   type UiSettings,
 } from "./lib/ui-settings.ts";
 import {
+  deriveAppearanceCssVariables,
+  normalizeAppearanceSettings,
+  setAppearanceMode,
+} from "./lib/appearance-mode.ts";
+import {
   normalizePathPrefixMappingsText,
   setActivePathPrefixMappingHomeDir,
   setActivePathPrefixMappingsText,
@@ -430,20 +435,6 @@ function parseNumberSetting(
   return Math.max(min, Math.min(max, value));
 }
 
-function parseColorSetting(value: unknown, fallback: string): string {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return fallback;
-  }
-  const isHex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(trimmed);
-  const isRgb = /^rgba?\(\s*[-\d.%\s,]+\)$/i.test(trimmed);
-  const isHsl = /^hsla?\(\s*[-\d.%\s,]+\)$/i.test(trimmed);
-  return isHex || isRgb || isHsl ? trimmed : fallback;
-}
-
 function parseReplyDoneSoundTone(
   value: unknown,
   fallback: ReplyDoneSoundTone,
@@ -517,7 +508,10 @@ function resolveSessionLabel(label: string): string {
 
 function parseUiSettings(value: unknown): UiSettings {
   const parsed = value && typeof value === "object" ? (value as Partial<UiSettings>) : {};
+  const appearanceSettings = normalizeAppearanceSettings(value);
+  // Appearance settings are normalized centrally so old top-level color fields survive migration.
   return {
+    ...appearanceSettings,
     fontFamily: typeof parsed.fontFamily === "string" && parsed.fontFamily.trim()
       ? parsed.fontFamily.trim()
       : DEFAULT_UI_SETTINGS.fontFamily,
@@ -631,36 +625,6 @@ function parseUiSettings(value: unknown): UiSettings {
       0,
       100,
     ),
-    accentColor: parseColorSetting(parsed.accentColor, DEFAULT_UI_SETTINGS.accentColor),
-    accentSoftColor: parseColorSetting(parsed.accentSoftColor, DEFAULT_UI_SETTINGS.accentSoftColor),
-    userBubbleColor: parseColorSetting(parsed.userBubbleColor, DEFAULT_UI_SETTINGS.userBubbleColor),
-    assistantBubbleColor: parseColorSetting(
-      parsed.assistantBubbleColor,
-      DEFAULT_UI_SETTINGS.assistantBubbleColor,
-    ),
-    markdownHeadingColor: parseColorSetting(
-      parsed.markdownHeadingColor,
-      DEFAULT_UI_SETTINGS.markdownHeadingColor,
-    ),
-    markdownLinkColor: parseColorSetting(
-      parsed.markdownLinkColor,
-      DEFAULT_UI_SETTINGS.markdownLinkColor,
-    ),
-    markdownBoldColor: parseColorSetting(
-      parsed.markdownBoldColor,
-      DEFAULT_UI_SETTINGS.markdownBoldColor,
-    ),
-    markdownItalicColor: parseColorSetting(
-      parsed.markdownItalicColor,
-      DEFAULT_UI_SETTINGS.markdownItalicColor,
-    ),
-    markdownCodeBg: parseColorSetting(parsed.markdownCodeBg, DEFAULT_UI_SETTINGS.markdownCodeBg),
-    markdownCodeText: parseColorSetting(parsed.markdownCodeText, DEFAULT_UI_SETTINGS.markdownCodeText),
-    markdownQuoteBg: parseColorSetting(parsed.markdownQuoteBg, DEFAULT_UI_SETTINGS.markdownQuoteBg),
-    markdownQuoteBorderColor: parseColorSetting(
-      parsed.markdownQuoteBorderColor,
-      DEFAULT_UI_SETTINGS.markdownQuoteBorderColor,
-    ),
     enableAnimations:
       typeof parsed.enableAnimations === "boolean"
         ? parsed.enableAnimations
@@ -685,11 +649,11 @@ function loadUiSettings(): UiSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.uiSettings);
     if (!raw) {
-      return { ...DEFAULT_UI_SETTINGS };
+      return parseUiSettings(DEFAULT_UI_SETTINGS);
     }
     return parseUiSettings(JSON.parse(raw));
   } catch {
-    return { ...DEFAULT_UI_SETTINGS };
+    return parseUiSettings(DEFAULT_UI_SETTINGS);
   }
 }
 
@@ -3278,6 +3242,11 @@ export default function App() {
     });
   }
 
+  const handleToggleAppearanceMode = () => {
+    // Toggling changes only the active mode; each mode keeps its own customized palette.
+    setUiSettings((prev) => setAppearanceMode(prev, prev.appearanceMode === "dark" ? "light" : "dark"));
+  };
+
   const getHistoryLimit = (key: string): number => {
     return historyLimitBySessionRef.current[key] ?? CHAT_HISTORY_INITIAL_LIMIT;
   };
@@ -3291,7 +3260,8 @@ export default function App() {
 
   const handleApplyUiSettingsScheme = (schemeId: string) => {
     if (schemeId === BUILTIN_UI_SETTINGS_SCHEME_ID) {
-      setUiSettings({ ...DEFAULT_UI_SETTINGS });
+      // Built-in reset intentionally restores both default palettes and the light mode.
+      setUiSettings(parseUiSettings(DEFAULT_UI_SETTINGS));
       setActiveUiSettingsSchemeId(BUILTIN_UI_SETTINGS_SCHEME_ID);
       return;
     }
@@ -3299,7 +3269,7 @@ export default function App() {
     if (!matched) {
       return;
     }
-    setUiSettings({ ...matched.settings });
+    setUiSettings(parseUiSettings(matched.settings));
     setActiveUiSettingsSchemeId(matched.id);
   };
 
@@ -3318,7 +3288,8 @@ export default function App() {
         nextName = `${baseName} (${suffix})`;
         suffix += 1;
       }
-      return [{ id: nextId, name: nextName, settings: { ...uiSettings }, updatedAt: timestamp }, ...prev];
+      // Schemes are saved after normalization so migrated palettes remain portable.
+      return [{ id: nextId, name: nextName, settings: parseUiSettings(uiSettings), updatedAt: timestamp }, ...prev];
     });
     setActiveUiSettingsSchemeId(nextId);
   };
@@ -3330,7 +3301,7 @@ export default function App() {
     const timestamp = Date.now();
     setUiSettingsSchemes((prev) =>
       prev.map((item) =>
-        item.id === schemeId ? { ...item, settings: { ...uiSettings }, updatedAt: timestamp } : item
+        item.id === schemeId ? { ...item, settings: parseUiSettings(uiSettings), updatedAt: timestamp } : item
       ).sort((a, b) => b.updatedAt - a.updatedAt)
     );
   };
@@ -3674,27 +3645,11 @@ export default function App() {
       "--claw-pattern-strength",
       `${uiSettings.backgroundPatternStrength / 100}`,
     );
-    document.documentElement.style.setProperty("--claw-accent", uiSettings.accentColor);
-    document.documentElement.style.setProperty("--claw-accent-soft", uiSettings.accentSoftColor);
-    document.documentElement.style.setProperty("--claw-user-bubble", uiSettings.userBubbleColor);
-    document.documentElement.style.setProperty(
-      "--claw-assistant-bubble",
-      uiSettings.assistantBubbleColor,
-    );
-    document.documentElement.style.setProperty(
-      "--claw-md-heading",
-      uiSettings.markdownHeadingColor,
-    );
-    document.documentElement.style.setProperty("--claw-md-link", uiSettings.markdownLinkColor);
-    document.documentElement.style.setProperty("--claw-md-strong", uiSettings.markdownBoldColor);
-    document.documentElement.style.setProperty("--claw-md-em", uiSettings.markdownItalicColor);
-    document.documentElement.style.setProperty("--claw-md-code-bg", uiSettings.markdownCodeBg);
-    document.documentElement.style.setProperty("--claw-md-code-text", uiSettings.markdownCodeText);
-    document.documentElement.style.setProperty("--claw-md-quote-bg", uiSettings.markdownQuoteBg);
-    document.documentElement.style.setProperty(
-      "--claw-md-quote-border",
-      uiSettings.markdownQuoteBorderColor,
-    );
+    // Keep all mode-owned CSS variables derived from the active palette in one helper.
+    for (const [property, nextValue] of Object.entries(deriveAppearanceCssVariables(uiSettings))) {
+      document.documentElement.style.setProperty(property, nextValue);
+    }
+    document.documentElement.setAttribute("data-appearance-mode", uiSettings.appearanceMode);
     document.documentElement.style.setProperty(
       "--claw-session-indicator-w",
       `${uiSettings.sessionIndicatorWidth}px`,
@@ -5820,6 +5775,8 @@ export default function App() {
               sidebarWidth={uiSettings.sidebarWidth}
               enableAnimations={uiSettings.enableAnimations}
               autoHoverSidebar={false}
+              appearanceMode={uiSettings.appearanceMode}
+              onToggleAppearanceMode={handleToggleAppearanceMode}
               onToggleSidebarCollapse={() => setSidebarCollapsed((prev) => !prev)}
               onSetSidebarCollapsed={(v) => setSidebarCollapsed(v)}
               onSwitchToChat={() => switchView("chat")}
@@ -5867,6 +5824,8 @@ export default function App() {
               sessionInfo={sessionInfo}
               models={models}
               uiSettings={uiSettings}
+              appearanceMode={uiSettings.appearanceMode}
+              onToggleAppearanceMode={handleToggleAppearanceMode}
               canLoadOlder={canLoadMoreHistory}
               loadingOlder={loadingOlderHistory}
               isCurrentSessionLoading={isCurrentSessionLoading}
@@ -5898,6 +5857,8 @@ export default function App() {
             sidebarWidth={uiSettings.sidebarWidth}
             enableAnimations={uiSettings.enableAnimations}
             autoHoverSidebar={false}
+            appearanceMode={uiSettings.appearanceMode}
+            onToggleAppearanceMode={handleToggleAppearanceMode}
             onToggleSidebarCollapse={() => setSidebarCollapsed((prev) => !prev)}
             onSetSidebarCollapsed={(v) => setSidebarCollapsed(v)}
             onSwitchToChat={() => switchView("chat")}
@@ -5909,6 +5870,8 @@ export default function App() {
             sourceData={mediaBrowserSourceData}
             activeSessionKey={selectedSessionKey}
             enableAnimations={uiSettings.enableAnimations}
+            appearanceMode={uiSettings.appearanceMode}
+            onToggleAppearanceMode={handleToggleAppearanceMode}
             onSwitchToChat={() => switchView("chat")}
             onOpenFiles={() => switchView("files")}
             onOpenSettings={() => setShowSettings(true)}
