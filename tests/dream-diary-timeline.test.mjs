@@ -271,6 +271,11 @@ test("buildDreamDiaryTimelineSnapshot distinguishes empty, disabled, unavailable
   const disabledEmpty = buildSnapshot(emptyDocument, { disabled: true });
   const unavailable = buildSnapshot(emptyDocument, { unavailable: true, error: "Gateway unavailable" });
   const disabledReadable = buildSnapshot(readableDocument, { disabled: true });
+  const staleReadable = buildSnapshot(readableDocument, {
+    unavailable: true,
+    error: "Gateway unavailable",
+    note: "Could not refresh the Dream Diary. Showing the last readable snapshot.",
+  });
 
   assert.equal(empty.availability, "empty");
   assert.equal(disabledEmpty.availability, "disabled");
@@ -279,6 +284,9 @@ test("buildDreamDiaryTimelineSnapshot distinguishes empty, disabled, unavailable
   assert.equal(disabledReadable.availability, "disabled");
   assert.ok(disabledReadable.latestEntryId);
   assert.match(disabledReadable.note ?? "", /still available to read/i);
+  assert.equal(staleReadable.availability, "limited");
+  assert.ok(staleReadable.latestEntryId);
+  assert.match(staleReadable.note ?? "", /could not refresh/i);
 });
 
 test("DiaryEntryAttachment remains entry-scoped for future related memory support", () => {
