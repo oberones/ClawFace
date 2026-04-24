@@ -95,10 +95,12 @@ It should evolve toward:
 - high-level app state boundaries
 
 Recent shell guidance:
-- session-adjacent inspectors such as Dream Inspector should mount here as auxiliary panes
+- session-adjacent OpenClaw surfaces such as Dreams should mount here as auxiliary panes
 - `src/app.tsx` should own only pane visibility/context handoff, not domain parsing or fetch orchestration
-- gateway-facing normalization and inspector-specific loading state should live in dedicated helper/controller seams
-- Dream Timeline should stay a Dream Inspector-adjacent surface derived from existing inspector snapshots via renderer-side helpers such as `src/lib/dream-timeline.ts` and `src/hooks/useDreamTimelineController.ts`, rather than becoming a separate dashboard stack
+- gateway-facing normalization and surface-specific loading state should live in dedicated helper/controller seams
+- Dreams is currently a diary-first timeline and reader backed by `doctor.memory.dreamDiary`, with `doctor.memory.status` used only for disabled or availability context
+- diary parsing and grouping should stay in renderer-side helper seams such as `src/lib/dream-diary.ts` and `src/lib/dream-diary-timeline.ts`, with `src/hooks/useDreamDiaryTimelineController.ts` owning fetch, refresh, and selected-entry state
+- future Imported Insights or Memory Palace support should attach to specific diary entries rather than restoring a candidate-first dashboard as the primary Dreams surface
 
 ---
 

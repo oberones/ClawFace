@@ -5,7 +5,7 @@ import MediaBrowser from "./components/media-browser/MediaBrowser.tsx";
 import SessionSidebar from "./components/SessionSidebar.tsx";
 import SettingsModal from "./components/SettingsModal.tsx";
 import NewSessionModal from "./components/NewSessionModal.tsx";
-import DreamInspectorPane from "./components/dreams/DreamInspectorPane.tsx";
+import DreamDiaryTimelinePane from "./components/dreams/DreamDiaryTimelinePane.tsx";
 import { GatewayClient } from "./lib/gateway.ts";
 import {
   type AgentsListResult,
@@ -122,7 +122,7 @@ import {
   type ThreadToolStateSnapshot,
 } from "./lib/thread-tool-state.ts";
 import { useDevicePairingController } from "./hooks/useDevicePairingController.ts";
-import { useDreamInspectorController } from "./hooks/useDreamInspectorController.ts";
+import { useDreamDiaryTimelineController } from "./hooks/useDreamDiaryTimelineController.ts";
 import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 import { useThreadToolEventController } from "./hooks/useThreadToolEventController.ts";
@@ -2235,7 +2235,7 @@ export default function App() {
   }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => loadUiSettings().autoHoverSidebar);
   const [activeView, setActiveView] = useState<"chat" | "files" | "media">("chat");
-  const [showDreamInspector, setShowDreamInspector] = useState(false);
+  const [showDreams, setShowDreams] = useState(false);
   const activeViewRef = useRef(activeView);
   activeViewRef.current = activeView;
   const [showSettings, setShowSettings] = useState(false);
@@ -4169,9 +4169,9 @@ export default function App() {
     () => normalizeThinkingValue(sessionInfo.thinkingLevel),
     [sessionInfo.thinkingLevel],
   );
-  const dreamInspectorVisible = activeView === "chat" && showDreamInspector;
-  const dreamInspectorController = useDreamInspectorController({
-    open: dreamInspectorVisible,
+  const dreamsVisible = activeView === "chat" && showDreams;
+  const dreamDiaryTimelineController = useDreamDiaryTimelineController({
+    open: dreamsVisible,
     connectionStatus: connectionState.status,
     selectedSessionKey,
     sessionInfo,
@@ -5807,7 +5807,7 @@ export default function App() {
               onSearchGateway={searchSessionsFromGateway}
               onOpenDreams={() => {
                 switchView("chat");
-                setShowDreamInspector(true);
+                setShowDreams(true);
               }}
               onOpenFiles={() => switchView("files")}
               onOpenMedia={() => switchView("media")}
@@ -5833,7 +5833,7 @@ export default function App() {
       {/* Main content area */}
       <div className="main-shell">
         {activeView === "chat" ? (
-          <div className={`chat-workstation-shell${dreamInspectorVisible ? " is-dream-inspector-open" : ""}`}>
+          <div className={`chat-workstation-shell${dreamsVisible ? " is-dreams-open" : ""}`}>
             <ChatView
               sessionKey={selectedSessionKey}
               messages={messages}
@@ -5878,16 +5878,16 @@ export default function App() {
               onThinkingSelect={(level) => void handleSelectThinking(level)}
               onCreateSession={() => setShowNewSession(true)}
               onOpenSettings={() => setShowSettings(true)}
-              dreamInspectorOpen={dreamInspectorVisible}
-              onToggleDreamInspector={() => setShowDreamInspector((prev) => !prev)}
+              dreamsOpen={dreamsVisible}
+              onToggleDreams={() => setShowDreams((prev) => !prev)}
               onOpenFiles={() => switchView("files")}
               onResolveRemoteImage={resolveRemoteImage}
               onCompact={() => void handleSlashCommand("/compact")}
             />
-            {dreamInspectorVisible ? (
-              <DreamInspectorPane
-                controller={dreamInspectorController}
-                onClose={() => setShowDreamInspector(false)}
+            {dreamsVisible ? (
+              <DreamDiaryTimelinePane
+                controller={dreamDiaryTimelineController}
+                onClose={() => setShowDreams(false)}
               />
             ) : null}
           </div>
