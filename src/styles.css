@@ -591,6 +591,14 @@ body::before {
   line-height: 1;
 }
 
+.chat-brand-subtitle {
+  margin-top: 3px;
+  color: var(--claw-text-soft);
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
 .status-pill {
   margin-top: 4px;
   font-size: 12px;
@@ -618,18 +626,18 @@ body::before {
   max-width: min(420px, 48vw);
   padding: 7px 10px;
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, white);
-  background: rgba(248, 252, 255, 0.82);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-surface) 82%, var(--claw-bg-elevated));
 }
 
 .session-runtime-pill.is-active {
-  background: color-mix(in srgb, #eefbf4 82%, white);
-  border-color: color-mix(in srgb, #8ad0a7 56%, white);
+  background: color-mix(in srgb, #2f855a 12%, var(--claw-surface));
+  border-color: color-mix(in srgb, #8ad0a7 48%, var(--claw-border));
 }
 
 .session-runtime-pill.is-warning {
-  background: color-mix(in srgb, #fff6e8 82%, white);
-  border-color: color-mix(in srgb, #e8b46f 56%, white);
+  background: color-mix(in srgb, #d97706 12%, var(--claw-surface));
+  border-color: color-mix(in srgb, #e8b46f 48%, var(--claw-border));
 }
 
 .session-runtime-dot {
@@ -701,9 +709,9 @@ body::before {
   gap: 7px;
   padding: 6px;
   border-radius: 18px;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, white);
-  background: rgba(248, 252, 255, 0.84);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-surface) 84%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--claw-surface) 62%, transparent);
 }
 
 .session-runtime-control {
@@ -2466,8 +2474,8 @@ body::before {
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, white);
-  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-surface) 90%, var(--claw-bg-elevated));
 }
 
 .shortcut-scheme-summary {
@@ -2515,8 +2523,8 @@ body::before {
   gap: 5px;
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, white);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-surface) 92%, var(--claw-bg-elevated));
   color: var(--claw-text-soft);
   font-size: 11px;
 }
@@ -2556,7 +2564,7 @@ body::before {
 }
 
 .field-hint {
-  color: color-mix(in srgb, var(--claw-text-soft) 88%, white);
+  color: color-mix(in srgb, var(--claw-text-soft) 88%, var(--claw-surface));
   font-size: 11px;
   line-height: 1.5;
 }
@@ -2577,8 +2585,8 @@ body::before {
 .device-visibility-row,
 .device-visibility-note {
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, white);
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-surface) 88%, var(--claw-bg-elevated));
 }
 
 .device-visibility-summary-card {
@@ -2652,7 +2660,7 @@ body::before {
 }
 
 .device-visibility-row.is-current {
-  border-color: color-mix(in srgb, var(--claw-accent) 56%, white);
+  border-color: color-mix(in srgb, var(--claw-accent) 56%, var(--claw-border));
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--claw-accent) 24%, transparent);
 }
 
@@ -2661,8 +2669,8 @@ body::before {
   margin: 0;
   padding: 7px 8px;
   border-radius: 10px;
-  background: rgba(14, 23, 38, 0.06);
-  color: color-mix(in srgb, var(--claw-text) 90%, black);
+  background: color-mix(in srgb, var(--claw-bg) 38%, var(--claw-surface));
+  color: var(--claw-text-soft);
   font-size: 11px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -2682,22 +2690,22 @@ body::before {
 }
 
 .device-visibility-status-chip.good {
-  background: color-mix(in srgb, #dff7eb 88%, white);
-  color: #1f6b46;
+  background: color-mix(in srgb, #16a34a 18%, var(--claw-surface));
+  color: color-mix(in srgb, #86efac 82%, var(--claw-text));
 }
 
 .device-visibility-status-chip.warning {
-  background: color-mix(in srgb, #fff0d2 88%, white);
-  color: #8b5c12;
+  background: color-mix(in srgb, #d97706 18%, var(--claw-surface));
+  color: color-mix(in srgb, #fcd34d 82%, var(--claw-text));
 }
 
 .device-visibility-status-chip.neutral {
-  background: color-mix(in srgb, #e6edf7 88%, white);
-  color: #36506f;
+  background: color-mix(in srgb, var(--claw-accent-soft) 58%, var(--claw-surface));
+  color: color-mix(in srgb, var(--claw-accent) 78%, var(--claw-text));
 }
 
 .device-visibility-status-chip.muted {
-  background: rgba(118, 133, 156, 0.14);
+  background: color-mix(in srgb, var(--claw-text-muted) 14%, var(--claw-surface));
   color: var(--claw-text-soft);
 }
 
@@ -2709,9 +2717,9 @@ body::before {
 }
 
 .device-visibility-note.warning {
-  border-color: color-mix(in srgb, #d89b27 45%, white);
-  background: color-mix(in srgb, #fff4dc 88%, white);
-  color: #7f5714;
+  border-color: color-mix(in srgb, #d89b27 45%, var(--claw-border));
+  background: color-mix(in srgb, #d97706 12%, var(--claw-surface));
+  color: color-mix(in srgb, #fcd34d 76%, var(--claw-text));
 }
 
 .ui-btn.device-visibility-action {
@@ -2721,14 +2729,14 @@ body::before {
 }
 
 .ui-btn.device-visibility-action.is-danger {
-  border-color: color-mix(in srgb, #d37a7a 58%, white);
-  color: #8f3030;
-  background: color-mix(in srgb, #fff1f1 92%, white);
+  border-color: color-mix(in srgb, #d37a7a 58%, var(--claw-border));
+  color: color-mix(in srgb, #fca5a5 78%, var(--claw-text));
+  background: color-mix(in srgb, #ef4444 10%, var(--claw-surface));
 }
 
 .ui-btn.device-visibility-action.is-danger:hover:not(:disabled) {
-  border-color: color-mix(in srgb, #cc6262 68%, white);
-  background: color-mix(in srgb, #ffe3e3 90%, white);
+  border-color: color-mix(in srgb, #cc6262 68%, var(--claw-border));
+  background: color-mix(in srgb, #ef4444 16%, var(--claw-surface));
 }
 
 .path-mapping-textarea {
@@ -2992,7 +3000,7 @@ body::before {
 
 body {
   color: var(--claw-neutral-900);
-  background: #f5f6f8;
+  background: var(--claw-bg);
 }
 
 body::before {
@@ -3000,6 +3008,19 @@ body::before {
   background:
     radial-gradient(circle at 0% 0%, rgba(24, 24, 27, 0.04), transparent 42%),
     radial-gradient(circle at 100% 100%, rgba(24, 24, 27, 0.03), transparent 45%);
+}
+
+:root[data-appearance-mode="dark"] {
+  color-scheme: dark;
+  --claw-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --claw-shadow-float: 0 18px 42px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-appearance-mode="dark"] body::before {
+  opacity: 0.42;
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--claw-accent) 16%, transparent), transparent 42%),
+    radial-gradient(circle at 100% 100%, rgba(148, 163, 184, 0.1), transparent 45%);
 }
 
 .app-shell {
@@ -3216,7 +3237,11 @@ body::before {
 .chat-scroll {
   padding: 18px 18px 14px;
   background:
-    linear-gradient(180deg, rgba(252, 252, 253, 0.35), rgba(255, 255, 255, 0.7) 120px),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--claw-bg-elevated) 34%, transparent),
+      color-mix(in srgb, var(--claw-surface) 70%, transparent) 120px
+    ),
     var(--claw-neutral-0);
 }
 
@@ -3669,7 +3694,7 @@ body::before {
 
 .attachment-preview-file-ext {
   color: var(--claw-neutral-500);
-  background: rgba(255, 255, 255, 0.6);
+  background: color-mix(in srgb, var(--claw-surface) 70%, transparent);
 }
 
 .attachment-trigger {
@@ -3726,16 +3751,40 @@ body::before {
 }
 
 .ui-btn-primary {
-  border-color: #18181b;
-  background: #18181b;
+  border-color: var(--claw-accent);
+  background: var(--claw-accent);
   color: #fafafa;
   box-shadow: none;
 }
 
 .ui-btn-primary:hover {
-  border-color: #27272a;
-  background: #27272a;
+  border-color: color-mix(in srgb, var(--claw-accent) 86%, var(--claw-text));
+  background: color-mix(in srgb, var(--claw-accent) 86%, var(--claw-text));
   box-shadow: none;
+}
+
+.appearance-mode-toggle {
+  min-width: 78px;
+  justify-content: flex-start;
+}
+
+.appearance-mode-toggle-orb {
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: var(--claw-bg);
+  box-shadow: inset 0 0 0 3px var(--claw-surface);
+}
+
+.appearance-mode-toggle[aria-pressed="true"] .appearance-mode-toggle-orb {
+  background: var(--claw-accent);
+  box-shadow: inset 0 0 0 3px var(--claw-bg);
+}
+
+.appearance-mode-toggle-label {
+  min-width: 30px;
+  text-align: left;
 }
 
 .ui-input {
@@ -3800,6 +3849,13 @@ body::before {
 
 .setting-title {
   color: var(--claw-neutral-700);
+}
+
+.setting-helper-text {
+  margin: -2px 0 8px;
+  color: var(--claw-neutral-500);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .field-label {
@@ -3943,7 +3999,7 @@ body::before {
   max-height: min(52vh, 520px);
   object-fit: contain;
   display: block;
-  background: #f4f6fa;
+  background: var(--claw-neutral-100);
 }
 
 .attachment-image-fallback {
@@ -3956,7 +4012,7 @@ body::before {
   box-sizing: border-box;
   border: 1px dashed var(--claw-border-strong);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--claw-bg-elevated) 84%, white);
+  background: color-mix(in srgb, var(--claw-bg-elevated) 84%, var(--claw-surface));
   color: var(--claw-text-soft);
   font-size: 12px;
   text-align: center;
@@ -4168,9 +4224,9 @@ body {
 body::before {
   opacity: 0.22;
   background:
-    radial-gradient(ellipse at 12% -6%, rgba(148, 163, 184, 0.18), transparent 52%),
-    radial-gradient(ellipse at 88% 4%,  rgba(148, 163, 184, 0.14), transparent 48%),
-    radial-gradient(ellipse at 50% 105%, rgba(148, 163, 184, 0.10), transparent 40%);
+    radial-gradient(ellipse at 12% -6%, color-mix(in srgb, var(--claw-accent) 14%, transparent), transparent 52%),
+    radial-gradient(ellipse at 88% 4%, color-mix(in srgb, var(--claw-accent-soft) 18%, transparent), transparent 48%),
+    radial-gradient(ellipse at 50% 105%, color-mix(in srgb, var(--claw-bg-elevated) 16%, transparent), transparent 40%);
 }
 
 /* ---------- 2. Main shell — allow menus to escape -------------------- */
@@ -4305,7 +4361,7 @@ body::before {
   opacity: 0;
   background: radial-gradient(
     ellipse 180px 140px at var(--glow-x) var(--glow-y),
-    rgba(255, 248, 210, 0.65),
+    color-mix(in srgb, var(--claw-accent) 18%, transparent),
     transparent 70%
   );
   transition: opacity var(--t-normal) var(--ease-out-quart);
@@ -4499,14 +4555,14 @@ body::before {
 .floating-menu,
 .thinking-menu {
   background: var(--frost-menu-bg);
-  border: 1px solid rgba(253, 230, 138, 0.35);
+  border: 1px solid color-mix(in srgb, var(--claw-accent) 24%, var(--frost-border));
   filter: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   isolation: isolate;
   box-shadow:
-    0 0 0 1px rgba(253, 230, 138, 0.10),
-    0 0 20px rgba(253, 230, 138, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--claw-accent) 8%, transparent),
+    0 0 20px color-mix(in srgb, var(--claw-accent) 12%, transparent),
     0 12px 40px rgba(0, 0, 0, 0.14),
     0 4px 12px rgba(0, 0, 0, 0.08);
   z-index: 9999 !important;
@@ -4516,14 +4572,14 @@ body::before {
 
 .slash-menu {
   background: var(--frost-menu-bg);
-  border: 1px solid rgba(253, 230, 138, 0.35);
+  border: 1px solid color-mix(in srgb, var(--claw-accent) 24%, var(--frost-border));
   filter: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   isolation: isolate;
   box-shadow:
-    0 0 0 1px rgba(253, 230, 138, 0.10),
-    0 0 20px rgba(253, 230, 138, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--claw-accent) 8%, transparent),
+    0 0 20px color-mix(in srgb, var(--claw-accent) 12%, transparent),
     0 12px 40px rgba(0, 0, 0, 0.14),
     0 4px 12px rgba(0, 0, 0, 0.08);
   z-index: 9999 !important;
@@ -4574,7 +4630,7 @@ body::before {
 .floating-item:hover,
 .slash-item:hover,
 .thinking-item:hover {
-  background: #f3f4f6;
+  background: var(--claw-neutral-100);
   transform: translateX(2px);
 }
 
@@ -4679,8 +4735,8 @@ body::before {
 }
 
 .ui-btn-primary:active:not(:disabled) {
-  background: #0f0f11;
-  border-color: #0f0f11;
+  background: color-mix(in srgb, var(--claw-accent) 84%, var(--claw-text));
+  border-color: color-mix(in srgb, var(--claw-accent) 84%, var(--claw-text));
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -4691,7 +4747,7 @@ body::before {
 }
 
 .session-main:active {
-  background: rgba(253, 230, 138, 0.15);
+  background: color-mix(in srgb, var(--claw-accent) 12%, transparent);
   border-radius: var(--claw-radius-xs);
   transition-duration: var(--t-press);
 }
@@ -4815,7 +4871,7 @@ body::before {
 
 .composer-inner {
   border-color: var(--frost-border);
-  background: rgba(255, 255, 255, 0.5);
+  background: color-mix(in srgb, var(--claw-surface) 72%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -4847,7 +4903,7 @@ body::before {
 
 .topbar-status {
   border-color: var(--frost-border);
-  background: rgba(255, 255, 255, 0.6);
+  background: color-mix(in srgb, var(--claw-surface) 78%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -5757,8 +5813,8 @@ body::before {
 }
 
 .mb-filter-chip {
-  border: 1px solid color-mix(in srgb, var(--claw-border) 78%, white);
-  background: color-mix(in srgb, white 86%, var(--claw-accent-soft) 14%);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 78%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-surface) 86%, var(--claw-accent-soft) 14%);
   color: var(--claw-text-soft);
   border-radius: 999px;
   min-height: 28px;
@@ -5770,7 +5826,7 @@ body::before {
 
 .mb-filter-chip.is-active {
   border-color: color-mix(in srgb, var(--claw-accent) 45%, var(--claw-border));
-  background: color-mix(in srgb, var(--claw-accent-soft) 72%, white);
+  background: color-mix(in srgb, var(--claw-accent-soft) 72%, var(--claw-surface));
   color: var(--claw-text);
 }
 
@@ -5792,7 +5848,7 @@ body::before {
   max-width: 100%;
   padding: 2px 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--claw-accent-soft) 65%, white);
+  background: color-mix(in srgb, var(--claw-accent-soft) 65%, var(--claw-surface));
   color: var(--claw-text-soft);
   font-size: 10px;
   font-weight: 640;
@@ -5812,10 +5868,14 @@ body::before {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 75%, white);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 75%, var(--claw-surface));
   border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 252, 255, 0.78)),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--claw-surface) 86%, transparent),
+      color-mix(in srgb, var(--claw-bg-elevated) 78%, transparent)
+    ),
     var(--claw-bg-elevated);
   box-shadow:
     0 18px 34px rgba(27, 44, 69, 0.07),
@@ -5829,7 +5889,7 @@ body::before {
   justify-content: space-between;
   gap: 12px;
   padding: 18px 20px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--claw-border) 70%, white);
+  border-bottom: 1px solid color-mix(in srgb, var(--claw-border) 70%, var(--claw-surface));
 }
 
 .mb-preview-copy {
@@ -5885,7 +5945,7 @@ body::before {
 .mb-preview-bubble {
   display: flex;
   justify-content: center;
-  background: rgba(249, 252, 255, 0.86);
+  background: color-mix(in srgb, var(--claw-surface) 86%, var(--claw-bg-elevated));
 }
 
 .mb-preview-open {
@@ -5937,7 +5997,7 @@ body::before {
   font-size: 12px;
   font-weight: 640;
   color: var(--claw-accent);
-  background: rgba(255, 255, 255, 0.95);
+  background: color-mix(in srgb, var(--claw-surface) 95%, transparent);
   border: 1px solid color-mix(in srgb, var(--claw-accent) 25%, var(--claw-border));
   border-radius: 999px;
   box-shadow: 0 8px 24px rgba(27, 44, 69, 0.12);
@@ -5989,7 +6049,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--claw-accent) 6%, rgba(255, 255, 255, 0.92));
+  background: color-mix(in srgb, var(--claw-accent) 6%, color-mix(in srgb, var(--claw-surface) 92%, transparent));
   border: 2.5px dashed color-mix(in srgb, var(--claw-accent) 50%, var(--claw-border));
   border-radius: inherit;
   z-index: 30;
@@ -6064,12 +6124,16 @@ body::before {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid color-mix(in srgb, var(--claw-border) 86%, white);
+  border-left: 1px solid color-mix(in srgb, var(--claw-border) 86%, var(--claw-surface));
   background:
-    radial-gradient(circle at 12% 0%, rgba(213, 233, 255, 0.5), transparent 34%),
-    linear-gradient(180deg, rgba(252, 254, 255, 0.96), rgba(246, 250, 252, 0.9)),
-    color-mix(in srgb, var(--claw-bg-elevated) 82%, white);
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.72);
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--claw-accent-soft) 50%, transparent), transparent 34%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--claw-surface) 96%, transparent),
+      color-mix(in srgb, var(--claw-bg-elevated) 90%, transparent)
+    ),
+    color-mix(in srgb, var(--claw-bg-elevated) 82%, var(--claw-surface));
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--claw-surface) 72%, transparent);
 }
 
 .dream-diary-header {
@@ -6078,10 +6142,14 @@ body::before {
   justify-content: space-between;
   gap: 14px;
   padding: 16px 18px 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--claw-border) 86%, white);
+  border-bottom: 1px solid color-mix(in srgb, var(--claw-border) 86%, var(--claw-surface));
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(248, 252, 253, 0.7)),
-    color-mix(in srgb, var(--claw-bg-elevated) 72%, white);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--claw-surface) 88%, transparent),
+      color-mix(in srgb, var(--claw-bg-elevated) 70%, transparent)
+    ),
+    color-mix(in srgb, var(--claw-bg-elevated) 72%, var(--claw-surface));
 }
 
 .dream-diary-kicker {
@@ -6113,8 +6181,8 @@ body::before {
   align-items: center;
   padding: 3px 9px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--claw-accent) 26%, white);
-  background: color-mix(in srgb, var(--claw-accent-soft) 70%, white);
+  border: 1px solid color-mix(in srgb, var(--claw-accent) 26%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-accent-soft) 70%, var(--claw-surface));
   color: color-mix(in srgb, var(--claw-accent) 74%, var(--claw-text));
   font-size: 11px;
   font-weight: 720;
@@ -6160,8 +6228,8 @@ body::before {
 .dream-diary-banner,
 .dream-inline-note {
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, white);
-  background: rgba(250, 252, 255, 0.9);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-surface) 90%, var(--claw-bg-elevated));
   color: var(--claw-text-soft);
   font-size: 12px;
   line-height: 1.5;
@@ -6179,10 +6247,14 @@ body::before {
 .dream-diary-timeline-list,
 .dream-diary-reader {
   min-height: 0;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, white);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, var(--claw-surface));
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 252, 253, 0.86)),
-    color-mix(in srgb, var(--claw-surface) 90%, white);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--claw-surface) 94%, transparent),
+      color-mix(in srgb, var(--claw-bg-elevated) 86%, transparent)
+    ),
+    color-mix(in srgb, var(--claw-surface) 90%, var(--claw-bg-elevated));
   box-shadow: 0 14px 32px rgba(31, 47, 66, 0.06);
 }
 
@@ -6217,9 +6289,9 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, white);
+  border: 1px solid color-mix(in srgb, var(--claw-border) 84%, var(--claw-surface));
   border-radius: 14px;
-  background: rgba(251, 253, 255, 0.92);
+  background: color-mix(in srgb, var(--claw-surface) 92%, var(--claw-bg-elevated));
   color: inherit;
   cursor: pointer;
   padding: 10px 11px;
@@ -6238,8 +6310,8 @@ body::before {
 }
 
 .dream-diary-timeline-entry.is-selected {
-  border-color: color-mix(in srgb, var(--claw-accent) 46%, white);
-  background: color-mix(in srgb, var(--claw-accent-soft) 70%, white);
+  border-color: color-mix(in srgb, var(--claw-accent) 46%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-accent-soft) 70%, var(--claw-surface));
   box-shadow: 0 10px 24px rgba(50, 75, 106, 0.12);
 }
 
@@ -6313,7 +6385,7 @@ body::before {
     max-width: none;
     max-height: 52%;
     border-left: none;
-    border-top: 1px solid color-mix(in srgb, var(--claw-border) 86%, white);
+    border-top: 1px solid color-mix(in srgb, var(--claw-border) 86%, var(--claw-surface));
   }
 
   .dream-diary-reader-layout {
@@ -6325,4 +6397,48 @@ body::before {
   .dream-diary-reader {
     overflow: visible;
   }
+}
+
+:root[data-appearance-mode="dark"] .ui-btn-primary {
+  color: #07111f;
+}
+
+:root[data-appearance-mode="dark"] .ui-btn-light,
+:root[data-appearance-mode="dark"] .ui-input,
+:root[data-appearance-mode="dark"] .toggle-row,
+:root[data-appearance-mode="dark"] .setting-card,
+:root[data-appearance-mode="dark"] .settings-modal,
+:root[data-appearance-mode="dark"] .modal-header,
+:root[data-appearance-mode="dark"] .new-session-modal {
+  background: var(--claw-surface);
+}
+
+:root[data-appearance-mode="dark"] .dream-diary-shell,
+:root[data-appearance-mode="dark"] .dream-diary-header,
+:root[data-appearance-mode="dark"] .dream-diary-timeline-list,
+:root[data-appearance-mode="dark"] .dream-diary-reader {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--claw-surface) 94%, transparent), color-mix(in srgb, var(--claw-bg-elevated) 88%, transparent)),
+    var(--claw-surface);
+  box-shadow: none;
+}
+
+:root[data-appearance-mode="dark"] .dream-diary-banner,
+:root[data-appearance-mode="dark"] .dream-inline-note,
+:root[data-appearance-mode="dark"] .dream-diary-timeline-entry {
+  background: color-mix(in srgb, var(--claw-surface) 86%, var(--claw-bg));
+  border-color: var(--claw-border);
+}
+
+:root[data-appearance-mode="dark"] .dream-diary-timeline-entry.is-selected {
+  background: color-mix(in srgb, var(--claw-accent-soft) 74%, var(--claw-surface));
+  border-color: color-mix(in srgb, var(--claw-accent) 48%, var(--claw-border));
+}
+
+:root[data-appearance-mode="dark"] .image-lightbox,
+:root[data-appearance-mode="dark"] .floating-menu,
+:root[data-appearance-mode="dark"] .thinking-menu,
+:root[data-appearance-mode="dark"] .slash-menu {
+  background: var(--claw-surface);
+  border-color: var(--claw-border);
 }
