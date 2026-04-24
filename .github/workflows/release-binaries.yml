@@ -1,0 +1,185 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+  NPM_CONFIG_CACHE: ${{ github.workspace }}/.cache/npm
+
+jobs:
+  verify-tag-is-on-main:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tagged commit is on origin/main
+        run: |
+          git fetch origin main --no-tags --depth=1
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/main"; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not point to a commit on origin/main."
+            exit 1
+          fi
+
+  verify:
+    needs: verify-tag-is-on-main
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit regressions
+        run: make test-unit
+
+      - name: Run typecheck
+        run: make typecheck
+
+      - name: Build renderer bundle
+        run: make build
+
+  package-macos:
+    needs: verify
+    runs-on: macos-15-intel
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build macOS distributables
+        run: npm run desktop:dist:mac
+
+      - name: Upload macOS workflow artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: clawface-macos-x64-${{ github.ref_name }}
+          path: |
+            desktop-dist/*.dmg
+            desktop-dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  package-windows:
+    needs: verify
+    runs-on: windows-2025
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows distributables
+        run: npm run desktop:dist:win
+
+      - name: Upload Windows workflow artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: clawface-windows-x64-${{ github.ref_name }}
+          path: |
+            desktop-dist/*.exe
+            desktop-dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  package-linux:
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install Linux packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y rpm libopenjp2-tools
+
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Linux distributables
+        run: npm run desktop:dist:linux
+
+      - name: Upload Linux workflow artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: clawface-linux-x64-${{ github.ref_name }}
+          path: |
+            desktop-dist/*.AppImage
+            desktop-dist/*.deb
+            desktop-dist/*.rpm
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-release:
+    needs:
+      - package-macos
+      - package-windows
+      - package-linux
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download packaged workflow artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: release-assets
+
+      - name: Create or update GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          mapfile -t assets < <(find release-assets -type f \
+            \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' -o -name '*.rpm' \) \
+            | sort)
+
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "::error::No release assets were found."
+            exit 1
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" --verify-tag --generate-notes --title "$tag"
+          fi

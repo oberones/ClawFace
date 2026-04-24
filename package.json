@@ -2,6 +2,7 @@
   "name": "clawface",
   "private": true,
   "version": "0.13.0",
+  "description": "Desktop-first OpenClaw client for sessions, tools, files, media, and memory visibility.",
   "main": "electron/main.cjs",
   "type": "module",
   "engines": {
@@ -16,7 +17,9 @@
     "desktop:build:web": "vite build",
     "desktop:dev": "node scripts/desktop-dev.mjs",
     "desktop:pack": "npm run desktop:build:web && electron-builder --dir",
-    "desktop:dist:mac": "npm run desktop:build:web && electron-builder --mac dmg zip --publish never",
+    "desktop:dist:mac": "npm run desktop:build:web && electron-builder --mac dmg zip --x64 --publish never",
+    "desktop:dist:win": "npm run desktop:build:web && electron-builder --win nsis zip --x64 --publish never",
+    "desktop:dist:linux": "npm run desktop:build:web && electron-builder --linux AppImage deb rpm --x64 --publish never",
     "preview": "vite preview",
     "check:runtime": "node scripts/check-runtime.mjs",
     "check:rollup-linux": "node -e \"require.resolve('@rollup/rollup-linux-x64-gnu')\"",
@@ -49,7 +52,6 @@
   "build": {
     "appId": "com.openclaw.para",
     "productName": "ClawFace",
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
     "icon": "public/clawface-logo.png",
     "directories": {
       "output": "desktop-dist"
@@ -60,12 +62,33 @@
       "package.json"
     ],
     "mac": {
+      "artifactName": "${productName}-${version}-macos-${arch}.${ext}",
       "category": "public.app-category.productivity",
+      "icon": "public/clawface-logo.png",
       "target": [
         "dmg",
         "zip"
       ],
       "identity": null
+    },
+    "win": {
+      "artifactName": "${productName}-${version}-windows-${arch}.${ext}",
+      "icon": "public/clawface-logo.png",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
+      "category": "Utility",
+      "icon": "public/clawface-logo.png",
+      "maintainer": "ClawFace maintainers",
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ]
     }
   }
 }
