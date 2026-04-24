@@ -4,7 +4,7 @@ Desktop-first OpenClaw client for people who want sessions, tools, files, media,
 
 ![ClawFace application preview](./public/ClawFace0.4.2.png)
 
-> Compatibility note: some package/build metadata may still use the legacy name `ClawUI` while the rename to `ClawFace` finishes across the repo.
+> Compatibility note: some local settings and compatibility keys still use the legacy `clawui` name so existing installs keep working.
 
 ## What ClawFace Is
 
@@ -21,8 +21,8 @@ ClawFace is the desktop frontend for OpenClaw users who already run OpenClaw loc
 - Work with **desktop attachments** through drag/drop, paste-image handling, staged attachments, local image rendering, and image lightbox support
 - Follow **tool activity** in the conversation flow instead of digging through raw trace output
 - Browse **Files** and **Media** inside dedicated app surfaces
-- Open **Dream Inspector** to see waiting, grounded, and promoted memory candidates, Dream Diary context, and nearby related memory context
-- Open **Dream Timeline** to see evidence-derived chronology from visible promotion timestamps, replay touchpoints, and Dream Diary timing
+- Read the **Dream Diary** in a focused timeline reader that splits visible diary timestamps into individual entries, including repeated same-hour entries
+- Keep OpenClaw dream-writing background sessions out of the main session list while still reading their human-facing diary output
 - Use **desktop-oriented settings** such as path-prefix mappings for shared-volume/container installs
 
 ## Quick Start
@@ -39,7 +39,19 @@ Use the pinned runtime for source builds:
 - Node.js `22.22.0`
 - npm `10.9.4`
 
+Packaged binaries are attached to GitHub Releases when maintainers tag a commit on `main`.
+
 ## Install
+
+### Download a Release
+
+When a tagged release is available, download the appropriate artifact from the project's GitHub Releases page:
+
+- macOS arm64: `.dmg` or `.zip`
+- Windows x64: `.exe` installer or `.zip`
+- Linux x64: `.AppImage`, `.deb`, or `.rpm`
+
+Release binaries are currently unsigned. Your operating system may require an extra confirmation step on first launch.
 
 ### macOS
 
@@ -63,7 +75,13 @@ npm run desktop:dev
 npm run desktop:dist:mac
 ```
 
-That writes the app bundle and macOS artifacts to `desktop-dist/`.
+That writes unsigned macOS arm64 `.dmg` and `.zip` artifacts to `desktop-dist/`.
+
+To build macOS x64 artifacts instead, run:
+
+```bash
+npm run desktop:dist:mac:x64
+```
 
 ### Windows
 
@@ -87,9 +105,15 @@ npm run desktop:dev
 npm run desktop:pack
 ```
 
+6. To build distributable Windows x64 artifacts, run:
+
+```bash
+npm run desktop:dist:win
+```
+
 Notes:
-- The repo is currently exercised most heavily on macOS.
-- Windows support is expected to work from source, but packaged Windows installer flows are not yet the primary validated path in this repo.
+- The release workflow builds Windows x64 `.exe` and `.zip` artifacts.
+- Local Windows packages are unsigned.
 
 ### Linux
 
@@ -113,8 +137,14 @@ npm run desktop:dev
 npm run desktop:pack
 ```
 
+6. To build distributable Linux x64 artifacts, run:
+
+```bash
+npm run desktop:dist:linux
+```
+
 Notes:
-- Linux support is currently best treated as a source-run workflow.
+- The release workflow builds Linux x64 `.AppImage`, `.deb`, and `.rpm` artifacts.
 - If Electron reports missing system libraries on your distro, install the usual desktop GUI dependencies required by Electron and retry.
 
 ## Notes
@@ -123,8 +153,8 @@ Notes:
 
 - ClawFace works on top of the OpenClaw gateway surfaces that already exist today.
 - This repo does **not** make backend OpenClaw changes.
-- Some memory features are intentionally evidence-based because raw backend event logs are not exposed to the frontend.
-- Dream Timeline is therefore a visible-evidence timeline, not a raw memory event-log viewer.
+- The Dreams surface reads the currently exposed Dream Diary snapshot rather than a raw backend event log.
+- Diary chronology is parsed from visible `DREAMS.md` headings and timestamps, so unusual diary structures may show limited chronology while keeping the text readable.
 
 ### Media Path Mapping
 
@@ -167,15 +197,15 @@ make verify
 - path prefix mapping for shared-volume/container installs
 - generated-image source resolution into `~/.openclaw/media`
 - renderer image source selection when both pretty filenames and concrete UUID media paths are present
-- Dream Inspector helper logic such as candidate shaping, diary parsing, and related-context matching
-- Dream Timeline helper logic such as chronology derivation, empty/disabled handling, and artifact-link shaping
+- Dream Diary parsing and timeline normalization, including OpenClaw timestamp formats and repeated same-hour entries
+- gateway response normalization, including filtering OpenClaw dream narrative background sessions out of the user-facing session list
 
 Practical validation guidance:
 
 - `make test-unit` for helper-level regressions
 - `make typecheck` for renderer/app safety
 - `make build` for the production bundling check
-- add a desktop visual pass for Dream Inspector and Dream Timeline changes because they rely on adjacent pane composition and shell interaction details
+- add a desktop visual pass for Dream Diary, Files, Media, and session-shell changes because they rely on adjacent pane composition and desktop interaction details
 
 ### Runtime Expectations
 
