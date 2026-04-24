@@ -28,7 +28,9 @@ import { useAutoScroll } from "../hooks/useAutoScroll.ts";
 import { useImageLightboxController } from "../hooks/useImageLightboxController.ts";
 import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
+import type { AppearanceMode } from "../lib/appearance-mode.ts";
 import { createBottomPinScheduler } from "../lib/scroll-anchoring.ts";
+import { AppearanceModeToggle } from "./AppearanceModeToggle.tsx";
 
 type ChatViewProps = {
   sessionKey: string | null;
@@ -55,6 +57,8 @@ type ChatViewProps = {
   sessionInfo: SessionInfo;
   models: ModelListItem[];
   uiSettings: UiSettings;
+  appearanceMode: AppearanceMode;
+  onToggleAppearanceMode: () => void;
   canLoadOlder: boolean;
   loadingOlder: boolean;
   isCurrentSessionLoading?: boolean;
@@ -96,6 +100,7 @@ type ThreadSnapshot = {
 };
 
 
+/** Renders the active chat workstation surface and its shell-level controls. */
 export default function ChatView(props: ChatViewProps) {
   const [activeCommand, setActiveCommand] = useState(0);
   const [runtimeControlsMenuOpen, setRuntimeControlsMenuOpen] = useState(false);
@@ -1126,6 +1131,10 @@ export default function ChatView(props: ChatViewProps) {
               {props.dreamsOpen ? "Hide Dreams" : "Dreams"}
             </button>
           ) : null}
+          <AppearanceModeToggle
+            mode={props.appearanceMode}
+            onToggle={props.onToggleAppearanceMode}
+          />
           <button type="button" onClick={props.onCreateSession} className="ui-btn ui-btn-light">
             New Session
           </button>

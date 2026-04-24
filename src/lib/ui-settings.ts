@@ -1,3 +1,9 @@
+import type {
+  AppearanceMode,
+  AppearancePalettes,
+} from "./appearance-mode.ts";
+import { DEFAULT_APPEARANCE_PALETTES } from "./appearance-mode.ts";
+
 export type ReplyDoneSoundTone =
   | "glass"
   | "marimba"
@@ -10,6 +16,8 @@ export type ReplyDoneSoundTone =
 export type ReplyDoneSoundSource = "tone" | "custom";
 
 export type UiSettings = {
+  appearanceMode: AppearanceMode;
+  appearancePalettes: AppearancePalettes;
   fontFamily: string;
   fontSize: number;
   lineHeight: number;
@@ -34,24 +42,17 @@ export type UiSettings = {
   messageGap: number;
   panelOpacity: number;
   backgroundPatternStrength: number;
-  accentColor: string;
-  accentSoftColor: string;
-  userBubbleColor: string;
-  assistantBubbleColor: string;
-  markdownHeadingColor: string;
-  markdownLinkColor: string;
-  markdownBoldColor: string;
-  markdownItalicColor: string;
-  markdownCodeBg: string;
-  markdownCodeText: string;
-  markdownQuoteBg: string;
-  markdownQuoteBorderColor: string;
   enableAnimations: boolean;
   sessionIndicatorWidth: number;
   autoHoverSidebar: boolean;
 };
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
+  appearanceMode: "light",
+  appearancePalettes: {
+    light: { ...DEFAULT_APPEARANCE_PALETTES.light },
+    dark: { ...DEFAULT_APPEARANCE_PALETTES.dark },
+  },
   fontFamily: "Manrope",
   fontSize: 16,
   lineHeight: 1.62,
@@ -76,18 +77,6 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   messageGap: 14,
   panelOpacity: 100,
   backgroundPatternStrength: 10,
-  accentColor: "#18181b",
-  accentSoftColor: "#f4f4f5",
-  userBubbleColor: "#f4f4f5",
-  assistantBubbleColor: "#ffffff",
-  markdownHeadingColor: "#18181b",
-  markdownLinkColor: "#18181b",
-  markdownBoldColor: "#111827",
-  markdownItalicColor: "#3f3f46",
-  markdownCodeBg: "#f4f4f5",
-  markdownCodeText: "#18181b",
-  markdownQuoteBg: "#fafafa",
-  markdownQuoteBorderColor: "#d4d4d8",
   enableAnimations: true,
   sessionIndicatorWidth: 3,
   autoHoverSidebar: false,

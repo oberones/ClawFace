@@ -1,5 +1,11 @@
 import React from "react";
 import { DEFAULT_UI_SETTINGS, type UiSettings } from "../lib/ui-settings.ts";
+import {
+  getActiveAppearancePalette,
+  patchActiveAppearancePalette,
+  resetActiveAppearanceColorSystem,
+  resetActiveAppearanceMarkdown,
+} from "../lib/appearance-mode.ts";
 import { parsePathPrefixMappingsText } from "../lib/path-prefix-mappings.ts";
 import { AgentSessionShortcutsSection } from "./settings-sections/AgentSessionShortcutsSection.tsx";
 import { AppActionShortcutsSection } from "./settings-sections/AppActionShortcutsSection.tsx";
@@ -126,24 +132,9 @@ const CHAT_CONTROLS_DEFAULTS: Partial<UiSettings> = {
   autoHoverSidebar: DEFAULT_UI_SETTINGS.autoHoverSidebar,
 };
 
-const COLOR_SYSTEM_DEFAULTS: Partial<UiSettings> = {
+const COLOR_SYSTEM_GLOBAL_DEFAULTS: Partial<UiSettings> = {
   panelOpacity: DEFAULT_UI_SETTINGS.panelOpacity,
   backgroundPatternStrength: DEFAULT_UI_SETTINGS.backgroundPatternStrength,
-  accentColor: DEFAULT_UI_SETTINGS.accentColor,
-  accentSoftColor: DEFAULT_UI_SETTINGS.accentSoftColor,
-  userBubbleColor: DEFAULT_UI_SETTINGS.userBubbleColor,
-  assistantBubbleColor: DEFAULT_UI_SETTINGS.assistantBubbleColor,
-};
-
-const MARKDOWN_DEFAULTS: Partial<UiSettings> = {
-  markdownHeadingColor: DEFAULT_UI_SETTINGS.markdownHeadingColor,
-  markdownLinkColor: DEFAULT_UI_SETTINGS.markdownLinkColor,
-  markdownBoldColor: DEFAULT_UI_SETTINGS.markdownBoldColor,
-  markdownItalicColor: DEFAULT_UI_SETTINGS.markdownItalicColor,
-  markdownCodeBg: DEFAULT_UI_SETTINGS.markdownCodeBg,
-  markdownCodeText: DEFAULT_UI_SETTINGS.markdownCodeText,
-  markdownQuoteBg: DEFAULT_UI_SETTINGS.markdownQuoteBg,
-  markdownQuoteBorderColor: DEFAULT_UI_SETTINGS.markdownQuoteBorderColor,
 };
 
 export default function SettingsModal(props: SettingsModalProps) {
@@ -165,8 +156,28 @@ export default function SettingsModal(props: SettingsModalProps) {
     return null;
   }
 
+  const activeAppearancePalette = getActiveAppearancePalette(props.uiSettings);
+
   const patch = (next: Partial<UiSettings>) => {
     props.onUiSettingsChange({ ...props.uiSettings, ...next });
+  };
+
+  const patchActivePalette = (next: Partial<typeof activeAppearancePalette>) => {
+    // Palette patches are mode-scoped so light and dark customizations do not overwrite each other.
+    props.onUiSettingsChange(patchActiveAppearancePalette(props.uiSettings, next));
+  };
+
+  const resetActiveColorSystem = () => {
+    // Section reset is intentionally narrower than the full Settings reset.
+    props.onUiSettingsChange({
+      ...resetActiveAppearanceColorSystem(props.uiSettings),
+      ...COLOR_SYSTEM_GLOBAL_DEFAULTS,
+    });
+  };
+
+  const resetActiveMarkdown = () => {
+    // Markdown reset touches only the active mode's markdown palette.
+    props.onUiSettingsChange(resetActiveAppearanceMarkdown(props.uiSettings));
   };
 
   const patchReplyDoneSound = (next: ReplyDoneSoundPatch) => {
@@ -327,15 +338,19 @@ export default function SettingsModal(props: SettingsModalProps) {
             />
 
             <ColorSystemSection
+              appearanceMode={props.uiSettings.appearanceMode}
+              palette={activeAppearancePalette}
               uiSettings={props.uiSettings}
-              onPatch={patch}
-              onReset={() => patch(COLOR_SYSTEM_DEFAULTS)}
+              onSettingsPatch={patch}
+              onPalettePatch={patchActivePalette}
+              onReset={resetActiveColorSystem}
             />
 
             <MarkdownReadabilitySection
-              uiSettings={props.uiSettings}
-              onPatch={patch}
-              onReset={() => patch(MARKDOWN_DEFAULTS)}
+              appearanceMode={props.uiSettings.appearanceMode}
+              palette={activeAppearancePalette}
+              onPatch={patchActivePalette}
+              onReset={resetActiveMarkdown}
             />
           </div>
         </div>

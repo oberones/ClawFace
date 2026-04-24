@@ -5,6 +5,8 @@ import { BrowserBreadcrumbs } from "./browser-shell/BrowserBreadcrumbs.tsx";
 import { BrowserEmptyState } from "./browser-shell/BrowserEmptyState.tsx";
 import { BrowserRootTabs } from "./browser-shell/BrowserRootTabs.tsx";
 import { BrowserShellLayout } from "./browser-shell/BrowserShellLayout.tsx";
+import { AppearanceModeToggle } from "./AppearanceModeToggle.tsx";
+import type { AppearanceMode } from "../lib/appearance-mode.ts";
 
 /* ── Types ────────────────────────────────────────────────────────── */
 
@@ -601,9 +603,12 @@ function FileSidebar(props: {
 
 /* ── Preview Area ─────────────────────────────────────────────────── */
 
+/** Renders file preview actions while keeping appearance controls outside the file sidebar. */
 function PreviewArea(props: {
   enableAnimations: boolean;
   onOpenSettings: () => void;
+  appearanceMode: AppearanceMode;
+  onToggleAppearanceMode: () => void;
 }) {
   const fm = useFmState();
   const { previewEntry: entry, previewContent: content, previewLoading: loading } = fm;
@@ -638,9 +643,15 @@ function PreviewArea(props: {
         areaClassName="fm-preview-area"
         title="Files"
         actions={(
-          <button type="button" onClick={props.onOpenSettings} className="ui-btn ui-btn-primary">
-            Settings
-          </button>
+          <>
+            <AppearanceModeToggle
+              mode={props.appearanceMode}
+              onToggle={props.onToggleAppearanceMode}
+            />
+            <button type="button" onClick={props.onOpenSettings} className="ui-btn ui-btn-primary">
+              Settings
+            </button>
+          </>
         )}
       >
         <BrowserEmptyState
@@ -709,6 +720,10 @@ function PreviewArea(props: {
           <button type="button" className="ui-btn ui-btn-light" onClick={fm.closePreview}>
             × Close
           </button>
+          <AppearanceModeToggle
+            mode={props.appearanceMode}
+            onToggle={props.onToggleAppearanceMode}
+          />
           <button type="button" onClick={props.onOpenSettings} className="ui-btn ui-btn-primary">
             Settings
           </button>
@@ -801,6 +816,8 @@ export type FileManagerProps = {
   onSwitchToChat: () => void;
   onSwitchToMedia?: () => void;
   onOpenSettings: () => void;
+  appearanceMode: AppearanceMode;
+  onToggleAppearanceMode: () => void;
 };
 
 // Shared provider instance — rendered once around both sidebar+main
@@ -811,6 +828,7 @@ export function FileManagerProvider(props: { children: React.ReactNode }) {
   return <FmProvider>{props.children}</FmProvider>;
 }
 
+/** Switches between the file sidebar face and the full file browser surface. */
 export default function FileManager(props: FileManagerProps) {
   const [dragOver, setDragOver] = useState(false);
 
@@ -835,11 +853,19 @@ export default function FileManager(props: FileManagerProps) {
     <MainContent
       enableAnimations={props.enableAnimations}
       onOpenSettings={props.onOpenSettings}
+      appearanceMode={props.appearanceMode}
+      onToggleAppearanceMode={props.onToggleAppearanceMode}
     />
   );
 }
 
-function MainContent(props: { enableAnimations: boolean; onOpenSettings: () => void }) {
+/** Owns file-browser drag/drop overlays around the shared preview area. */
+function MainContent(props: {
+  enableAnimations: boolean;
+  onOpenSettings: () => void;
+  appearanceMode: AppearanceMode;
+  onToggleAppearanceMode: () => void;
+}) {
   const fm = useFmState();
   const [dragOver, setDragOver] = useState(false);
 
@@ -868,7 +894,12 @@ function MainContent(props: { enableAnimations: boolean; onOpenSettings: () => v
       {dragOver && (
         <div className="fm-drop-overlay"><div className="fm-drop-label">Drop files to upload</div></div>
       )}
-      <PreviewArea enableAnimations={props.enableAnimations} onOpenSettings={props.onOpenSettings} />
+      <PreviewArea
+        enableAnimations={props.enableAnimations}
+        onOpenSettings={props.onOpenSettings}
+        appearanceMode={props.appearanceMode}
+        onToggleAppearanceMode={props.onToggleAppearanceMode}
+      />
     </div>
   );
 }
