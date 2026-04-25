@@ -3,7 +3,8 @@ import type { AvatarState } from "./avatar-state.ts";
 export type AvatarProfileId =
   | "clawface-default"
   | "clawface-neon-console"
-  | "clawface-prism-node";
+  | "clawface-prism-node"
+  | "clawface-mark";
 
 export type AvatarProfile = {
   id: AvatarProfileId;
@@ -64,6 +65,17 @@ export const AVATAR_PROFILES: readonly AvatarProfile[] = [
     name: "Prism Node",
     description: "A geometric signal core with crystalline color shifts.",
     spriteSrc: "avatars/clawface-prism-node.png",
+    thumbnailState: "success",
+    thumbnailFrame: 0,
+    frameSize: AVATAR_PROFILE_FRAME_SIZE,
+    columns: AVATAR_PROFILE_COLUMNS,
+    rows: AVATAR_PROFILE_ROWS,
+  },
+  {
+    id: "clawface-mark",
+    name: "ClawFace Mark",
+    description: "A logo-inspired companion with cyan claws and a bright little grin.",
+    spriteSrc: "avatars/clawface-mark.png",
     thumbnailState: "success",
     thumbnailFrame: 0,
     frameSize: AVATAR_PROFILE_FRAME_SIZE,

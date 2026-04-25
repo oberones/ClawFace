@@ -12,6 +12,7 @@
 - Q: Should the two new avatar styles follow specific visual concepts? → A: No specific concepts beyond supporting the same states as the existing avatar.
 - Q: Should avatar style be global or per agent/session? → A: Global setting.
 - Q: Should Settings show visual previews or a compact named selector for v1? → A: Thumbnail previews.
+- Follow-up: Add one more avatar style inspired by the ClawFace logo itself.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -26,7 +27,7 @@ As a ClawFace user, I want to choose between the default avatar and two addition
 **Acceptance Scenarios**:
 
 1. **Given** ClawFace has the default avatar selected, **When** the user opens Settings and chooses another avatar style, **Then** the lower-left avatar pane updates to the chosen style without moving or changing behavior.
-2. **Given** the user selects the third avatar style, **When** Settings is closed and reopened, **Then** the third style remains selected.
+2. **Given** the user selects another avatar style, **When** Settings is closed and reopened, **Then** that style remains selected.
 3. **Given** the avatar is currently showing thinking, streaming, tool-running, approval-needed, or disconnected state, **When** the user changes avatar style, **Then** the new style shows the same state rather than resetting to idle.
 
 ---
@@ -57,7 +58,7 @@ As a ClawFace user, I want avatar style selection to feel like a lightweight des
 
 **Acceptance Scenarios**:
 
-1. **Given** the user opens Settings, **When** they inspect avatar controls, **Then** they see exactly three bundled avatar style choices with thumbnail previews: the existing default plus two new styles.
+1. **Given** the user opens Settings, **When** they inspect avatar controls, **Then** they see exactly four bundled avatar style choices with thumbnail previews: the existing default, two distinct companion styles, and one ClawFace logo-inspired style.
 2. **Given** the user chooses a style, **When** they continue normal chat usage, **Then** no new controls appear in the avatar pane itself and the chat workflow remains unchanged.
 3. **Given** a style choice is unavailable due to asset failure, **When** the avatar pane renders, **Then** ClawFace falls back gracefully without blocking Settings or chat.
 
@@ -69,11 +70,11 @@ As a future ClawFace maintainer, I want avatar profiles to be represented as a s
 
 **Why this priority**: This is a follow-up to an existing avatar feature. The implementation should extend the profile boundary rather than reintroduce presentation logic into known architectural hotspots.
 
-**Independent Test**: Review the implementation boundary and verify that adding a future fourth bundled style would require registering a profile and asset mapping, not changing avatar state derivation or chat/session runtime logic.
+**Independent Test**: Review the implementation boundary and verify that adding a future fifth bundled style would require registering a profile and asset mapping, not changing avatar state derivation or chat/session runtime logic.
 
 **Acceptance Scenarios**:
 
-1. **Given** the app supports three avatar styles, **When** a maintainer reviews state derivation, **Then** all styles share the same avatar state resolver and status labels.
+1. **Given** the app supports four avatar styles, **When** a maintainer reviews state derivation, **Then** all styles share the same avatar state resolver and status labels.
 2. **Given** a future style is considered, **When** it follows the documented profile structure, **Then** it can reuse the same pane placement, animation setting, reduced-motion behavior, and state priority.
 
 ### Edge Cases
@@ -93,8 +94,8 @@ As a future ClawFace maintainer, I want avatar profiles to be represented as a s
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST provide exactly three bundled avatar style choices for this feature version: the existing default avatar plus two new animated avatar styles.
-- **FR-002**: The two new avatar styles MUST be visually distinct from the default and from each other at the existing avatar pane size, using clearly different silhouettes, palettes, or visual motifs.
+- **FR-001**: The system MUST provide exactly four bundled avatar style choices for this feature version: the existing default avatar, two distinct animated avatar styles, and one ClawFace logo-inspired animated avatar style.
+- **FR-002**: The three additional avatar styles MUST be visually distinct from the default and from each other at the existing avatar pane size, using clearly different silhouettes, palettes, or visual motifs.
 - **FR-003**: All avatar styles MUST use the same lower-left pane placement below the Sessions pane.
 - **FR-004**: All avatar styles MUST use the same rendered dimensions, responsive collapse behavior, and layout footprint as the existing avatar.
 - **FR-005**: All avatar styles MUST support the same avatar state set as the existing avatar: idle, thinking, streaming/responding, tool-running, excited/successful response, serious response, cautionary response, warning/blocked/guardrail-style response, approval needed, and disconnected or pairing required.
@@ -126,22 +127,22 @@ As a future ClawFace maintainer, I want avatar profiles to be represented as a s
 
 ### Measurable Outcomes
 
-- **SC-001**: A manual regression pass can select each of the three avatar styles from thumbnail previews in Settings and see the lower-left avatar pane update within one second without restarting the app.
-- **SC-002**: For each of the three styles, all ten avatar states are visually distinguishable from idle at the existing pane size in animation-enabled mode.
-- **SC-003**: For each of the three styles, all ten avatar states render as static representative frames when animations are disabled or reduced motion is active.
+- **SC-001**: A manual regression pass can select each of the four avatar styles from thumbnail previews in Settings and see the lower-left avatar pane update within one second without restarting the app.
+- **SC-002**: For each of the four styles, all ten avatar states are visually distinguishable from idle at the existing pane size in animation-enabled mode.
+- **SC-003**: For each of the four styles, all ten avatar states render as static representative frames when animations are disabled or reduced motion is active.
 - **SC-004**: A persisted style choice survives an app restart and is restored before or with the first render of the avatar pane.
 - **SC-005**: Invalid saved style ids normalize to the default avatar without an uncaught error or broken Settings UI.
 - **SC-006**: Implementation validation passes `make typecheck` and `make build`; because the feature touches avatar helper/settings behavior and packaged image assets, `make test-unit` also passes.
 - **SC-007**: Focused tests cover profile normalization or selection behavior and prove existing avatar state derivation remains independent of selected style.
 - **SC-008**: The feature adds no required OpenClaw backend change and can be demonstrated entirely with bundled frontend assets and existing ClawFace settings.
-- **SC-009**: In supported desktop window sizes and collapsed-sidebar states, all three avatar styles keep the same layout footprint and do not overlap session, gateway, approval, tool, chat, or composer controls.
+- **SC-009**: In supported desktop window sizes and collapsed-sidebar states, all four avatar styles keep the same layout footprint and do not overlap session, gateway, approval, tool, chat, or composer controls.
 
 ## Assumptions
 
 - The existing single default avatar feature from `005-pixel-avatar` is available as the base behavior and placement for this follow-up.
 - "Totally different styles" means visually distinct bundled art directions that support the same states as the existing avatar, not different sizes, behaviors, placements, state semantics, or product modes.
-- The exact visual concepts for the two new avatars may be chosen during implementation as long as they are tasteful, clearly distinct, desktop-native, legible at the existing pane size, and support the same state set.
-- The MVP includes three bundled local profiles only: no user-uploaded art, generated-at-runtime art, marketplace, downloadable skins, account sync, or agent-specific automatic selection.
+- The exact visual concepts for non-logo additional avatars may be chosen during implementation as long as they are tasteful, clearly distinct, desktop-native, legible at the existing pane size, and support the same state set.
+- The MVP includes four bundled local profiles only: no user-uploaded art, generated-at-runtime art, marketplace, downloadable skins, account sync, or agent-specific automatic selection.
 - The selected avatar style is a global local UI preference, not an OpenClaw session property, per-agent setting, or backend-managed setting.
 - Existing ClawFace settings persistence is sufficient for storing one selected avatar profile id.
 - Existing CSS sprite-sheet animation infrastructure remains the preferred implementation approach for all profiles.

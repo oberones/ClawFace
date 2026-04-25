@@ -5,7 +5,7 @@
 
 ## Summary
 
-Extend the existing lower-left avatar status pane so users can choose between three bundled avatar profiles: the current default plus two new, visually distinct pixel-art styles. The implementation will keep the existing avatar state derivation, pane placement, animation setting, and reduced-motion behavior, while adding a small profile registry, static sprite-sheet assets under `public/avatars`, and a thumbnail-based avatar selector in Settings.
+Extend the existing lower-left avatar status pane so users can choose between four bundled avatar profiles: the current default, two visually distinct companion styles, and one ClawFace logo-inspired style. The implementation will keep the existing avatar state derivation, pane placement, animation setting, and reduced-motion behavior, while adding a small profile registry, static sprite-sheet assets under `public/avatars`, and a thumbnail-based avatar selector in Settings.
 
 The v1 technical approach stays dependency-light: React components render a selected profile, CSS `background-position` plus `steps()` handles frame playback, `image-rendering: pixelated` preserves crisp scaling, and local UI settings persist the selected profile id.
 
@@ -19,7 +19,7 @@ The v1 technical approach stays dependency-light: React components render a sele
 **Project Type**: Desktop frontend application
 **Performance Goals**: Avatar profile switching updates within one second; no streaming/chat hot-path recomputation; sprite rendering remains compositor-friendly CSS
 **Constraints**: No backend/API/IPC contract changes; no remote assets; animations must obey existing `enableAnimations` and `prefers-reduced-motion`; packaged `file://` builds must resolve assets
-**Scale/Scope**: Three bundled avatar profiles, ten shared avatar states, one global local preference, compact Settings selector
+**Scale/Scope**: Four bundled avatar profiles, ten shared avatar states, one global local preference, compact Settings selector
 
 ## Constitution Check
 
@@ -56,7 +56,8 @@ public/
     ├── README.md
     ├── clawface-default.png
     ├── clawface-neon-console.png
-    └── clawface-prism-node.png
+    ├── clawface-prism-node.png
+    └── clawface-mark.png
 
 src/
 ├── app.tsx
@@ -88,7 +89,7 @@ Research output is captured in [research.md](./research.md). Key conclusions:
 - Keep every profile on the same grid geometry and state row order as the default avatar.
 - Use a data-driven profile registry for asset paths, display names, thumbnail metadata, and fallback behavior.
 - Render Settings thumbnails from the same sprite sheets so previews cannot drift from the live avatar art.
-- Generate the two new sprite sheets as bundled static assets during implementation; do not add remote loading or runtime image generation.
+- Generate the three additional sprite sheets as bundled static assets during implementation; do not add remote loading or runtime image generation.
 
 ## Phase 1: Design
 
@@ -106,10 +107,10 @@ Design artifacts:
    - Update `parseUiSettings` in `src/app.tsx` to normalize unknown/missing profile ids to the default.
 
 2. **Bundled Avatar Assets**
-   - Generate two new pixel-art sprite sheets under `public/avatars`.
+   - Generate three additional pixel-art sprite sheets under `public/avatars`.
    - Use the same 4 columns, 10 state rows, and default row order documented in `public/avatars/README.md`.
    - Update the avatar asset README with all bundled profiles and asset requirements.
-   - Suggested implementation-time art directions: `Neon Console` for a sharp terminal/glow style and `Prism Node` for a softer crystalline/status-light style. Final names may change if the generated artwork lands better, but they must remain tasteful and clearly distinct.
+   - Suggested implementation-time art directions: `Neon Console` for a sharp terminal/glow style, `Prism Node` for a softer crystalline/status-light style, and `ClawFace Mark` for a compact logo-inspired style. Final names may change if the generated artwork lands better, but they must remain tasteful and clearly distinct.
 
 3. **Renderer Integration**
    - Update `AnimatedAvatar` to accept an `AvatarProfile` or profile id and set `--avatar-image` from the selected profile.
@@ -118,7 +119,7 @@ Design artifacts:
 
 4. **Settings Selector**
    - Add `AvatarStyleSection` under `src/components/settings-sections`.
-   - Show exactly three thumbnail choices with accessible labels, selected state, and a compact layout that fits the existing Settings grid.
+   - Show exactly four thumbnail choices with accessible labels, selected state, and a compact layout that fits the existing Settings grid.
    - Use the same sprite sheet as the live avatar for each thumbnail, likely a static success or idle frame plus label.
    - Wire the section through `SettingsModal` using existing `patch({ avatarProfileId })` behavior.
 

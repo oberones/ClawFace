@@ -8,6 +8,7 @@ Bundled profiles:
 - `clawface-default.png` — Classic
 - `clawface-neon-console.png` — Neon Console
 - `clawface-prism-node.png` — Prism Node
+- `clawface-mark.png` — ClawFace Mark
 
 Geometry:
 
