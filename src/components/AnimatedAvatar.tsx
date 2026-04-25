@@ -1,10 +1,17 @@
-import type { CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { AvatarState } from "../lib/avatar-state.ts";
 import { AVATAR_STATE_LABELS } from "../lib/avatar-state.ts";
+import {
+  DEFAULT_AVATAR_PROFILE_ID,
+  getAvatarProfile,
+  resolveAvatarSpriteSrc,
+  type AvatarProfile,
+} from "../lib/avatar-profile.ts";
 
 type AnimatedAvatarProps = {
   state: AvatarState;
   animationsEnabled: boolean;
+  profile: AvatarProfile;
   className?: string;
 };
 
@@ -13,7 +20,7 @@ type AvatarStyle = CSSProperties & {
   "--avatar-image": string;
 };
 
-const DEFAULT_AVATAR_SPRITE_SRC = new URL("avatars/clawface-default.png", window.location.href).href;
+const DEFAULT_AVATAR_PROFILE = getAvatarProfile(DEFAULT_AVATAR_PROFILE_ID);
 
 const FRAME_COUNTS: Record<AvatarState, number> = {
   idle: 4,
@@ -42,6 +49,45 @@ export function AnimatedAvatar(props: AnimatedAvatarProps) {
   const label = AVATAR_STATE_LABELS[props.state];
   const canAnimate = props.animationsEnabled && ANIMATED_STATES.has(props.state);
   const className = ["animated-avatar", props.className].filter(Boolean).join(" ");
+  const selectedSpriteUrl = useMemo(
+    () => resolveAvatarSpriteSrc(props.profile, window.location.href),
+    [props.profile],
+  );
+  const fallbackSpriteUrl = useMemo(
+    () => resolveAvatarSpriteSrc(DEFAULT_AVATAR_PROFILE, window.location.href),
+    [],
+  );
+  const [spriteUrl, setSpriteUrl] = useState(selectedSpriteUrl);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSpriteUrl(selectedSpriteUrl);
+
+    if (props.profile.id === DEFAULT_AVATAR_PROFILE_ID) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const image = new Image();
+    image.onload = () => {
+      if (!cancelled) {
+        setSpriteUrl(selectedSpriteUrl);
+      }
+    };
+    image.onerror = () => {
+      if (!cancelled) {
+        setSpriteUrl(fallbackSpriteUrl);
+      }
+    };
+    image.src = selectedSpriteUrl;
+
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [fallbackSpriteUrl, props.profile.id, selectedSpriteUrl]);
 
   return (
     <span
@@ -51,7 +97,7 @@ export function AnimatedAvatar(props: AnimatedAvatarProps) {
       style={
         {
           "--avatar-frames": FRAME_COUNTS[props.state],
-          "--avatar-image": `url("${DEFAULT_AVATAR_SPRITE_SRC}")`,
+          "--avatar-image": `url("${spriteUrl}")`,
         } as AvatarStyle
       }
       role="img"
