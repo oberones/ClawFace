@@ -3,6 +3,10 @@ import type {
   AppearancePalettes,
 } from "./appearance-mode.ts";
 import { DEFAULT_APPEARANCE_PALETTES } from "./appearance-mode.ts";
+import {
+  DEFAULT_AVATAR_PROFILE_ID,
+  type AvatarProfileId,
+} from "./avatar-profile.ts";
 
 export type ReplyDoneSoundTone =
   | "glass"
@@ -45,6 +49,7 @@ export type UiSettings = {
   enableAnimations: boolean;
   sessionIndicatorWidth: number;
   autoHoverSidebar: boolean;
+  avatarProfileId: AvatarProfileId;
 };
 
 export const DEFAULT_UI_SETTINGS: UiSettings = {
@@ -80,4 +85,5 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   enableAnimations: true,
   sessionIndicatorWidth: 3,
   autoHoverSidebar: false,
+  avatarProfileId: DEFAULT_AVATAR_PROFILE_ID,
 };
