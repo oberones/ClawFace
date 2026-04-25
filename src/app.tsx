@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChatView from "./components/ChatView.tsx";
+import { AvatarStatusPane } from "./components/AvatarStatusPane.tsx";
 import FileManager, { FileManagerProvider } from "./components/FileManager.tsx";
 import MediaBrowser from "./components/media-browser/MediaBrowser.tsx";
 import SessionSidebar from "./components/SessionSidebar.tsx";
@@ -132,6 +133,7 @@ import { useRemoteImageResolver } from "./hooks/useRemoteImageResolver.ts";
 import { useStagedAttachments } from "./hooks/useStagedAttachments.ts";
 import { useThreadToolEventController } from "./hooks/useThreadToolEventController.ts";
 import { useThreadToolController } from "./hooks/useThreadToolController.ts";
+import { useAvatarStatus } from "./hooks/useAvatarStatus.ts";
 
 const STORAGE_KEYS = {
   gatewayUrl: "clawui.gateway.url",
@@ -5667,6 +5669,16 @@ export default function App() {
     return approvals[0] ?? null;
   }, [pendingApprovalsBySession, selectedSessionKey]);
 
+  const avatarState = useAvatarStatus({
+    sessionKey: selectedSessionKey,
+    messages,
+    streamText,
+    thinking,
+    toolItems,
+    connectionStatus: connectionState.status,
+    approvalNeeded: Boolean(activePendingApproval),
+  });
+
   const pendingApprovalCountsBySession = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
     const exactSessionKeys = new Set(sessions.map((session) => session.key));
@@ -5740,33 +5752,40 @@ export default function App() {
         style={{ width: sidebarCollapsed ? "84px" : `${uiSettings.sidebarWidth}px`, height: "100%", transition: "width 0.34s cubic-bezier(0.16, 1, 0.3, 1)" }}>
         <div className="sidebar-flip-card" style={{ height: "100%" }}>
           <div className="sidebar-face face-front" style={{ height: "100%" }}>
-            <SessionSidebar
-              sessions={sessions}
-              selectedKey={selectedSessionKey}
-              sessionActivity={sessionActivity}
-              pendingApprovalCounts={pendingApprovalCountsBySession}
-              collapsed={sidebarCollapsed}
-              sidebarWidth={uiSettings.sidebarWidth}
-              deletingKeys={deletingSessionKeys}
-              enableAnimations={uiSettings.enableAnimations}
-              autoHover={uiSettings.autoHoverSidebar && activeView === "chat"}
-              onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
-              onSetCollapsed={(v) => setSidebarCollapsed(v)}
-              onSelect={handleSelectSession}
-              onCreate={() => setShowNewSession(true)}
-              onDelete={(key, opts) => void handleDeleteSession(key, opts)}
-              hasMore={canLoadMoreSessions}
-              onReachEnd={() => void handleLoadMoreSessions()}
-              sessionPreviews={sessionPreviews}
-              allSessionRows={allSessionRows}
-              onSearchGateway={searchSessionsFromGateway}
-              onOpenDreams={() => {
-                switchView("chat");
-                setShowDreams(true);
-              }}
-              onOpenFiles={() => switchView("files")}
-              onOpenMedia={() => switchView("media")}
-            />
+            <div className={`sidebar-stack${sidebarCollapsed ? " is-collapsed" : ""}`}>
+              <SessionSidebar
+                sessions={sessions}
+                selectedKey={selectedSessionKey}
+                sessionActivity={sessionActivity}
+                pendingApprovalCounts={pendingApprovalCountsBySession}
+                collapsed={sidebarCollapsed}
+                sidebarWidth={uiSettings.sidebarWidth}
+                deletingKeys={deletingSessionKeys}
+                enableAnimations={uiSettings.enableAnimations}
+                autoHover={uiSettings.autoHoverSidebar && activeView === "chat"}
+                onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+                onSetCollapsed={(v) => setSidebarCollapsed(v)}
+                onSelect={handleSelectSession}
+                onCreate={() => setShowNewSession(true)}
+                onDelete={(key, opts) => void handleDeleteSession(key, opts)}
+                hasMore={canLoadMoreSessions}
+                onReachEnd={() => void handleLoadMoreSessions()}
+                sessionPreviews={sessionPreviews}
+                allSessionRows={allSessionRows}
+                onSearchGateway={searchSessionsFromGateway}
+                onOpenDreams={() => {
+                  switchView("chat");
+                  setShowDreams(true);
+                }}
+                onOpenFiles={() => switchView("files")}
+                onOpenMedia={() => switchView("media")}
+              />
+              <AvatarStatusPane
+                state={avatarState}
+                animationsEnabled={uiSettings.enableAnimations}
+                collapsed={sidebarCollapsed}
+              />
+            </div>
           </div>
           <div className="sidebar-face face-back" style={{ height: "100%" }}>
             <FileManager
