@@ -8,6 +8,12 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.16.0 (2026-04-25)
+
+### Feat
+
+- pixel avatar feature specification
+
 ## v0.15.1 (2026-04-24)
 
 ### Fix
