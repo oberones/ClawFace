@@ -34,12 +34,14 @@ ClawFace MUST treat OpenClaw as an external dependency whose currently exposed g
 
 - Read `AGENTS.md` and the relevant docs in `docs/` before making major architectural or product changes.
 - Specs, plans, and task lists produced through spec-kit MUST demonstrate how they satisfy this constitution before implementation proceeds.
+- All commits MUST use Conventional Commit format, such as `feat(scope): add selectable avatar styles` or `fix: prevent stale avatar status`.
 - Code review MUST verify:
   - the change reduces or at least does not worsen ownership sprawl
   - validation coverage matches the risk of the change
   - UX stays consistent with existing ClawFace surfaces
   - performance-sensitive paths do not introduce obvious waste
   - the implementation does not depend on unavailable OpenClaw changes or implied backend seams
+  - commit messages follow Conventional Commit format
 - UI-heavy or workflow-heavy changes SHOULD include a concise manual regression checklist or explicit functional test flows.
 - A simpler approach SHOULD be preferred unless added complexity is clearly justified by product value, platform constraints, or architecture health.
 
@@ -47,4 +49,4 @@ ClawFace MUST treat OpenClaw as an external dependency whose currently exposed g
 
 This constitution supersedes informal local habits for spec-kit-driven work in this repository. Every new spec, plan, and task breakdown MUST be checked against these principles. Amendments require updating this file and the matching template, plus a short rationale in the change that introduced the amendment. When this constitution conflicts with stale planning output, the constitution and the current repo guidance in `AGENTS.md` and `docs/` win.
 
-**Version**: 1.1.0 | **Ratified**: 2026-04-20 | **Last Amended**: 2026-04-22
+**Version**: 1.2.0 | **Ratified**: 2026-04-20 | **Last Amended**: 2026-04-25

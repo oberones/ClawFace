@@ -9,6 +9,7 @@ import {
 import { parsePathPrefixMappingsText } from "../lib/path-prefix-mappings.ts";
 import { AgentSessionShortcutsSection } from "./settings-sections/AgentSessionShortcutsSection.tsx";
 import { AppActionShortcutsSection } from "./settings-sections/AppActionShortcutsSection.tsx";
+import { AvatarStyleSection } from "./settings-sections/AvatarStyleSection.tsx";
 import { ChatControlsSection } from "./settings-sections/ChatControlsSection.tsx";
 import { ColorSystemSection } from "./settings-sections/ColorSystemSection.tsx";
 import { DeviceVisibilitySection } from "./settings-sections/DeviceVisibilitySection.tsx";
@@ -335,6 +336,11 @@ export default function SettingsModal(props: SettingsModalProps) {
               onPatchReplyDoneSound={patchReplyDoneSound}
               onCustomSoundChange={handleCustomSoundChange}
               onClearCustomSound={clearCustomSound}
+            />
+
+            <AvatarStyleSection
+              selectedProfileId={props.uiSettings.avatarProfileId}
+              onSelectProfile={(avatarProfileId) => patch({ avatarProfileId })}
             />
 
             <ColorSystemSection

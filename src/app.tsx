@@ -32,6 +32,7 @@ import {
   type ReplyDoneSoundTone,
   type UiSettings,
 } from "./lib/ui-settings.ts";
+import { getAvatarProfile, normalizeAvatarProfileId } from "./lib/avatar-profile.ts";
 import {
   deriveAppearanceCssVariables,
   normalizeAppearanceSettings,
@@ -644,6 +645,7 @@ function parseUiSettings(value: unknown): UiSettings {
       typeof parsed.autoHoverSidebar === "boolean"
         ? parsed.autoHoverSidebar
         : DEFAULT_UI_SETTINGS.autoHoverSidebar,
+    avatarProfileId: normalizeAvatarProfileId(parsed.avatarProfileId),
   };
 }
 
@@ -5678,6 +5680,10 @@ export default function App() {
     connectionStatus: connectionState.status,
     approvalNeeded: Boolean(activePendingApproval),
   });
+  const selectedAvatarProfile = useMemo(
+    () => getAvatarProfile(uiSettings.avatarProfileId),
+    [uiSettings.avatarProfileId],
+  );
 
   const pendingApprovalCountsBySession = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
@@ -5784,6 +5790,7 @@ export default function App() {
                 state={avatarState}
                 animationsEnabled={uiSettings.enableAnimations}
                 collapsed={sidebarCollapsed}
+                profile={selectedAvatarProfile}
               />
             </div>
           </div>

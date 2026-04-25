@@ -135,3 +135,21 @@ test("avatar state labels cover every state", () => {
     assert.ok(AVATAR_STATE_LABELS[state].length > 0);
   }
 });
+
+test("deriveAvatarState remains independent of avatar profile selection", () => {
+  const { deriveAvatarState } = loadAvatarStateModule();
+  const baselineSnapshot = connectedSnapshot({
+    activeToolCount: 1,
+    thinking: true,
+    streaming: true,
+  });
+
+  assert.equal(deriveAvatarState(baselineSnapshot), "tool-running");
+  assert.equal(
+    deriveAvatarState({
+      ...baselineSnapshot,
+      avatarProfileId: "clawface-prism-node",
+    }),
+    "tool-running",
+  );
+});
