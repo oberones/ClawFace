@@ -26,10 +26,10 @@ function readPngSize(filePath) {
   };
 }
 
-test("avatar profile registry defines three unique bundled profiles", () => {
+test("avatar profile registry defines four unique bundled profiles", () => {
   const { AVATAR_PROFILES, DEFAULT_AVATAR_PROFILE_ID } = loadAvatarProfileModule();
 
-  assert.equal(AVATAR_PROFILES.length, 3);
+  assert.equal(AVATAR_PROFILES.length, 4);
   assert.equal(AVATAR_PROFILES[0].id, DEFAULT_AVATAR_PROFILE_ID);
   assert.equal(new Set(AVATAR_PROFILES.map((profile) => profile.id)).size, AVATAR_PROFILES.length);
 

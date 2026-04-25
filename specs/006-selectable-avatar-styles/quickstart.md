@@ -4,7 +4,7 @@
 
 1. Add `src/lib/avatar-profile.ts` with the bundled profile registry, default profile id, profile lookup, and normalization helper.
 2. Add `avatarProfileId` to `UiSettings`, `DEFAULT_UI_SETTINGS`, and `parseUiSettings`.
-3. Generate and add two new sprite sheets under `public/avatars`, matching the default geometry and row order.
+3. Generate and add three additional sprite sheets under `public/avatars`, matching the default geometry and row order.
 4. Update `AnimatedAvatar` to accept a selected profile and set `--avatar-image` from that profile.
 5. Update `AvatarStatusPane` and the `AvatarStatusPane` call site in `src/app.tsx` to pass the selected profile id or profile.
 6. Add `AvatarStyleSection` to `src/components/settings-sections` and mount it from `SettingsModal` using the existing settings patch flow.
@@ -23,11 +23,11 @@ If image asset generation uses any temporary local tooling, do not add runtime d
 
 ## Manual Regression Checklist
 
-- Settings shows exactly three avatar choices with thumbnail previews.
+- Settings shows exactly four avatar choices with thumbnail previews.
 - Each avatar can be selected and the lower-left pane updates within one second.
 - The selected avatar persists after closing/reopening Settings and after app restart.
 - Invalid saved profile ids fall back to the default without a broken Settings UI.
-- All three profiles show the same state set: idle, thinking, streaming, tool-running, success, serious, caution, warning, approval-needed, disconnected.
+- All four profiles show the same state set: idle, thinking, streaming, tool-running, success, serious, caution, warning, approval-needed, disconnected.
 - Animations enabled: animated states play smoothly without rapid flashing.
 - UI animations disabled: every profile shows a static representative frame.
 - OS/browser reduced motion active: every profile shows a static representative frame.

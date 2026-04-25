@@ -7,7 +7,11 @@ This is an internal renderer contract. It does not define a backend, gateway, IP
 `src/lib/avatar-profile.ts` should expose:
 
 ```ts
-export type AvatarProfileId = "clawface-default" | "clawface-neon-console" | "clawface-prism-node";
+export type AvatarProfileId =
+  | "clawface-default"
+  | "clawface-neon-console"
+  | "clawface-prism-node"
+  | "clawface-mark";
 
 export type AvatarProfile = {
   id: AvatarProfileId;
@@ -29,7 +33,7 @@ export function getAvatarProfile(value: unknown): AvatarProfile;
 
 **Required behavior**:
 
-- `AVATAR_PROFILES` contains exactly three profiles for v1.
+- `AVATAR_PROFILES` contains exactly four profiles for v1.
 - `normalizeAvatarProfileId` returns `DEFAULT_AVATAR_PROFILE_ID` for invalid values.
 - `getAvatarProfile` always returns a valid profile.
 - Every profile points to a bundled asset under `public/avatars`.
@@ -86,7 +90,7 @@ type AvatarStyleSectionProps = {
 
 **Required behavior**:
 
-- Exactly three selectable thumbnail options render for v1.
+- Exactly four selectable thumbnail options render for v1.
 - The selected option is visibly and accessibly marked.
 - Selection calls `onSelectProfile` with a normalized profile id.
 - The selector does not expose upload, marketplace, editor, or remote asset affordances.

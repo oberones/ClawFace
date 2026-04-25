@@ -32,7 +32,7 @@
 
 **Alternatives Considered**:
 
-- **Hard-code three buttons in `SettingsModal`**: Rejected because it adds known-hotspot load and duplicates profile metadata.
+- **Hard-code style buttons in `SettingsModal`**: Rejected because it adds known-hotspot load and duplicates profile metadata.
 - **Put profile state into `avatar-state.ts`**: Rejected because state priority and visual profile selection are separate concerns.
 
 ## Decision: Persist The Selected Profile In Existing UI Settings
@@ -67,7 +67,7 @@
 
 ## Decision: Generate Two New Bundled Static Assets
 
-**Decision**: During implementation, generate two new sprite sheets under `public/avatars`, each covering all ten existing avatar states with the same geometry as the default profile.
+**Decision**: During implementation, generate three additional sprite sheets under `public/avatars`, each covering all ten existing avatar states with the same geometry as the default profile.
 
 **Rationale**:
 
@@ -79,8 +79,9 @@
 
 - **Neon Console**: compact, terminal-inspired, high-contrast pixel shape with cool glow accents and clear state lights.
 - **Prism Node**: geometric, crystalline/status-light style with softer palette and different silhouette from the default and Neon Console.
+- **ClawFace Mark**: compact mark based on the ClawFace logo's dark face, cyan claw shapes, magenta circuitry, bright eyes, and grin.
 
-The exact generated art can vary as long as both styles are tasteful, legible at the existing pane size, and clearly distinct from the default and from each other.
+The exact generated art can vary as long as additional styles are tasteful, legible at the existing pane size, and clearly distinct from the default and from each other.
 
 ## Decision: Keep Avatar State Selection Shared Across Profiles
 

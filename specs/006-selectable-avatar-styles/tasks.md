@@ -40,7 +40,7 @@
 
 ## Phase 3: User Story 1 - Choose An Avatar Style In Settings (Priority: P1) MVP
 
-**Goal**: Let users choose exactly one of three bundled avatar styles from thumbnail previews in Settings and immediately update the lower-left avatar pane.
+**Goal**: Let users choose exactly one of four bundled avatar styles from thumbnail previews in Settings and immediately update the lower-left avatar pane.
 
 **Independent Test**: Open Settings, choose each thumbnail option, close and reopen Settings, and verify the lower-left avatar pane uses the selected artwork without moving or resetting the current avatar state.
 
@@ -53,10 +53,10 @@
 - [X] T009 [US1] Update `src/components/AnimatedAvatar.tsx` to accept an `AvatarProfile` prop and set `--avatar-image` from `profile.spriteSrc`
 - [X] T010 [US1] Update `src/components/AvatarStatusPane.tsx` to accept and pass an `AvatarProfile` without changing status copy or state derivation
 - [X] T011 [US1] Resolve the selected profile with `getAvatarProfile(uiSettings.avatarProfileId)` in `src/app.tsx` and pass it to `AvatarStatusPane`
-- [X] T012 [P] [US1] Create `src/components/settings-sections/AvatarStyleSection.tsx` with exactly three selectable thumbnail options sourced from `AVATAR_PROFILES`
+- [X] T012 [P] [US1] Create `src/components/settings-sections/AvatarStyleSection.tsx` with exactly four selectable thumbnail options sourced from `AVATAR_PROFILES`
 - [X] T013 [US1] Mount `AvatarStyleSection` from `src/components/SettingsModal.tsx` using the existing `patch({ avatarProfileId })` settings flow
 - [X] T014 [US1] Add selected, hover, focus, and thumbnail layout styles for the avatar selector in `src/styles.css`
-- [ ] T015 [US1] After T032-T034 are complete, verify selecting each profile updates the live lower-left avatar pane within one second and persists after Settings is reopened
+- [ ] T015 [US1] After T032-T035 are complete, verify selecting each profile updates the live lower-left avatar pane within one second and persists after Settings is reopened
 
 **Checkpoint**: User Story 1 is functional and testable as the MVP.
 
@@ -78,9 +78,9 @@
 - [X] T018 [US2] Keep `FRAME_COUNTS`, animated-state selection, ARIA status label, and `data-avatar-state` behavior profile-independent in `src/components/AnimatedAvatar.tsx`
 - [X] T019 [US2] Ensure avatar selector thumbnails render static representative frames without requiring CSS animation in `src/components/settings-sections/AvatarStyleSection.tsx`
 - [X] T020 [US2] Update `src/styles.css` only as needed so all profiles use the existing `.animated-avatar` row mapping, `steps()` playback, `[data-animations-off]`, and `prefers-reduced-motion` rules
-- [ ] T021 [US2] Manually verify animations enabled, UI animations disabled, and OS/browser reduced-motion behavior for all three profiles
+- [ ] T021 [US2] Manually verify animations enabled, UI animations disabled, and OS/browser reduced-motion behavior for all four profiles
 
-**Checkpoint**: All three profiles communicate the same runtime and final-response states with shared behavior.
+**Checkpoint**: All four profiles communicate the same runtime and final-response states with shared behavior.
 
 ---
 
@@ -88,7 +88,7 @@
 
 **Goal**: Keep the Settings selector compact, thumbnail-based, accessible, and free of editor, upload, download, marketplace, account, or backend concepts.
 
-**Independent Test**: Review the Settings UI and confirm it presents exactly three bundled thumbnail choices with accessible labels and no new controls in the live avatar pane.
+**Independent Test**: Review the Settings UI and confirm it presents exactly four bundled thumbnail choices with accessible labels and no new controls in the live avatar pane.
 
 ### Implementation for User Story 3
 
@@ -106,7 +106,7 @@
 
 **Goal**: Make future bundled styles or optional OpenClaw-provided metadata possible without duplicating state logic or increasing known hotspot load.
 
-**Independent Test**: Review the implementation and verify adding a fourth bundled profile would require adding a profile entry and sprite asset, not changing state derivation or chat/session runtime logic.
+**Independent Test**: Review the implementation and verify adding a future fifth bundled profile would require adding a profile entry and sprite asset, not changing state derivation or chat/session runtime logic.
 
 ### Implementation for User Story 4
 
@@ -122,13 +122,14 @@
 
 ## Phase 7: Bundled Asset Generation
 
-**Purpose**: Generate and package the two new creative avatar styles required by the feature.
+**Purpose**: Generate and package the three additional creative avatar styles required by the feature.
 
 - [X] T032 [P] Generate `public/avatars/clawface-neon-console.png` as a 4-column by 10-row pixel-art sprite sheet with the same state row order as `clawface-default.png`
 - [X] T033 [P] Generate `public/avatars/clawface-prism-node.png` as a 4-column by 10-row pixel-art sprite sheet with the same state row order as `clawface-default.png`
-- [X] T034 Verify both new sprite sheets are visually distinct from the default and from each other at the live pane size and collapsed sidebar size
-- [X] T035 Update `public/avatars/README.md` with the two new filenames, profile names, geometry, state row order, and packaged-asset expectations
-- [X] T036 Confirm implementation-time image generation does not add any runtime animation or image-generation dependency to `package.json`
+- [X] T034 [P] Generate `public/avatars/clawface-mark.png` as a logo-inspired 4-column by 10-row pixel-art sprite sheet with the same state row order as `clawface-default.png`
+- [X] T035 Verify all additional sprite sheets are visually distinct from the default and from each other at the live pane size and collapsed sidebar size
+- [X] T036 Update `public/avatars/README.md` with the new filenames, profile names, geometry, state row order, and packaged-asset expectations
+- [X] T037 Confirm implementation-time image generation does not add any runtime animation or image-generation dependency to `package.json`
 
 **Checkpoint**: All required avatar images exist as bundled static assets.
 
@@ -138,14 +139,14 @@
 
 **Purpose**: Final validation, manual regression, and cleanup across all user stories.
 
-- [X] T037 [P] Run `make test-unit` and fix failures in `src/lib/avatar-profile.ts`, `src/lib/avatar-state.ts`, or `tests/avatar-profile.test.mjs`
-- [X] T038 [P] Run `make typecheck` and fix TypeScript errors in `src/lib/avatar-profile.ts`, `src/lib/ui-settings.ts`, `src/components/AnimatedAvatar.tsx`, `src/components/AvatarStatusPane.tsx`, `src/components/settings-sections/AvatarStyleSection.tsx`, `src/components/SettingsModal.tsx`, or `src/app.tsx`
-- [X] T039 Run `make build` and fix Vite/Electron packaged asset issues involving `public/avatars/*.png`
-- [ ] T040 Execute the manual regression checklist in `specs/006-selectable-avatar-styles/quickstart.md`
-- [ ] T041 [US3] Define and manually verify sprite load failure behavior so `AvatarStatusPane` keeps accessible status text and either falls back to the default profile or remains non-blocking when a selected sprite cannot load
-- [X] T042 [P] Remove unused imports, dead CSS, speculative marketplace/editor code, or profile-specific state branches from changed source files
-- [X] T043 [P] Review docs in `specs/006-selectable-avatar-styles/` and update them if implementation changes filenames, profile names, geometry, or validation steps
-- [ ] T044 Prepare implementation commit with Conventional Commit format, for example `feat(avatar): add selectable avatar styles`
+- [X] T038 [P] Run `make test-unit` and fix failures in `src/lib/avatar-profile.ts`, `src/lib/avatar-state.ts`, or `tests/avatar-profile.test.mjs`
+- [X] T039 [P] Run `make typecheck` and fix TypeScript errors in `src/lib/avatar-profile.ts`, `src/lib/ui-settings.ts`, `src/components/AnimatedAvatar.tsx`, `src/components/AvatarStatusPane.tsx`, `src/components/settings-sections/AvatarStyleSection.tsx`, `src/components/SettingsModal.tsx`, or `src/app.tsx`
+- [X] T040 Run `make build` and fix Vite/Electron packaged asset issues involving `public/avatars/*.png`
+- [ ] T041 Execute the manual regression checklist in `specs/006-selectable-avatar-styles/quickstart.md`
+- [ ] T042 [US3] Define and manually verify sprite load failure behavior so `AvatarStatusPane` keeps accessible status text and either falls back to the default profile or remains non-blocking when a selected sprite cannot load
+- [X] T043 [P] Remove unused imports, dead CSS, speculative marketplace/editor code, or profile-specific state branches from changed source files
+- [X] T044 [P] Review docs in `specs/006-selectable-avatar-styles/` and update them if implementation changes filenames, profile names, geometry, or validation steps
+- [ ] T045 Prepare implementation commit with Conventional Commit format, for example `feat(avatar): add selectable avatar styles`
 
 ---
 
@@ -159,7 +160,7 @@
 - **US2 (Phase 4)**: Depends on US1 component/profile wiring
 - **US3 (Phase 5)**: Depends on US1 selector UI
 - **US4 (Phase 6)**: Can run after US1 wiring is present; final review depends on US2 and US3
-- **Bundled Assets (Phase 7)**: Can begin after profile filenames are chosen in Setup; T032-T034 must complete before final US1 visual verification in T015
+- **Bundled Assets (Phase 7)**: Can begin after profile filenames are chosen in Setup; T032-T035 must complete before final US1 visual verification in T015
 - **Polish (Phase 8)**: Depends on selected user stories and assets being complete
 
 ### User Story Dependencies
@@ -184,14 +185,14 @@
 - T009 and T012 can start in parallel after `AvatarProfile` types exist.
 - T016 and T017 can run in parallel because they cover different test files/concerns.
 - T022 and T023 both touch `AvatarStyleSection`; do not run them in parallel unless one owner coordinates that file.
-- T032 and T033 can run in parallel because they produce separate image files.
-- T037 and T038 can run in parallel after implementation, while T039 should follow once typecheck and unit tests pass.
+- T032, T033, and T034 can run in parallel because they produce separate image files.
+- T038 and T039 can run in parallel after implementation, while T040 should follow once typecheck and unit tests pass.
 
 ## Parallel Example: User Story 1
 
 ```text
 Task: "Update src/components/AnimatedAvatar.tsx to accept an AvatarProfile prop and set --avatar-image from profile.spriteSrc"
-Task: "Create src/components/settings-sections/AvatarStyleSection.tsx with exactly three selectable thumbnail options sourced from AVATAR_PROFILES"
+Task: "Create src/components/settings-sections/AvatarStyleSection.tsx with exactly four selectable thumbnail options sourced from AVATAR_PROFILES"
 ```
 
 ## Parallel Example: Bundled Assets
@@ -199,6 +200,7 @@ Task: "Create src/components/settings-sections/AvatarStyleSection.tsx with exact
 ```text
 Task: "Generate public/avatars/clawface-neon-console.png as a 4-column by 10-row pixel-art sprite sheet"
 Task: "Generate public/avatars/clawface-prism-node.png as a 4-column by 10-row pixel-art sprite sheet"
+Task: "Generate public/avatars/clawface-mark.png as a logo-inspired 4-column by 10-row pixel-art sprite sheet"
 ```
 
 ## Implementation Strategy
@@ -207,8 +209,8 @@ Task: "Generate public/avatars/clawface-prism-node.png as a 4-column by 10-row p
 
 1. Complete Setup and Foundational phases.
 2. Complete the profile registry, Settings selector, and live pane wiring from User Story 1.
-3. Generate the two sprite sheets, verify thumbnails render, and complete T015.
-4. Run `make test-unit` and a focused manual check for selecting all three styles.
+3. Generate the three additional sprite sheets, verify thumbnails render, and complete T015.
+4. Run `make test-unit` and a focused manual check for selecting all four styles.
 
 ### Incremental Delivery
 

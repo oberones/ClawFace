@@ -306,6 +306,101 @@ function drawPrismBase(pixels, ox, oy, frame, mood) {
   }
 }
 
+function drawClawFaceMarkBase(pixels, ox, oy, frame, mood) {
+  const outline = rgba("#06142f");
+  const deep = rgba("#120028");
+  const violet = rgba("#32106b");
+  const cyan = rgba("#39f6ff");
+  const cyanBright = rgba("#b7fbff");
+  const magenta = rgba("#ff4de8");
+  const white = rgba("#fff7fb");
+  const amber = rgba("#ffd166");
+  const red = rgba("#ff5277");
+  const green = rgba("#68ffbc");
+  const bob = mood === "streaming" || mood === "success" ? frame % 2 : 0;
+  const cx = ox + 12;
+  const cy = oy + 12 + bob;
+
+  rect(pixels, ox + 5, oy + 6 + bob, 14, 12, outline);
+  rect(pixels, ox + 6, oy + 5 + bob, 12, 14, deep);
+  rect(pixels, ox + 4, oy + 10 + bob, 2, 5, cyan);
+  rect(pixels, ox + 18, oy + 10 + bob, 2, 5, cyan);
+  line(pixels, ox + 6, oy + 18 + bob, ox + 10, oy + 21 + bob, cyan);
+  line(pixels, ox + 10, oy + 21 + bob, ox + 13, oy + 18 + bob, cyan);
+  line(pixels, ox + 5, oy + 7 + bob, ox + 9, oy + 3 + bob, cyanBright);
+  line(pixels, ox + 10, oy + 7 + bob, ox + 13, oy + 2 + bob, cyanBright);
+  line(pixels, ox + 15, oy + 7 + bob, ox + 18, oy + 3 + bob, cyanBright);
+  rect(pixels, ox + 7, oy + 8 + bob, 3, 1, violet);
+  rect(pixels, ox + 14, oy + 8 + bob, 4, 1, violet);
+  rect(pixels, ox + 17, oy + 9 + bob, 1, 3, magenta);
+  rect(pixels, ox + 5, oy + 15 + bob, 3, 1, magenta);
+
+  if (mood === "idle") {
+    dot(pixels, ox + 8, oy + 11 + bob, white);
+    dot(pixels, ox + 14, oy + 11 + bob, white);
+    rect(pixels, ox + 10, oy + 16 + bob, 5, 1, white);
+  }
+  if (mood === "thinking") {
+    dot(pixels, ox + 8, oy + 11 + bob, white);
+    dot(pixels, ox + 14, oy + 11 + bob, white);
+    const orbit = [[cx - 7, cy - 10], [cx, cy - 12], [cx + 7, cy - 10], [cx + 9, cy - 5]];
+    orbit.forEach(([x, y], index) => dot(pixels, x, y, index === frame ? magenta : cyan));
+    rect(pixels, ox + 11, oy + 16 + bob, 3, 1, white);
+  }
+  if (mood === "streaming") {
+    dot(pixels, ox + 8, oy + 11 + bob, cyanBright);
+    dot(pixels, ox + 14, oy + 11 + bob, cyanBright);
+    rect(pixels, ox + 8, oy + 15 + bob, 3 + frame, 1, green);
+    rect(pixels, ox + 9, oy + 17 + bob, 7 - (frame % 3), 1, cyan);
+  }
+  if (mood === "tool-running") {
+    dot(pixels, ox + 8, oy + 11 + bob, cyanBright);
+    dot(pixels, ox + 14, oy + 11 + bob, cyanBright);
+    outlineRect(pixels, ox + 9, oy + 14 + bob, 7, 5, cyan);
+    rect(pixels, ox + 12, oy + 11 + (frame % 3) + bob, 1, 4, amber);
+    rect(pixels, ox + 7 + (frame % 4), oy + 16 + bob, 4, 1, amber);
+  }
+  if (mood === "success") {
+    dot(pixels, ox + 8, oy + 11 + bob, white);
+    dot(pixels, ox + 14, oy + 11 + bob, white);
+    line(pixels, ox + 8, oy + 15 + bob, ox + 11, oy + 18 + bob, green);
+    line(pixels, ox + 11, oy + 18 + bob, ox + 17, oy + 10 + bob, green);
+    rect(pixels, ox + 9, oy + 17 + bob, 6, 1, white);
+  }
+  if (mood === "serious") {
+    rect(pixels, ox + 8, oy + 11 + bob, 3, 1, white);
+    rect(pixels, ox + 14, oy + 11 + bob, 3, 1, white);
+    rect(pixels, ox + 9, oy + 16 + bob, 7, 1, cyan);
+  }
+  if (mood === "caution") {
+    dot(pixels, ox + 8, oy + 11 + bob, amber);
+    dot(pixels, ox + 14, oy + 11 + bob, amber);
+    line(pixels, cx, cy - 3, cx + 5, cy + 5, amber);
+    line(pixels, cx, cy - 3, cx - 5, cy + 5, amber);
+    rect(pixels, cx - 4, cy + 5, 9, 1, amber);
+  }
+  if (mood === "warning") {
+    dot(pixels, ox + 8, oy + 11 + bob, red);
+    dot(pixels, ox + 14, oy + 11 + bob, red);
+    line(pixels, ox + 8, oy + 15 + bob, ox + 16, oy + 19 + bob, red);
+    line(pixels, ox + 16, oy + 15 + bob, ox + 8, oy + 19 + bob, red);
+  }
+  if (mood === "approval-needed") {
+    dot(pixels, ox + 8, oy + 11 + bob, white);
+    dot(pixels, ox + 14, oy + 11 + bob, white);
+    outlineRect(pixels, ox + 8, oy + 14 + bob, 9, 5, amber);
+    rect(pixels, ox + 10, oy + 16 + bob, 5, 1, green);
+    dot(pixels, ox + 17, oy + 16 + bob, amber);
+  }
+  if (mood === "disconnected") {
+    dot(pixels, ox + 8, oy + 11 + bob, red);
+    dot(pixels, ox + 14, oy + 11 + bob, red);
+    rect(pixels, ox + 8, oy + 16 + bob, 3, 1, red);
+    rect(pixels, ox + 14, oy + 16 + bob, 3, 1, red);
+    line(pixels, ox + 11, oy + 17 + bob, ox + 13, oy + 14 + bob, red);
+  }
+}
+
 function drawSheet(drawFrame) {
   const pixels = makeCanvas();
   STATE_ROWS.forEach((state, row) => {
@@ -325,4 +420,8 @@ writePng(
 writePng(
   path.join(OUTPUT_DIR, "clawface-prism-node.png"),
   drawSheet(drawPrismBase),
+);
+writePng(
+  path.join(OUTPUT_DIR, "clawface-mark.png"),
+  drawSheet(drawClawFaceMarkBase),
 );

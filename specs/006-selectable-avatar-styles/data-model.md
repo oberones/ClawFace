@@ -70,7 +70,7 @@ View model used by the Settings selector.
 
 **Rules**:
 
-- Settings shows exactly three options for v1.
+- Settings shows exactly four options for v1.
 - Options are selectable by mouse, keyboard, and screen reader.
 - Selecting an option patches existing UI settings with the profile id.
 
