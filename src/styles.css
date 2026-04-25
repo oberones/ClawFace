@@ -2981,6 +2981,87 @@ body::before {
   accent-color: var(--claw-accent);
 }
 
+.avatar-style-options {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.avatar-style-option {
+  appearance: none;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 82%, var(--claw-surface));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--claw-surface) 90%, var(--claw-bg-elevated));
+  color: var(--claw-text);
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.avatar-style-option:hover {
+  border-color: color-mix(in srgb, var(--claw-accent) 46%, var(--claw-border));
+  background: color-mix(in srgb, var(--claw-accent-soft) 32%, var(--claw-surface));
+}
+
+.avatar-style-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--claw-accent) 72%, white);
+  outline-offset: 2px;
+}
+
+.avatar-style-option.is-selected {
+  border-color: color-mix(in srgb, var(--claw-accent) 62%, var(--claw-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--claw-accent) 28%, transparent);
+}
+
+.avatar-style-option:active {
+  transform: translateY(1px);
+}
+
+.avatar-style-preview {
+  --avatar-size: 42px;
+  --avatar-sheet-width: 168px;
+  --avatar-sheet-height: 420px;
+  --avatar-travel-x: -168px;
+  --avatar-row-1: -42px;
+  --avatar-row-2: -84px;
+  --avatar-row-3: -126px;
+  --avatar-row-4: -168px;
+  --avatar-row-5: -210px;
+  --avatar-row-6: -252px;
+  --avatar-row-7: -294px;
+  --avatar-row-8: -336px;
+  --avatar-row-9: -378px;
+}
+
+.avatar-style-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.avatar-style-name {
+  color: var(--claw-text);
+  font-size: 12px;
+  font-weight: 730;
+  line-height: 1.15;
+}
+
+.avatar-style-description {
+  color: var(--claw-text-soft);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
 .new-session-modal {
   width: min(460px, 100%);
   border-radius: 22px;
@@ -3133,6 +3214,10 @@ body::before {
   }
 
   .scheme-save-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .avatar-style-options {
     grid-template-columns: minmax(0, 1fr);
   }
 

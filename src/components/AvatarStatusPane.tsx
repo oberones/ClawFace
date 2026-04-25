@@ -1,11 +1,13 @@
 import type { AvatarState } from "../lib/avatar-state.ts";
 import { AVATAR_STATE_LABELS } from "../lib/avatar-state.ts";
+import type { AvatarProfile } from "../lib/avatar-profile.ts";
 import { AnimatedAvatar } from "./AnimatedAvatar.tsx";
 
 type AvatarStatusPaneProps = {
   state: AvatarState;
   animationsEnabled: boolean;
   collapsed: boolean;
+  profile: AvatarProfile;
 };
 
 const AVATAR_STATUS_DETAILS: Record<AvatarState, string> = {
@@ -36,6 +38,7 @@ export function AvatarStatusPane(props: AvatarStatusPaneProps) {
       <AnimatedAvatar
         state={props.state}
         animationsEnabled={props.animationsEnabled}
+        profile={props.profile}
         className="avatar-status-pane-avatar"
       />
       {!props.collapsed && (
