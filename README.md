@@ -39,6 +39,8 @@ Use the pinned runtime for source builds:
 - Node.js `22.22.0`
 - npm `10.9.4`
 
+For user setup by deployment type, see [`docs/QUICK-START.md`](./docs/QUICK-START.md). It covers host OpenClaw, Docker OpenClaw with media/workspace path mappings, and remote OpenClaw.
+
 Packaged binaries are attached to GitHub Releases when maintainers tag a commit on `main`.
 
 ## Install
@@ -158,11 +160,7 @@ Notes:
 
 ### Media Path Mapping
 
-ClawFace can render OpenClaw-generated images and other local media in several deployment shapes, but the path resolution strategy depends on where OpenClaw is running.
-
-- **OpenClaw on the host machine**: media paths usually resolve directly.
-- **OpenClaw in a local container with shared volumes**: use **Settings -> Path Prefix Mappings** to map container paths to host paths.
-- **OpenClaw on a remote machine**: path mappings alone are not enough unless the remote media directory is also exposed locally; use a file/media server or a gateway-served media endpoint for that setup.
+ClawFace can render OpenClaw-generated images and other local media in several deployment shapes, but the path resolution strategy depends on where OpenClaw is running. See the [Quick Start guide](./docs/QUICK-START.md) for the full host, Docker, and remote setup notes.
 
 The most common Docker mapping looks like:
 
