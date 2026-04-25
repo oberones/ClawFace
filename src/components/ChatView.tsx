@@ -7,7 +7,6 @@ import type {
   ModelListItem,
   PendingApproval,
   SessionInfo,
-  SessionRuntimeStatus,
   SessionTransitionState,
   ToolItem,
 } from "../lib/types.ts";
@@ -179,6 +178,7 @@ export default function ChatView(props: ChatViewProps) {
     () => [...props.toolItems].sort((a, b) => a.startedAt - b.startedAt),
     [props.toolItems],
   );
+
   const messageTailKey = useMemo(() => {
     const lastMessage = props.messages[props.messages.length - 1];
     if (!lastMessage) {
@@ -696,7 +696,12 @@ export default function ChatView(props: ChatViewProps) {
       triggerChatImpulse();
     }
     prevMessageIdsRef.current = new Set(currentIds);
-  }, [props.messages, sessionTransitionPhase, markPoppingMessages, triggerChatImpulse]);
+  }, [
+    props.messages,
+    sessionTransitionPhase,
+    markPoppingMessages,
+    triggerChatImpulse,
+  ]);
 
   useEffect(() => {
     const currentIds = props.toolItems.map((tool) => tool.id);
@@ -985,98 +990,6 @@ export default function ChatView(props: ChatViewProps) {
     writeClipboardText(PAIRING_APPROVAL_COMMAND);
   }, [writeClipboardText]);
 
-  const currentSessionRuntime = useMemo<{
-    status: SessionRuntimeStatus;
-    label: string;
-    detail: string;
-    tone: "neutral" | "active" | "warning";
-  }>(() => {
-    if (connectionFeedback.approvalBanner) {
-      return {
-        status: "disconnected",
-        label: connectionFeedback.approvalBanner.title,
-        detail: connectionFeedback.approvalBanner.message,
-        tone: "warning",
-      };
-    }
-    if (props.pendingApproval) {
-      return {
-        status: "working",
-        label: props.pendingApproval.title,
-        detail: props.pendingApproval.description,
-        tone: "warning",
-      };
-    }
-    if (connectionFeedback.sessionBanner) {
-      return {
-        status: connectionStatus === "connecting" ? "reconnecting" : "disconnected",
-        label: connectionFeedback.sessionBanner.title,
-        detail: connectionFeedback.sessionBanner.message,
-        tone: connectionFeedback.sessionBanner.tone === "info" ? "neutral" : "warning",
-      };
-    }
-    if (isSessionSwitching) {
-      return {
-        status: "switching",
-        label: "Switching session",
-        detail: "Restoring the selected conversation and thread state.",
-        tone: "neutral",
-      };
-    }
-    if (props.isCurrentSessionLoading) {
-      return {
-        status: "loading",
-        label: "Loading session",
-        detail: "Fetching history and rebuilding the current thread.",
-        tone: "neutral",
-      };
-    }
-    if (props.streamText) {
-      return {
-        status: "streaming",
-        label: "Streaming reply",
-        detail: "The assistant is actively streaming output into this session.",
-        tone: "active",
-      };
-    }
-    if (props.thinking) {
-      return {
-        status: "thinking",
-        label: "Thinking",
-        detail: "The assistant is working before it starts streaming a reply.",
-        tone: "active",
-      };
-    }
-    if (props.canAbort || props.toolItems.some((item) => item.status !== "result")) {
-      return {
-        status: "working",
-        label: "Working",
-        detail: "This session still has active runtime work in progress.",
-        tone: "active",
-      };
-    }
-    return {
-      status: "idle",
-      label: "Idle",
-      detail: props.sessionKey
-        ? "This session is connected and ready for the next action."
-        : "Create or select a session to start working.",
-      tone: "neutral",
-    };
-  }, [
-    connectionFeedback.approvalBanner,
-    connectionFeedback.sessionBanner,
-    connectionStatus,
-    isSessionSwitching,
-    props.canAbort,
-    props.isCurrentSessionLoading,
-    props.pendingApproval,
-    props.sessionKey,
-    props.streamText,
-    props.thinking,
-    props.toolItems,
-  ]);
-
   const sendDisabled = composerRuntimeState !== "ready";
   const sendLabel = composerRuntimeState === "busy" ? "Busy" : "Send";
 
@@ -1091,17 +1004,6 @@ export default function ChatView(props: ChatViewProps) {
                 <div className="chat-brand-title">ClawFace</div>
                 <div className="chat-brand-subtitle">OpenClaw control surface · v{__APP_VERSION__}</div>
               </div>
-            </div>
-            <div
-              className={`session-runtime-pill${currentSessionRuntime.tone === "active" ? " is-active" : currentSessionRuntime.tone === "warning" ? " is-warning" : ""}`}
-              title={currentSessionRuntime.detail}
-              aria-label={`Current session status: ${currentSessionRuntime.label}. ${currentSessionRuntime.detail}`}
-            >
-              <span className={`session-runtime-dot is-${currentSessionRuntime.status}`} />
-              <span className="session-runtime-copy">
-                <span className="session-runtime-label">{currentSessionRuntime.label}</span>
-                <span className="session-runtime-detail">{currentSessionRuntime.detail}</span>
-              </span>
             </div>
           </div>
           <div className="topbar-status">
