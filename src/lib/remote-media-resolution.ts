@@ -13,6 +13,8 @@ export const DEFAULT_REMOTE_MEDIA_READ_METHODS = [
   "media.read",
 ] as const;
 
+// Candidate counts are intentionally capped because remote media probing fans out
+// across advertised RPC methods, parameter shapes, and HTTP fallback endpoints.
 const MAX_GATEWAY_REMOTE_MEDIA_URL_CANDIDATES = 18;
 const MAX_REMOTE_MEDIA_READ_METHODS = 8;
 
@@ -157,6 +159,9 @@ export function extractRenderableImageSourceFromUnknown(
   sourcePathHint: string,
   mimeHint?: string | null,
 ): string | null {
+  // Gateway implementations return media in several shapes: raw base64 strings,
+  // data URLs, HTTP URLs, or nested objects. Breadth-first traversal finds the
+  // nearest renderable image while maxDepth/maxNodes prevent pathological payloads.
   const queue: Array<{ value: unknown; depth: number; mimeHint?: string | null }> = [
     { value, depth: 0, mimeHint },
   ];
@@ -320,6 +325,8 @@ export function buildRemoteMediaReadParamVariants(reference: string): Record<str
     return [];
   }
   const referenceKind = classifyRemoteMediaReference(normalizedReference);
+  // Different OpenClaw/gateway versions have used different parameter names for
+  // the same media reference, so build a small ordered compatibility matrix.
   const paramBases: Record<string, unknown>[] =
     referenceKind === "artifact"
       ? [
@@ -399,6 +406,8 @@ export function toGatewayHttpBaseCandidates(rawGatewayUrl: string): string[] {
     if (protocol !== "http:" && protocol !== "https:") {
       return;
     }
+    // A gateway URL may point at a websocket subpath; try each parent HTTP path
+    // before falling back to the origin so deployments behind prefixes work.
     const originBase = `${protocol}//${value.host}`;
     const segments = value.pathname.split("/").filter(Boolean);
     for (let i = segments.length; i >= 1; i -= 1) {

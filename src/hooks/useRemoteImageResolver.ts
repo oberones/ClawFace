@@ -125,6 +125,8 @@ export function useRemoteImageResolver(
     gatewayUrl: string,
     filePath: string,
   ): Promise<string | null> => {
+    // RPC reads are preferred, but some gateway deployments only expose media
+    // through HTTP endpoints; probe a bounded candidate list as a final fallback.
     const candidates = buildGatewayRemoteMediaUrlCandidates(gatewayUrl, filePath);
     const desktopFetchImageUrl = window.desktopInfo?.fetchImageUrl;
     for (const candidate of candidates) {

@@ -143,6 +143,8 @@ function annotateDuplicateTimestamps(entries: DiaryTimelineEntry[]): DiaryTimeli
     if (count <= 1) {
       return entry;
     }
+    // OpenClaw can append multiple diary entries under the same visible timestamp;
+    // preserve each entry while giving the reader a stable occurrence label.
     const index = (seen.get(entry.dateLabel) ?? 0) + 1;
     seen.set(entry.dateLabel, index);
     const occurrenceLabel = `Entry ${index} of ${count}`;
