@@ -25,6 +25,8 @@ export function resolveEventSessionKey(params: {
     return selectedSessionKey;
   }
 
+  // Background run events may arrive after the user switches sessions, so keep a
+  // small run-to-session cache instead of routing every event to the selected tab.
   for (const entry of params.cachedRuns ?? []) {
     const sessionKey = entry.sessionKey?.trim();
     if (!sessionKey) {

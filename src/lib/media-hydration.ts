@@ -15,6 +15,8 @@ const MEDIA_TOOL_NAME_RE = /(image|media|screenshot|render|draw|picture|photo)/;
 const IMAGE_OUTPUT_RE = /\.(png|jpe?g|webp|gif|bmp|svg)\b/i;
 
 export function toolMayProduceMedia(tool: MediaExpectationTool): boolean {
+  // Be intentionally generous: generated media can appear as a final attachment
+  // after the textual tool result, so these hints decide whether to poll history.
   if (Boolean(tool.mediaPaths?.length)) {
     return true;
   }
@@ -66,6 +68,8 @@ export function decideFinalizedRunHydration(params: {
   hasCommittedMessage: boolean;
   expectsMedia: boolean;
 }): FinalizedRunHydrationDecision {
+  // If the final assistant message is missing, a history reload is the fastest
+  // way to recover both text and late-arriving attachments from the gateway.
   if (!params.hasFinalAssistantMessage) {
     if (params.hasCommittedAttachment || (params.hasCommittedMessage && !params.expectsMedia)) {
       return "clear";
@@ -77,6 +81,8 @@ export function decideFinalizedRunHydration(params: {
     return "clear";
   }
 
+  // Once text exists but expected media does not, schedule a short delayed poll
+  // instead of immediately reloading the whole thread.
   return params.expectsMedia ? "schedule" : "clear";
 }
 

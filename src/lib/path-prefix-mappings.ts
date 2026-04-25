@@ -8,6 +8,8 @@ export type ParsedPathPrefixMappings = {
   invalidLines: string[];
 };
 
+// Renderer-wide path mapping state mirrors the user's Settings value so media
+// helpers can translate container paths without threading mappings through every call.
 let activePathPrefixMappings: PathPrefixMapping[] = [];
 let activeHomeDirHint = "";
 
@@ -97,6 +99,8 @@ export function parsePathPrefixMappingsText(text: string): ParsedPathPrefixMappi
     mappings.push({ sourcePrefix, targetPrefix });
   }
 
+  // Longest source prefix wins so a specific workspace mapping can override a
+  // broader home/media mapping without depending on user-entered ordering.
   mappings.sort((a, b) => b.sourcePrefix.length - a.sourcePrefix.length);
   return { mappings, invalidLines };
 }
@@ -148,4 +152,3 @@ export function applyPathPrefixMappings(
 
   return normalizedValue;
 }
-

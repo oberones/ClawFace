@@ -2,6 +2,8 @@ import { applyPathPrefixMappings } from "./path-prefix-mappings.ts";
 
 export const DESKTOP_LOCAL_IMAGE_SCHEME = "claw-local-image";
 const WORKSPACE_MARKER = "/.openclaw/workspace";
+// Seeded by the app shell before Electron's desktopInfo bridge is guaranteed to
+// be available, keeping tests and early renderer hydration deterministic.
 const runtimePathHints: { homeDir: string; workspaceDir: string } = {
   homeDir: "",
   workspaceDir: "",
@@ -363,6 +365,8 @@ export function extractImageSourceCandidates(value: string): string[] {
 
   push(initial);
 
+  // Some OpenClaw surfaces have emitted paths encoded as compact base64 strings
+  // rather than image bytes, so decode only when the payload still looks path-like.
   const decodedBase64 = decodeCompactBase64AsUtf8(initial);
   if (decodedBase64 && isLikelyPathOrUrl(decodedBase64)) {
     push(decodedBase64);
@@ -543,6 +547,8 @@ function localPathFromDesktopLocalImageUrl(value: string): string | null {
 
 function localPathFromWebLocalImageProxyUrl(value: string): string | null {
   const trimmed = value.trim();
+  // Older dev builds could persist the web proxy path through file:// URLs; keep
+  // this parser tolerant so reloads can still recover the underlying local path.
   if (/^file:\/\/\/__claw\/local-image\?/i.test(trimmed)) {
     try {
       const parsed = new URL(trimmed);
@@ -687,6 +693,8 @@ export function normalizeRuntimeImageSourceData(
     };
   }
 
+  // If the value was not any known URL/path shape, treat it as raw base64 image
+  // data from the runtime and let the caller's MIME hint define the data URL.
   return { dataUrl: `data:${mimeType};base64,${trimmed}`, fromBase64: true };
 }
 
