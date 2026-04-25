@@ -330,6 +330,8 @@ function collectObjectCandidates(input: unknown, maxDepth = 4): Record<string, u
   const out: Record<string, unknown>[] = [];
   const queue: Array<{ value: unknown; depth: number }> = [{ value: tryParseJsonRecord(input), depth: 0 }];
   const seen = new Set<unknown>();
+  // Tool events can arrive wrapped in transport envelopes, data payloads, arrays,
+  // or JSON strings. Walk the object graph shallowly so one normalizer covers all.
   while (queue.length > 0) {
     const next = queue.shift();
     if (!next) {
@@ -465,6 +467,8 @@ function extractToolMediaPaths(source: Record<string, unknown>): string[] {
   const mediaUrls = media ? collectStringArray(media.mediaUrls) : [];
   const detailPaths = details ? collectStringArray(details.paths) : [];
   const detailMediaUrls = details && isRecord(details.media) ? collectStringArray(details.media.mediaUrls) : [];
+  // Prefer concrete image paths over pretty labels when both are present in tool
+  // output; this prevents a human-readable filename from hiding the real asset.
   return preferSpecificImagePathCandidates(
     dedupeStrings([
       ...direct,
@@ -713,6 +717,8 @@ export function attachLifecycleErrorToToolItems(
   if (!runId || !errorMessage || items.length === 0) {
     return items;
   }
+  // Lifecycle errors often arrive separately from the tool result event, so attach
+  // the failure to the latest still-running tool in that run.
   let targetIndex = -1;
   for (let i = items.length - 1; i >= 0; i -= 1) {
     const item = items[i];

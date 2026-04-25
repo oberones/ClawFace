@@ -28,6 +28,8 @@ export function normalizeShellGatewayHistory(
   const messages: ChatMessage[] = [];
   const toolUpdates: ToolUpdate[] = [];
   const seenContentKeys = new Set<string>();
+  // Preserve gateway ordering even when older history rows lack timestamps by
+  // assigning a monotonically increasing fallback timestamp.
   let lastTs = (params.fallbackNow ?? Date.now()) - Math.max(1, rawMessages.length);
 
   for (const raw of rawMessages) {
@@ -41,6 +43,8 @@ export function normalizeShellGatewayHistory(
     const nextToolUpdates = extractToolUpdatesFromMessage(raw, inferredTs);
     if (nextToolUpdates.length > 0) {
       toolUpdates.push(...nextToolUpdates);
+      // Tool-only rows become lightweight attachment messages so historical
+      // media stays visible even if the assistant text row was separate.
       for (const message of params.buildToolAttachmentMessages(nextToolUpdates)) {
         const contentKey = params.buildMessageDedupeKey(message);
         if (seenContentKeys.has(contentKey)) {
