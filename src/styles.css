@@ -6620,6 +6620,10 @@ body::before {
 
 .chat-workstation-shell .chat-shell {
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chat-workstation-shell:not(.is-dreams-open) .chat-shell {
   min-width: 480px;
 }
 
