@@ -121,8 +121,9 @@ function finalizeEntry(params: {
   lines: string[];
   startLine: number;
   endLine: number;
+  filterGeneratedArtifacts?: boolean;
 }): DreamDiaryEntry | null {
-  if (params.kind === "dated" && isGeneratedDiaryArtifact(params.lines)) {
+  if (params.filterGeneratedArtifacts && params.kind === "dated" && isGeneratedDiaryArtifact(params.lines)) {
     return null;
   }
   const body = params.lines.join("\n").trim();
@@ -223,6 +224,7 @@ export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefi
   const parseStartIndex = diaryStartIndex >= 0 ? diaryStartIndex + 1 : 0;
   const parseEndIndex = diaryStartIndex >= 0 && diaryEndIndex > diaryStartIndex ? diaryEndIndex : lines.length;
   const scopedContent = lines.slice(parseStartIndex, parseEndIndex).join("\n");
+  const filterGeneratedArtifacts = diaryStartIndex >= 0;
   const entries: DreamDiaryEntry[] = [];
   let currentLabel: string | null = null;
   let currentKind: DreamDiaryEntryKind = "limited";
@@ -238,6 +240,7 @@ export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefi
       lines: currentLines,
       startLine: currentStartLine,
       endLine,
+      filterGeneratedArtifacts,
     });
     if (entry) {
       entries.push(entry);
