@@ -16,7 +16,7 @@ import type { BackgroundSessionNotice } from "../lib/background-session-visibili
 import { ChatThread, renderThreadStateCard } from "./ChatThread.tsx";
 import { ToolActivityPanel } from "./ToolActivityPanel.tsx";
 import { Composer } from "./Composer.tsx";
-import { SessionRuntimeControls } from "./SessionRuntimeControls.tsx";
+import { ChatHeaderActions } from "./ChatHeaderActions.tsx";
 import { buildMotionVars, MessageRow } from "./MessageRow.tsx";
 import { formatCompactTokens } from "../lib/format.ts";
 import { renderMarkdown } from "../lib/markdown.ts";
@@ -29,7 +29,6 @@ import { useSlashCommands } from "../hooks/useSlashCommands.ts";
 import type { UiSettings } from "../lib/ui-settings.ts";
 import type { AppearanceMode } from "../lib/appearance-mode.ts";
 import { createBottomPinScheduler } from "../lib/scroll-anchoring.ts";
-import { AppearanceModeToggle } from "./AppearanceModeToggle.tsx";
 
 type ChatViewProps = {
   sessionKey: string | null;
@@ -1008,39 +1007,23 @@ export default function ChatView(props: ChatViewProps) {
           </div>
         </div>
 
-        <div className="chat-header-actions">
-          <SessionRuntimeControls
-            sessionKey={props.sessionKey}
-            sessionInfo={props.sessionInfo}
-            models={props.models}
-            modelBadgeScale={modelBadgeScale}
-            onModelSelect={props.onModelSelect}
-            onThinkingSelect={props.onThinkingSelect}
-            onMenuOpenChange={setRuntimeControlsMenuOpen}
-          />
-
-          {props.canAbort && (
-            <button type="button" onClick={props.onAbort} className="ui-btn ui-btn-light" style={{ color: "#b45309" }}>
-              &#9632; Stop
-            </button>
-          )}
-          {props.onToggleDreams ? (
-            <button type="button" onClick={props.onToggleDreams} className="ui-btn ui-btn-light">
-              <span aria-hidden="true">☁️</span>{" "}
-              {props.dreamsOpen ? "Hide Dreams" : "Dreams"}
-            </button>
-          ) : null}
-          <AppearanceModeToggle
-            mode={props.appearanceMode}
-            onToggle={props.onToggleAppearanceMode}
-          />
-          <button type="button" onClick={props.onCreateSession} className="ui-btn ui-btn-light">
-            New Session
-          </button>
-          <button type="button" onClick={props.onOpenSettings} className="ui-btn ui-btn-primary">
-            Settings
-          </button>
-        </div>
+        <ChatHeaderActions
+          sessionKey={props.sessionKey}
+          sessionInfo={props.sessionInfo}
+          models={props.models}
+          modelBadgeScale={modelBadgeScale}
+          canAbort={props.canAbort}
+          dreamsOpen={props.dreamsOpen}
+          appearanceMode={props.appearanceMode}
+          onAbort={props.onAbort}
+          onToggleDreams={props.onToggleDreams}
+          onToggleAppearanceMode={props.onToggleAppearanceMode}
+          onCreateSession={props.onCreateSession}
+          onOpenSettings={props.onOpenSettings}
+          onModelSelect={props.onModelSelect}
+          onThinkingSelect={props.onThinkingSelect}
+          onRuntimeControlsMenuOpenChange={setRuntimeControlsMenuOpen}
+        />
       </header>
 
       {connectionFeedback.approvalBanner && (

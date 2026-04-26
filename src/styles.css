@@ -709,8 +709,40 @@ body::before {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px 10px;
   position: relative;
+}
+
+.chat-header-action-group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.chat-header-action-group + .chat-header-action-group {
+  margin-left: 2px;
+  padding-left: 12px;
+  border-left: 1px solid color-mix(in srgb, var(--claw-border) 82%, transparent);
+}
+
+.chat-header-action-group.is-runtime {
+  flex: 1 1 auto;
+}
+
+.chat-header-action-group.is-surfaces,
+.chat-header-action-group.is-shell {
+  flex: 0 1 auto;
+}
+
+.chat-header-surface-action {
+  border-color: color-mix(in srgb, var(--claw-accent) 20%, var(--claw-border));
+  background: color-mix(in srgb, var(--claw-accent-soft) 42%, var(--claw-surface));
+}
+
+.chat-header-stop-action {
+  color: #b45309;
 }
 
 .animated-avatar {
@@ -4261,6 +4293,16 @@ body::before {
   .chat-header-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .chat-header-action-group {
+    flex: 1 1 100%;
+  }
+
+  .chat-header-action-group + .chat-header-action-group {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
   }
 
   .chat-header-actions .ui-btn {
