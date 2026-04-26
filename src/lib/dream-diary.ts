@@ -48,6 +48,14 @@ function isDiaryComment(line: string): boolean {
   return /^<!--[\s\S]*-->$/.test(line.trim());
 }
 
+function isDiaryStartMarker(line: string): boolean {
+  return /^<!--\s*openclaw:dreaming:diary:start\s*-->$/i.test(line.trim());
+}
+
+function isDiaryEndMarker(line: string): boolean {
+  return /^<!--\s*openclaw:dreaming:diary:end\s*-->$/i.test(line.trim());
+}
+
 function isDiarySeparator(line: string): boolean {
   return /^-{3,}$/.test(line.trim());
 }
@@ -79,6 +87,33 @@ function shouldSkipDiaryLine(line: string): boolean {
   return isDiaryTitle(line) || isDiaryComment(line) || isDiarySeparator(line);
 }
 
+function firstParagraphFromLines(lines: string[]): string {
+  return lines.join("\n")
+    .split(/\n\s*\n/g)[0]
+    ?.replace(/\n+/g, " ")
+    .trim() ?? "";
+}
+
+function isGeneratedDiaryArtifact(lines: string[]): boolean {
+  const firstParagraph = firstParagraphFromLines(lines);
+  if (!firstParagraph) {
+    return false;
+  }
+  if (/^(?:user|assistant|system)\s*:/i.test(firstParagraph)) {
+    return true;
+  }
+  if (/^possible\s+lasting\s+truths\s*:/i.test(firstParagraph)) {
+    return true;
+  }
+  if (
+    /^reflections\s*:/i.test(firstParagraph) &&
+    /\b(?:theme|confidence|evidence|note)\s*:/i.test(firstParagraph)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function finalizeEntry(params: {
   id: string;
   kind: DreamDiaryEntryKind;
@@ -86,7 +121,11 @@ function finalizeEntry(params: {
   lines: string[];
   startLine: number;
   endLine: number;
+  filterGeneratedArtifacts?: boolean;
 }): DreamDiaryEntry | null {
+  if (params.filterGeneratedArtifacts && params.kind === "dated" && isGeneratedDiaryArtifact(params.lines)) {
+    return null;
+  }
   const body = params.lines.join("\n").trim();
   if (!body && !params.dateLabel) {
     return null;
@@ -109,7 +148,7 @@ function finalizeEntry(params: {
   };
 }
 
-function fallbackDiaryEntry(content: string): DreamDiaryEntry | null {
+function fallbackDiaryEntry(content: string, startLine = 1): DreamDiaryEntry | null {
   const paragraphs = content
     .split(/\n\s*\n/g)
     .map((entry) => entry.replace(/\n+/g, " ").trim())
@@ -124,8 +163,8 @@ function fallbackDiaryEntry(content: string): DreamDiaryEntry | null {
     body: content.trim(),
     paragraphs,
     sourceRange: {
-      startLine: 1,
-      endLine: content.split("\n").length,
+      startLine,
+      endLine: startLine + content.split("\n").length - 1,
     },
   };
 }
@@ -177,11 +216,20 @@ export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefi
 
   const content = normalizeLineBreaks(source.content);
   const lines = content.split("\n");
+  const diaryStartIndex = lines.findIndex(isDiaryStartMarker);
+  const diaryEndIndex =
+    diaryStartIndex >= 0
+      ? lines.findIndex((line, index) => index > diaryStartIndex && isDiaryEndMarker(line))
+      : -1;
+  const parseStartIndex = diaryStartIndex >= 0 ? diaryStartIndex + 1 : 0;
+  const parseEndIndex = diaryStartIndex >= 0 && diaryEndIndex > diaryStartIndex ? diaryEndIndex : lines.length;
+  const scopedContent = lines.slice(parseStartIndex, parseEndIndex).join("\n");
+  const filterGeneratedArtifacts = diaryStartIndex >= 0;
   const entries: DreamDiaryEntry[] = [];
   let currentLabel: string | null = null;
   let currentKind: DreamDiaryEntryKind = "limited";
   let currentLines: string[] = [];
-  let currentStartLine = 1;
+  let currentStartLine = parseStartIndex + 1;
 
   const flushEntry = (endLine: number) => {
     const seed = currentLabel ?? currentKind;
@@ -192,6 +240,7 @@ export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefi
       lines: currentLines,
       startLine: currentStartLine,
       endLine,
+      filterGeneratedArtifacts,
     });
     if (entry) {
       entries.push(entry);
@@ -201,7 +250,7 @@ export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefi
     currentLines = [];
   };
 
-  for (let index = 0; index < lines.length; index += 1) {
+  for (let index = parseStartIndex; index < parseEndIndex; index += 1) {
     const rawLine = lines[index] ?? "";
     if (shouldSkipDiaryLine(rawLine)) {
       if (currentLabel === null && currentLines.length === 0) {
@@ -231,8 +280,8 @@ export function parseDreamDiarySnapshot(source: DreamDiarySource | null | undefi
     flushEntry(lines.length);
   }
 
-  if (entries.length === 0) {
-    const fallback = fallbackDiaryEntry(content);
+  if (entries.length === 0 && diaryStartIndex < 0) {
+    const fallback = fallbackDiaryEntry(scopedContent, parseStartIndex + 1);
     return {
       found: true,
       path: source.path,

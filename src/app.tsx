@@ -5779,10 +5779,6 @@ export default function App() {
                 sessionPreviews={sessionPreviews}
                 allSessionRows={allSessionRows}
                 onSearchGateway={searchSessionsFromGateway}
-                onOpenDreams={() => {
-                  switchView("chat");
-                  setShowDreams(true);
-                }}
                 onOpenFiles={() => switchView("files")}
                 onOpenMedia={() => switchView("media")}
               />
