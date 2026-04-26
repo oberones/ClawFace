@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { app, nativeImage, protocol } = require("electron");
+const { createImageContextMenuHandler } = require("./ipc/image-context-menu.cjs");
 const { registerDesktopIpcHandlers } = require("./ipc/register-desktop-ipc.cjs");
 const { createClawFsProtocolHandler } = require("./protocols/claw-fs.cjs");
 const {
@@ -201,6 +202,11 @@ function updateDesktopFsServerUrl(url) {
 registerDesktopIpcHandlers({
   readImageFile: localImageTransport.readDesktopImageFile,
   fetchImageUrl: localImageTransport.fetchDesktopImageUrl,
+  showImageContextMenu: createImageContextMenuHandler({
+    readImageFile: localImageTransport.readDesktopImageFile,
+    fetchImageUrl: localImageTransport.fetchDesktopImageUrl,
+    localImageScheme: DESKTOP_LOCAL_IMAGE_SCHEME,
+  }),
   setGatewayUrl: updateDesktopGatewayUrl,
   setFsServerUrl: updateDesktopFsServerUrl,
 });

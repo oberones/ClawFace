@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld("desktopInfo", {
   beep: () => ipcRenderer.invoke("desktop:beep"),
   readImageFile: (filePath) => ipcRenderer.invoke("desktop:read-image-file", filePath),
   fetchImageUrl: (url) => ipcRenderer.invoke("desktop:fetch-image-url", url),
+  showImageContextMenu: (payload) => ipcRenderer.invoke("desktop:show-image-context-menu", payload),
   setGatewayUrl: (url) => ipcRenderer.invoke("desktop:set-gateway-url", url),
   setFsServerUrl: (url) => ipcRenderer.invoke("desktop:set-fs-server-url", url),
 });

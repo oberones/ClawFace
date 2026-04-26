@@ -4,6 +4,7 @@ function registerDesktopIpcHandlers(params) {
   const {
     readImageFile,
     fetchImageUrl,
+    showImageContextMenu,
     setGatewayUrl,
     setFsServerUrl,
   } = params || {};
@@ -11,6 +12,7 @@ function registerDesktopIpcHandlers(params) {
   if (
     typeof readImageFile !== "function" ||
     typeof fetchImageUrl !== "function" ||
+    typeof showImageContextMenu !== "function" ||
     typeof setGatewayUrl !== "function" ||
     typeof setFsServerUrl !== "function"
   ) {
@@ -32,6 +34,10 @@ function registerDesktopIpcHandlers(params) {
 
   ipcMain.handle("desktop:fetch-image-url", (_event, rawUrl) => {
     return fetchImageUrl(rawUrl);
+  });
+
+  ipcMain.handle("desktop:show-image-context-menu", (event, payload) => {
+    return showImageContextMenu(event, payload);
   });
 
   ipcMain.handle("desktop:set-gateway-url", (_event, rawGatewayUrl) => {
