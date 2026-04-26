@@ -1030,6 +1030,7 @@ export default function ChatView(props: ChatViewProps) {
           )}
           {props.onToggleDreams ? (
             <button type="button" onClick={props.onToggleDreams} className="ui-btn ui-btn-light">
+              <span aria-hidden="true">☁️</span>{" "}
               {props.dreamsOpen ? "Hide Dreams" : "Dreams"}
             </button>
           ) : null}
