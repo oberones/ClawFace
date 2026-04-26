@@ -3,6 +3,7 @@ import ChatView from "./components/ChatView.tsx";
 import { AvatarStatusPane, GatewayStatusIndicator } from "./components/AvatarStatusPane.tsx";
 import FileManager, { FileManagerProvider } from "./components/FileManager.tsx";
 import MediaBrowser from "./components/media-browser/MediaBrowser.tsx";
+import { PanelResizeHandle } from "./components/PanelResizeHandle.tsx";
 import SessionSidebar from "./components/SessionSidebar.tsx";
 import SettingsModal from "./components/SettingsModal.tsx";
 import NewSessionModal from "./components/NewSessionModal.tsx";
@@ -62,6 +63,13 @@ import {
 import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
 import { deriveGatewayStatusIndicator, PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
+import {
+  clampPanelWidth,
+  MEMORY_PANEL_WIDTH_MAX,
+  MEMORY_PANEL_WIDTH_MIN,
+  SESSION_PANEL_WIDTH_MAX,
+  SESSION_PANEL_WIDTH_MIN,
+} from "./lib/panel-layout.ts";
 import {
   formatApprovalDecisionLabel,
   pickApprovalResolveMethod,
@@ -535,8 +543,14 @@ function parseUiSettings(value: unknown): UiSettings {
     sidebarWidth: parseNumberSetting(
       parsed.sidebarWidth,
       DEFAULT_UI_SETTINGS.sidebarWidth,
-      220,
-      420,
+      SESSION_PANEL_WIDTH_MIN,
+      SESSION_PANEL_WIDTH_MAX,
+    ),
+    memoryPanelWidth: parseNumberSetting(
+      parsed.memoryPanelWidth,
+      DEFAULT_UI_SETTINGS.memoryPanelWidth,
+      MEMORY_PANEL_WIDTH_MIN,
+      MEMORY_PANEL_WIDTH_MAX,
     ),
     modelBadgeScale: parseNumberSetting(
       parsed.modelBadgeScale,
@@ -2209,6 +2223,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showNewSession, setShowNewSession] = useState(false);
   const [uiSettings, setUiSettings] = useState<UiSettings>(() => loadUiSettings());
+  const [resizingPanel, setResizingPanel] = useState<"session" | "memory" | null>(null);
   const [pathPrefixMappingsText, setPathPrefixMappingsText] = useState<string>(
     () => loadPathPrefixMappingsText(),
   );
@@ -3639,6 +3654,7 @@ export default function App() {
       `${uiSettings.sidebarFontSize}px`,
     );
     document.documentElement.style.setProperty("--claw-sidebar-width", `${uiSettings.sidebarWidth}px`);
+    document.documentElement.style.setProperty("--claw-memory-panel-width", `${uiSettings.memoryPanelWidth}px`);
     document.documentElement.style.setProperty(
       "--claw-chat-bubble-radius",
       `${uiSettings.chatBubbleRadius}px`,
@@ -5688,6 +5704,24 @@ export default function App() {
     () => deriveGatewayStatusIndicator(connectionState.status),
     [connectionState.status],
   );
+  const handleSessionPanelWidthChange = useCallback((nextWidth: number) => {
+    setUiSettings((prev) => {
+      const sidebarWidth = clampPanelWidth(nextWidth, SESSION_PANEL_WIDTH_MIN, SESSION_PANEL_WIDTH_MAX);
+      return sidebarWidth === prev.sidebarWidth ? prev : { ...prev, sidebarWidth };
+    });
+  }, []);
+  const handleMemoryPanelWidthChange = useCallback((nextWidth: number) => {
+    setUiSettings((prev) => {
+      const memoryPanelWidth = clampPanelWidth(nextWidth, MEMORY_PANEL_WIDTH_MIN, MEMORY_PANEL_WIDTH_MAX);
+      return memoryPanelWidth === prev.memoryPanelWidth ? prev : { ...prev, memoryPanelWidth };
+    });
+  }, []);
+  const handleSessionResizeActiveChange = useCallback((active: boolean) => {
+    setResizingPanel((current) => (active ? "session" : current === "session" ? null : current));
+  }, []);
+  const handleMemoryResizeActiveChange = useCallback((active: boolean) => {
+    setResizingPanel((current) => (active ? "memory" : current === "memory" ? null : current));
+  }, []);
 
   const pendingApprovalCountsBySession = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
@@ -5756,10 +5790,14 @@ export default function App() {
 
   return (
     <FileManagerProvider>
-    <div className="app-shell">
+    <div className={`app-shell${resizingPanel ? " is-panel-resizing" : ""}`}>
       {/* Sidebar with unified 3D flip */}
       <div className={`sidebar-flip-container${activeView === "files" ? " is-flipped" : ""}`}
-        style={{ width: sidebarCollapsed ? "84px" : `${uiSettings.sidebarWidth}px`, height: "100%", transition: "width 0.34s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+        style={{
+          width: sidebarCollapsed ? "84px" : `${uiSettings.sidebarWidth}px`,
+          height: "100%",
+          transition: resizingPanel === "session" ? "none" : "width 0.34s cubic-bezier(0.16, 1, 0.3, 1)",
+        }}>
         <div className="sidebar-flip-card" style={{ height: "100%" }}>
           <div className="sidebar-face face-front" style={{ height: "100%" }}>
             <div className={`sidebar-stack${sidebarCollapsed ? " is-collapsed" : ""}`}>
@@ -5817,6 +5855,20 @@ export default function App() {
           </div>
         </div>
       </div>
+      {sidebarCollapsed ? (
+        <div className="panel-resize-spacer" aria-hidden="true" />
+      ) : (
+        <PanelResizeHandle
+          label="Resize sessions panel"
+          value={uiSettings.sidebarWidth}
+          min={SESSION_PANEL_WIDTH_MIN}
+          max={SESSION_PANEL_WIDTH_MAX}
+          direction="increase-right"
+          onChange={handleSessionPanelWidthChange}
+          onResizeActiveChange={handleSessionResizeActiveChange}
+          className="is-session"
+        />
+      )}
 
       {/* Main content area */}
       <div className="main-shell">
@@ -5875,10 +5927,22 @@ export default function App() {
               onCompact={() => void handleSlashCommand("/compact")}
             />
             {dreamsVisible ? (
-              <DreamDiaryTimelinePane
-                controller={dreamDiaryTimelineController}
-                onClose={() => setShowDreams(false)}
-              />
+              <>
+                <PanelResizeHandle
+                  label="Resize Dreams memory panel"
+                  value={uiSettings.memoryPanelWidth}
+                  min={MEMORY_PANEL_WIDTH_MIN}
+                  max={MEMORY_PANEL_WIDTH_MAX}
+                  direction="increase-left"
+                  onChange={handleMemoryPanelWidthChange}
+                  onResizeActiveChange={handleMemoryResizeActiveChange}
+                  className="is-memory"
+                />
+                <DreamDiaryTimelinePane
+                  controller={dreamDiaryTimelineController}
+                  onClose={() => setShowDreams(false)}
+                />
+              </>
             ) : null}
           </div>
         ) : activeView === "files" ? (
