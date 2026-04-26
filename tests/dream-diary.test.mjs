@@ -76,6 +76,98 @@ test("parseDreamDiarySnapshot splits OpenClaw managed diary timestamps into entr
   assert.deepEqual(document.entries[1]?.paragraphs, ["A fresh signal arrived after the cleanup started."]);
 });
 
+test("parseDreamDiarySnapshot ignores internal dream artifacts in managed diary content", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
+
+  const document = parseDreamDiarySnapshot({
+    found: true,
+    path: "DREAMS.md",
+    content: [
+      "# Dream Diary",
+      "",
+      "## 2026-04-24",
+      "",
+      "This status-like section is outside the managed diary and should not render.",
+      "",
+      "<!-- openclaw:dreaming:diary:start -->",
+      "---",
+      "",
+      "*April 25, 2026 at 3:00 AM UTC*",
+      "",
+      "User: System: [2026-04-24 13:22:27 UTC] Gateway restart config-apply ok (config.apply) System: Run: openclaw doctor --non-interactive Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, say nothing needs attention.",
+      "",
+      "---",
+      "",
+      "*April 25, 2026 at 3:00 AM UTC*",
+      "",
+      "User: Hey can you run openclaw doctor again and report any issues?",
+      "",
+      "---",
+      "",
+      "*April 25, 2026 at 3:00 AM UTC*",
+      "",
+      "Possible Lasting Truths: No strong candidate truths surfaced.",
+      "",
+      "---",
+      "",
+      "*April 25, 2026 at 3:00 AM UTC*",
+      "",
+      "Reflections: Theme: `assistant` kept surfacing across 120 memories.; confidence: 0.89; evidence: memory/2026-04-11.md:328-331, memory/2026-04-12.md:373-376; note: reflection",
+      "",
+      "---",
+      "",
+      "*April 25, 2026 at 3:00 AM UTC*",
+      "",
+      "The dream watched the workspace settle after the restart. No new requests pulled it away from the quiet heartbeat.",
+      "",
+      "<!-- openclaw:dreaming:diary:end -->",
+      "",
+      "## 2026-04-26",
+      "",
+      "This trailing section is outside the managed diary and should not render either.",
+    ].join("\n"),
+    updatedAtMs: 1234,
+    error: null,
+  });
+
+  assert.equal(document.entries.length, 1);
+  assert.equal(document.entries[0]?.dateLabel, "April 25, 2026 at 3:00 AM UTC");
+  assert.deepEqual(document.entries[0]?.paragraphs, [
+    "The dream watched the workspace settle after the restart. No new requests pulled it away from the quiet heartbeat.",
+  ]);
+});
+
+test("parseDreamDiarySnapshot returns no fallback entry when managed diary contains only artifacts", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
+
+  const document = parseDreamDiarySnapshot({
+    found: true,
+    path: "DREAMS.md",
+    content: [
+      "# Dream Diary",
+      "",
+      "<!-- openclaw:dreaming:diary:start -->",
+      "---",
+      "",
+      "*April 26, 2026 at 3:00 AM UTC*",
+      "",
+      "User: Hey can you run openclaw doctor again and report any issues?",
+      "",
+      "---",
+      "",
+      "*April 26, 2026 at 3:00 AM UTC*",
+      "",
+      "Reflections: Theme: `assistant` kept surfacing across 120 memories.; confidence: 0.89; evidence: memory/2026-04-11.md:328-331; note: reflection",
+      "",
+      "<!-- openclaw:dreaming:diary:end -->",
+    ].join("\n"),
+    updatedAtMs: 1234,
+    error: null,
+  });
+
+  assert.equal(document.entries.length, 0);
+});
+
 test("parseDreamDiarySnapshot splits OpenClaw at-form diary timestamps into separate entries", () => {
   const { parseDreamDiarySnapshot } = loadModule();
 
