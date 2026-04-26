@@ -1,5 +1,11 @@
 import React from "react";
 import type { UiSettings } from "../../lib/ui-settings.ts";
+import {
+  MEMORY_PANEL_WIDTH_MAX,
+  MEMORY_PANEL_WIDTH_MIN,
+  SESSION_PANEL_WIDTH_MAX,
+  SESSION_PANEL_WIDTH_MIN,
+} from "../../lib/panel-layout.ts";
 import { NumberField } from "./SettingsFieldControls.tsx";
 
 const FONT_OPTIONS = [
@@ -80,11 +86,20 @@ export function TypographyLayoutSection(props: TypographyLayoutSectionProps) {
         <NumberField
           label="Sidebar width"
           value={props.uiSettings.sidebarWidth}
-          min={220}
-          max={420}
+          min={SESSION_PANEL_WIDTH_MIN}
+          max={SESSION_PANEL_WIDTH_MAX}
           step={2}
           suffix="px"
           onChange={(value) => props.onPatch({ sidebarWidth: value })}
+        />
+        <NumberField
+          label="Memory panel width"
+          value={props.uiSettings.memoryPanelWidth}
+          min={MEMORY_PANEL_WIDTH_MIN}
+          max={MEMORY_PANEL_WIDTH_MAX}
+          step={2}
+          suffix="px"
+          onChange={(value) => props.onPatch({ memoryPanelWidth: value })}
         />
         <NumberField
           label="Sidebar font size"

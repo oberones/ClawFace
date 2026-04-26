@@ -9,6 +9,7 @@
   --claw-content-width: 860px;
   --claw-sidebar-font-size: 13px;
   --claw-sidebar-width: 308px;
+  --claw-memory-panel-width: 520px;
   --claw-chat-bubble-radius: 18px;
   --claw-message-gap: 16px;
   --claw-panel-opacity: 0.94;
@@ -5790,6 +5791,80 @@ body::before {
 
 /* ── Sidebar flip container ─────────────────────────────────────── */
 
+.app-shell {
+  gap: 0;
+}
+
+.app-shell.is-panel-resizing,
+.app-shell.is-panel-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.panel-resize-handle,
+.panel-resize-spacer {
+  flex: 0 0 12px;
+  align-self: stretch;
+}
+
+.panel-resize-handle {
+  appearance: none;
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 12px;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--claw-accent) 62%, var(--claw-text-muted));
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.panel-resize-handle::before {
+  content: "";
+  width: 2px;
+  height: min(86px, calc(100% - 32px));
+  min-height: 38px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--claw-border-strong) 72%, transparent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--claw-accent) 0%, transparent);
+  transition:
+    width 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.panel-resize-handle:hover::before,
+.panel-resize-handle:focus-visible::before,
+.app-shell.is-panel-resizing .panel-resize-handle::before {
+  width: 3px;
+  background: color-mix(in srgb, var(--claw-accent) 72%, var(--claw-border-strong));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--claw-accent-soft) 76%, transparent);
+}
+
+.panel-resize-handle.is-memory {
+  flex-basis: 10px;
+  min-width: 10px;
+}
+
+.panel-resize-spacer {
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    gap: 8px;
+  }
+
+  .panel-resize-handle.is-session,
+  .panel-resize-spacer {
+    display: none;
+  }
+}
+
 .sidebar-flip-container {
   perspective: 2000px;
   display: flex;
@@ -6474,13 +6549,15 @@ body::before {
 }
 
 .chat-workstation-shell .chat-shell {
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 480px;
 }
 
 .dream-diary-shell {
-  width: min(520px, 42vw);
+  width: var(--claw-memory-panel-width);
+  flex: 0 1 var(--claw-memory-panel-width);
   min-width: 360px;
-  max-width: 580px;
+  max-width: 680px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -6730,7 +6807,8 @@ body::before {
 
 @media (max-width: 1120px) {
   .dream-diary-shell {
-    width: min(460px, 45vw);
+    width: min(var(--claw-memory-panel-width), 45vw);
+    flex-basis: min(var(--claw-memory-panel-width), 45vw);
   }
 }
 
@@ -6741,6 +6819,7 @@ body::before {
 
   .dream-diary-shell {
     width: 100%;
+    flex-basis: auto;
     min-width: 0;
     max-width: none;
     max-height: 52%;
@@ -6751,6 +6830,14 @@ body::before {
   .dream-diary-reader-layout {
     grid-template-columns: 1fr;
     overflow-y: auto;
+  }
+
+  .chat-workstation-shell .chat-shell {
+    min-width: 0;
+  }
+
+  .panel-resize-handle.is-memory {
+    display: none;
   }
 
   .dream-diary-timeline-list,

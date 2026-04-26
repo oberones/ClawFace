@@ -7,6 +7,7 @@ import {
   DEFAULT_AVATAR_PROFILE_ID,
   type AvatarProfileId,
 } from "./avatar-profile.ts";
+import { MEMORY_PANEL_WIDTH_DEFAULT } from "./panel-layout.ts";
 
 export type ReplyDoneSoundTone =
   | "glass"
@@ -28,6 +29,7 @@ export type UiSettings = {
   contentWidth: number;
   sidebarFontSize: number;
   sidebarWidth: number;
+  memoryPanelWidth: number;
   modelBadgeScale: number;
   composerActionScale: number;
   footerStatsFontSize: number;
@@ -64,6 +66,7 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   contentWidth: 900,
   sidebarFontSize: 13,
   sidebarWidth: 300,
+  memoryPanelWidth: MEMORY_PANEL_WIDTH_DEFAULT,
   modelBadgeScale: 1,
   composerActionScale: 1,
   footerStatsFontSize: 12,
