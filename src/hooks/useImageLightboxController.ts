@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import type { Attachment } from "../lib/types.ts";
 import {
   buildDesktopLocalImageUrl,
@@ -97,6 +98,26 @@ export function useImageLightboxController() {
       });
   }, [imageLightbox]);
 
+  const onLightboxImageContextMenu = useCallback((event: MouseEvent<HTMLImageElement>) => {
+    if (!imageLightbox) {
+      return;
+    }
+    const showImageContextMenu = window.desktopInfo?.showImageContextMenu;
+    if (!isDesktopRuntime() || typeof showImageContextMenu !== "function") {
+      return;
+    }
+    event.preventDefault();
+    void showImageContextMenu({
+      name: imageLightbox.name,
+      dataUrl: imageLightbox.dataUrl,
+      sourcePath: imageLightbox.sourcePath,
+      x: event.clientX,
+      y: event.clientY,
+    }).catch(() => {
+      // Native context menu errors should not break the image viewer.
+    });
+  }, [imageLightbox]);
+
   useEffect(() => {
     if (!imageLightbox || !isDesktopRuntime()) {
       return;
@@ -131,6 +152,7 @@ export function useImageLightboxController() {
     openImageLightbox,
     closeImageLightbox,
     onLightboxImageError,
+    onLightboxImageContextMenu,
     lightboxBlockedByWebLocalFile,
   };
 }

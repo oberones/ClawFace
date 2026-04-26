@@ -163,6 +163,7 @@ export default function ChatView(props: ChatViewProps) {
     openImageLightbox,
     closeImageLightbox,
     onLightboxImageError,
+    onLightboxImageContextMenu,
     lightboxBlockedByWebLocalFile,
   } = useImageLightboxController();
   const sessionFlyInRafRefs = useRef<number[]>([]);
@@ -1369,6 +1370,7 @@ export default function ChatView(props: ChatViewProps) {
                   alt={imageLightbox.name}
                   className="image-lightbox-image"
                   onError={onLightboxImageError}
+                  onContextMenu={onLightboxImageContextMenu}
                 />
               )}
             </div>

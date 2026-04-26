@@ -28,6 +28,16 @@ declare global {
         size?: number;
         dataUrl?: string;
       }>;
+      showImageContextMenu?: (payload: {
+        name?: string;
+        dataUrl?: string;
+        sourcePath?: string;
+        x?: number;
+        y?: number;
+      }) => Promise<{
+        ok: boolean;
+        error?: string;
+      }>;
       setGatewayUrl?: (
         url: string,
       ) => Promise<{
