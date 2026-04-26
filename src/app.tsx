@@ -7,6 +7,7 @@ import { PanelResizeHandle } from "./components/PanelResizeHandle.tsx";
 import SessionSidebar from "./components/SessionSidebar.tsx";
 import SettingsModal from "./components/SettingsModal.tsx";
 import NewSessionModal from "./components/NewSessionModal.tsx";
+import RenameSessionModal from "./components/RenameSessionModal.tsx";
 import DreamDiaryTimelinePane from "./components/dreams/DreamDiaryTimelinePane.tsx";
 import { GatewayClient } from "./lib/gateway.ts";
 import {
@@ -104,6 +105,16 @@ import {
   normalizeSessionsListResult,
   normalizeSessionsPreviewResult,
 } from "./lib/shell-gateway-responses.ts";
+import {
+  applySessionLabelOverridesToRowRecord,
+  applySessionLabelOverridesToRows,
+  moveSessionLabelOverride,
+  normalizeSessionLabel,
+  normalizeSessionLabelOverrides,
+  removeSessionLabelOverride,
+  upsertSessionLabelOverride,
+  type SessionLabelOverrides,
+} from "./lib/session-label-overrides.ts";
 import { normalizeShellGatewayHistory } from "./lib/shell-gateway-history.ts";
 import {
   normalizeChatSendResult,
@@ -156,6 +167,7 @@ const STORAGE_KEYS = {
   agentSessionShortcutSchemes: "clawui.agent.session.shortcuts",
   appActionShortcuts: "clawui.app.action.shortcuts",
   lastSession: "clawui.session.last",
+  sessionLabelOverrides: "clawui.session.labelOverrides",
   newSessionPreferredModel: "clawui.newSession.preferredModel",
 };
 
@@ -678,6 +690,26 @@ function loadUiSettings(): UiSettings {
 function saveUiSettings(settings: UiSettings) {
   try {
     localStorage.setItem(STORAGE_KEYS.uiSettings, JSON.stringify(settings));
+  } catch {
+    // ignore
+  }
+}
+
+function loadSessionLabelOverrides(): SessionLabelOverrides {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.sessionLabelOverrides);
+    if (!raw) {
+      return {};
+    }
+    return normalizeSessionLabelOverrides(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
+
+function saveSessionLabelOverrides(overrides: SessionLabelOverrides) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.sessionLabelOverrides, JSON.stringify(overrides));
   } catch {
     // ignore
   }
@@ -2222,7 +2254,11 @@ export default function App() {
   activeViewRef.current = activeView;
   const [showSettings, setShowSettings] = useState(false);
   const [showNewSession, setShowNewSession] = useState(false);
+  const [renamingSession, setRenamingSession] = useState<{ key: string; initialLabel: string } | null>(null);
   const [uiSettings, setUiSettings] = useState<UiSettings>(() => loadUiSettings());
+  const [sessionLabelOverrides, setSessionLabelOverrides] = useState<SessionLabelOverrides>(
+    () => loadSessionLabelOverrides(),
+  );
   const [resizingPanel, setResizingPanel] = useState<"session" | "memory" | null>(null);
   const [pathPrefixMappingsText, setPathPrefixMappingsText] = useState<string>(
     () => loadPathPrefixMappingsText(),
@@ -2286,6 +2322,7 @@ export default function App() {
   const lastFinalizedAssistantRef = useRef<{ text: string; at: number } | null>(null);
   const gatewayMethodsRef = useRef<Set<string>>(new Set());
   const sessionsRef = useRef<GatewaySessionRow[]>(sessions);
+  const sessionLabelOverridesRef = useRef<SessionLabelOverrides>(sessionLabelOverrides);
   const assistantReplyByRunRef = useRef<Record<string, Record<string, unknown>>>({});
   const committedAssistantAttachmentByRunRef = useRef<Record<string, string>>({});
   const scheduledHistoryHydrationByRunRef = useRef<Record<string, true>>({});
@@ -2340,6 +2377,13 @@ export default function App() {
   useEffect(() => {
     sessionsRef.current = sessions;
   }, [sessions]);
+
+  useEffect(() => {
+    sessionLabelOverridesRef.current = sessionLabelOverrides;
+    saveSessionLabelOverrides(sessionLabelOverrides);
+    setSessions((prev) => applySessionLabelOverridesToRows(prev, sessionLabelOverrides));
+    setAllSessionRows((prev) => applySessionLabelOverridesToRowRecord(prev, sessionLabelOverrides));
+  }, [sessionLabelOverrides, setSessions]);
 
   useEffect(() => {
     sessionPreviewsRef.current = sessionPreviews;
@@ -4280,7 +4324,10 @@ export default function App() {
         includeDerivedTitles: true,
         includeLastMessage: true,
       }));
-      return mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
+      return applySessionLabelOverridesToRows(
+        mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions),
+        sessionLabelOverridesRef.current,
+      );
     } catch {
       return [];
     }
@@ -4295,7 +4342,10 @@ export default function App() {
         includeDerivedTitles: true,
         includeLastMessage: true,
       }));
-      allSessions = mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
+      allSessions = applySessionLabelOverridesToRows(
+        mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions),
+        sessionLabelOverridesRef.current,
+      );
     } catch {
       return;
     }
@@ -4372,7 +4422,10 @@ export default function App() {
       }));
       setSessionDefaults(res.defaults);
       const primarySessionKey = resolvePrimarySessionKey(agents, lastConfigStateRef.current);
-      const mergedSessions = mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
+      const mergedSessions = applySessionLabelOverridesToRows(
+        mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions),
+        sessionLabelOverridesRef.current,
+      );
       const ordered = [...mergedSessions].sort((a, b) => {
         const aIsPrimary = a.key.toLowerCase() === primarySessionKey;
         const bIsPrimary = b.key.toLowerCase() === primarySessionKey;
@@ -4768,6 +4821,9 @@ export default function App() {
     if (previousSelectedKey && previousSelectedKey !== key) {
       saveCurrentToCache(previousSelectedKey);
     }
+    if (label) {
+      setSessionLabelOverrides((prev) => upsertSessionLabelOverride(prev, key, label));
+    }
     pendingSessionCreatesRef.current.add(key);
     setSessions((prev) => {
       const nextSession: GatewaySessionRow = {
@@ -4840,6 +4896,7 @@ export default function App() {
       return key;
     } catch (err) {
       pendingSessionCreatesRef.current.delete(key);
+      setSessionLabelOverrides((prev) => removeSessionLabelOverride(prev, key));
       setSessions((prev) => prev.filter((session) => session.key !== key));
       selectedSessionRef.current = previousSelectedKey;
       setSelectedSessionKey((prev) => (prev === key ? previousSelectedKey : prev));
@@ -5411,6 +5468,7 @@ export default function App() {
           }));
           const resolvedKey = resetRes.key ?? selectedSessionKey;
           if (resolvedKey !== selectedSessionKey) {
+            setSessionLabelOverrides((prev) => moveSessionLabelOverride(prev, selectedSessionKey, resolvedKey));
             setSelectedSessionKey(resolvedKey);
           }
           setSessionModelOverrides((prev) =>
@@ -5437,6 +5495,36 @@ export default function App() {
 
   async function handleCreateSession(label: string, agentId?: string | null, modelId?: string | null) {
     await createSession(label, true, agentId, modelId);
+  }
+
+  function handleRequestRenameSession(key: string, currentLabel: string) {
+    if (!key) {
+      return;
+    }
+    setRenamingSession({
+      key,
+      initialLabel: normalizeSessionLabel(currentLabel) || key,
+    });
+  }
+
+  function handleRenameSession(nextLabelInput: string) {
+    const target = renamingSession;
+    if (!target) {
+      return;
+    }
+    const label = normalizeSessionLabel(nextLabelInput);
+    if (!label) {
+      return;
+    }
+    setSessionLabelOverrides((prev) => upsertSessionLabelOverride(prev, target.key, label));
+    setRenamingSession(null);
+
+    const client = clientRef.current;
+    if (client) {
+      void client.request("sessions.patch", { key: target.key, label }).catch(() => {
+        // ClawFace keeps local names as the source of truth even when gateway sync fails.
+      });
+    }
   }
 
   async function handleLoadMoreSessions() {
@@ -5562,6 +5650,7 @@ export default function App() {
     }
     try {
       await client.request("sessions.delete", { key });
+      setSessionLabelOverrides((prev) => removeSessionLabelOverride(prev, key));
       sessionCacheRef.current.delete(key);
       setSessionActivity((prev) => {
         if (!(key in prev)) {
@@ -5815,6 +5904,7 @@ export default function App() {
                 onSetCollapsed={(v) => setSidebarCollapsed(v)}
                 onSelect={handleSelectSession}
                 onCreate={() => setShowNewSession(true)}
+                onRename={handleRequestRenameSession}
                 onDelete={(key, opts) => void handleDeleteSession(key, opts)}
                 hasMore={canLoadMoreSessions}
                 onReachEnd={() => void handleLoadMoreSessions()}
@@ -6036,6 +6126,12 @@ export default function App() {
         models={models}
         preferredModel={newSessionPreferredModel || null}
         onPreferredModelChange={(model) => setNewSessionPreferredModel(model ?? "")}
+      />
+      <RenameSessionModal
+        open={Boolean(renamingSession)}
+        initialLabel={renamingSession?.initialLabel ?? ""}
+        onClose={() => setRenamingSession(null)}
+        onRename={handleRenameSession}
       />
     </div>
     </FileManagerProvider>

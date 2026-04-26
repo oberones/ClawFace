@@ -477,7 +477,15 @@ body::before {
   letter-spacing: 0.01em;
 }
 
-.session-delete {
+.session-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  margin-bottom: 2px;
+}
+
+.session-card-action {
   appearance: none;
   border: 1px solid color-mix(in srgb, var(--claw-border) 70%, white);
   border-radius: 999px;
@@ -492,7 +500,6 @@ body::before {
   font-size: 15px;
   line-height: 1;
   flex: 0 0 20px;
-  margin-bottom: 2px;
   cursor: pointer;
   opacity: 0;
   transform: scale(0.92);
@@ -504,15 +511,21 @@ body::before {
     background-color calc(180ms * var(--claw-animation-duration-scale)) ease;
 }
 
-.session-card:hover .session-delete,
-.session-card.is-active .session-delete {
+.session-card:hover .session-card-action,
+.session-card.is-active .session-card-action {
   opacity: 1;
   transform: scale(1);
 }
 
-.session-delete:focus-visible {
+.session-card-action:focus-visible {
   opacity: 1;
   transform: scale(1);
+}
+
+.session-card-action:hover {
+  color: color-mix(in srgb, var(--claw-accent) 84%, var(--claw-text));
+  border-color: color-mix(in srgb, var(--claw-accent) 32%, var(--claw-border));
+  background: color-mix(in srgb, var(--claw-accent-soft) 70%, white);
 }
 
 .session-delete:hover {
@@ -3496,7 +3509,7 @@ body::before {
   color: var(--claw-neutral-400);
 }
 
-.session-delete {
+.session-card-action {
   border: 1px solid var(--claw-neutral-200);
   border-radius: 999px;
   width: 22px;
@@ -3510,11 +3523,17 @@ body::before {
   transform: none;
 }
 
-.session-card:hover .session-delete,
-.session-card.is-active .session-delete,
-.session-delete:focus-visible {
+.session-card:hover .session-card-action,
+.session-card.is-active .session-card-action,
+.session-card-action:focus-visible {
   opacity: 1;
   transform: none;
+}
+
+.session-rename:hover {
+  color: var(--claw-neutral-900);
+  border-color: var(--claw-neutral-300);
+  background: var(--claw-neutral-100);
 }
 
 .session-delete:hover {
@@ -5162,7 +5181,7 @@ body::before {
   transition-duration: var(--t-press);
 }
 
-.session-delete {
+.session-card-action {
   transition:
     color            var(--t-fast) var(--ease-out-quart),
     border-color     var(--t-fast) var(--ease-out-quart),
@@ -5171,7 +5190,7 @@ body::before {
     opacity          var(--t-fast) var(--ease-out-quart);
 }
 
-.session-delete:active:not(:disabled) {
+.session-card-action:active:not(:disabled) {
   transform: scale(0.9);
   transition-duration: var(--t-press);
 }
@@ -5671,14 +5690,14 @@ body::before {
   transition: background-color 80ms ease;
 }
 
-:root[data-animations-off] .session-delete {
+:root[data-animations-off] .session-card-action {
   transition:
     color            80ms ease,
     border-color     80ms ease,
     background-color 80ms ease;
 }
 
-:root[data-animations-off] .session-delete:active:not(:disabled) {
+:root[data-animations-off] .session-card-action:active:not(:disabled) {
   transform: none;
 }
 
