@@ -8,6 +8,18 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.17.0 (2026-04-26)
+
+### Feat
+
+- add image preview save context menu
+- **avatar**: add logo-inspired avatar style
+- **avatar**: add selectable avatar styles
+
+### Fix
+
+- allow chat panel to shrink with Dreams open
+
 ## v0.16.0 (2026-04-25)
 
 ### Feat
