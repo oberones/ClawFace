@@ -1006,10 +1006,6 @@ export default function ChatView(props: ChatViewProps) {
               </div>
             </div>
           </div>
-          <div className="topbar-status">
-            <span className={`status-dot ${connectionFeedback.statusDotClass}`} />
-            <span>{connectionFeedback.statusLabel}</span>
-          </div>
         </div>
 
         <div className="chat-header-actions">

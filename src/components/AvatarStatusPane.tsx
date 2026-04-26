@@ -1,6 +1,7 @@
 import type { AvatarState } from "../lib/avatar-state.ts";
 import { AVATAR_STATE_LABELS } from "../lib/avatar-state.ts";
 import type { AvatarProfile } from "../lib/avatar-profile.ts";
+import type { GatewayStatusIndicatorState } from "../lib/connection-feedback.ts";
 import { AnimatedAvatar } from "./AnimatedAvatar.tsx";
 
 type AvatarStatusPaneProps = {
@@ -8,6 +9,10 @@ type AvatarStatusPaneProps = {
   animationsEnabled: boolean;
   collapsed: boolean;
   profile: AvatarProfile;
+};
+
+type GatewayStatusIndicatorProps = GatewayStatusIndicatorState & {
+  collapsed: boolean;
 };
 
 const AVATAR_STATUS_DETAILS: Record<AvatarState, string> = {
@@ -49,5 +54,16 @@ export function AvatarStatusPane(props: AvatarStatusPaneProps) {
         </div>
       )}
     </section>
+  );
+}
+
+export function GatewayStatusIndicator(props: GatewayStatusIndicatorProps) {
+  const indicatorClassName = `gateway-status-indicator${props.collapsed ? " is-collapsed" : ""}`;
+
+  return (
+    <div className={indicatorClassName} role="status" aria-label={props.statusLabel} title={props.statusLabel}>
+      <span className={`status-dot ${props.statusDotClass}`} aria-hidden="true" />
+      {!props.collapsed && <span className="gateway-status-indicator-label">{props.statusLabel}</span>}
+    </div>
   );
 }

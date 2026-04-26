@@ -32,6 +32,8 @@ export type ConnectionFeedback = {
   sessionBanner: SessionRecoveryBanner | null;
 };
 
+export type GatewayStatusIndicatorState = Pick<ConnectionFeedback, "statusLabel" | "statusDotClass">;
+
 type ConnectionFeedbackParams = {
   connectionStatus: ConnectionStatus;
   hasActiveSession: boolean;
@@ -40,31 +42,35 @@ type ConnectionFeedbackParams = {
   interruptedRunBanner?: InterruptedRunSessionBanner | null;
 };
 
-export function deriveConnectionFeedback(params: ConnectionFeedbackParams): ConnectionFeedback {
-  const pairingMessage =
-    params.disabledReason || `Pairing required. Approve this device with ${PAIRING_APPROVAL_COMMAND}.`;
-
+export function deriveGatewayStatusIndicator(connectionStatus: ConnectionStatus): GatewayStatusIndicatorState {
   const statusLabel =
-    params.connectionStatus === "connected"
+    connectionStatus === "connected"
       ? "Gateway connected"
-      : params.connectionStatus === "connecting"
+      : connectionStatus === "connecting"
         ? "Connecting to gateway…"
-        : params.connectionStatus === "pairing-required"
+        : connectionStatus === "pairing-required"
           ? "Gateway pairing required"
-          : params.connectionStatus === "error"
+          : connectionStatus === "error"
             ? "Gateway connection error"
             : "Gateway disconnected";
 
   const statusDotClass =
-    params.connectionStatus === "connected"
+    connectionStatus === "connected"
       ? "connected"
-      : params.connectionStatus === "connecting"
+      : connectionStatus === "connecting"
         ? "connecting"
-        : params.connectionStatus === "pairing-required"
+        : connectionStatus === "pairing-required" || connectionStatus === "error"
           ? "warning"
-          : params.connectionStatus === "error"
-            ? "warning"
-            : "disconnected";
+          : "disconnected";
+
+  return { statusLabel, statusDotClass };
+}
+
+export function deriveConnectionFeedback(params: ConnectionFeedbackParams): ConnectionFeedback {
+  const pairingMessage =
+    params.disabledReason || `Pairing required. Approve this device with ${PAIRING_APPROVAL_COMMAND}.`;
+
+  const { statusLabel, statusDotClass } = deriveGatewayStatusIndicator(params.connectionStatus);
 
   const composerNotice =
     params.connectionStatus === "connecting"

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChatView from "./components/ChatView.tsx";
-import { AvatarStatusPane } from "./components/AvatarStatusPane.tsx";
+import { AvatarStatusPane, GatewayStatusIndicator } from "./components/AvatarStatusPane.tsx";
 import FileManager, { FileManagerProvider } from "./components/FileManager.tsx";
 import MediaBrowser from "./components/media-browser/MediaBrowser.tsx";
 import SessionSidebar from "./components/SessionSidebar.tsx";
@@ -61,7 +61,7 @@ import {
 } from "./lib/final-assistant-message.ts";
 import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
-import { PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
+import { deriveGatewayStatusIndicator, PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
 import {
   formatApprovalDecisionLabel,
   pickApprovalResolveMethod,
@@ -5684,6 +5684,10 @@ export default function App() {
     () => getAvatarProfile(uiSettings.avatarProfileId),
     [uiSettings.avatarProfileId],
   );
+  const gatewayStatusIndicator = useMemo(
+    () => deriveGatewayStatusIndicator(connectionState.status),
+    [connectionState.status],
+  );
 
   const pendingApprovalCountsBySession = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
@@ -5787,6 +5791,11 @@ export default function App() {
                 animationsEnabled={uiSettings.enableAnimations}
                 collapsed={sidebarCollapsed}
                 profile={selectedAvatarProfile}
+              />
+              <GatewayStatusIndicator
+                statusLabel={gatewayStatusIndicator.statusLabel}
+                statusDotClass={gatewayStatusIndicator.statusDotClass}
+                collapsed={sidebarCollapsed}
               />
             </div>
           </div>
