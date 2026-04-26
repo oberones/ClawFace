@@ -108,6 +108,7 @@ const TYPOGRAPHY_LAYOUT_DEFAULTS: Partial<UiSettings> = {
   lineHeight: DEFAULT_UI_SETTINGS.lineHeight,
   contentWidth: DEFAULT_UI_SETTINGS.contentWidth,
   sidebarWidth: DEFAULT_UI_SETTINGS.sidebarWidth,
+  memoryPanelWidth: DEFAULT_UI_SETTINGS.memoryPanelWidth,
   sidebarFontSize: DEFAULT_UI_SETTINGS.sidebarFontSize,
   sessionIndicatorWidth: DEFAULT_UI_SETTINGS.sessionIndicatorWidth,
   messageGap: DEFAULT_UI_SETTINGS.messageGap,

@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChatView from "./components/ChatView.tsx";
-import { AvatarStatusPane } from "./components/AvatarStatusPane.tsx";
+import { AvatarStatusPane, GatewayStatusIndicator } from "./components/AvatarStatusPane.tsx";
 import FileManager, { FileManagerProvider } from "./components/FileManager.tsx";
 import MediaBrowser from "./components/media-browser/MediaBrowser.tsx";
+import { PanelResizeHandle } from "./components/PanelResizeHandle.tsx";
 import SessionSidebar from "./components/SessionSidebar.tsx";
 import SettingsModal from "./components/SettingsModal.tsx";
 import NewSessionModal from "./components/NewSessionModal.tsx";
+import RenameSessionModal from "./components/RenameSessionModal.tsx";
 import DreamDiaryTimelinePane from "./components/dreams/DreamDiaryTimelinePane.tsx";
 import { GatewayClient } from "./lib/gateway.ts";
 import {
@@ -61,7 +63,14 @@ import {
 } from "./lib/final-assistant-message.ts";
 import { collectToolFinalMessages } from "./lib/tool-final-messages.ts";
 import { createReplyDoneSoundPlayer } from "./lib/reply-done-sound.ts";
-import { PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
+import { deriveGatewayStatusIndicator, PAIRING_APPROVAL_COMMAND } from "./lib/connection-feedback.ts";
+import {
+  clampPanelWidth,
+  MEMORY_PANEL_WIDTH_MAX,
+  MEMORY_PANEL_WIDTH_MIN,
+  SESSION_PANEL_WIDTH_MAX,
+  SESSION_PANEL_WIDTH_MIN,
+} from "./lib/panel-layout.ts";
 import {
   formatApprovalDecisionLabel,
   pickApprovalResolveMethod,
@@ -96,6 +105,16 @@ import {
   normalizeSessionsListResult,
   normalizeSessionsPreviewResult,
 } from "./lib/shell-gateway-responses.ts";
+import {
+  applySessionLabelOverridesToRowRecord,
+  applySessionLabelOverridesToRows,
+  moveSessionLabelOverride,
+  normalizeSessionLabel,
+  normalizeSessionLabelOverrides,
+  removeSessionLabelOverride,
+  upsertSessionLabelOverride,
+  type SessionLabelOverrides,
+} from "./lib/session-label-overrides.ts";
 import { normalizeShellGatewayHistory } from "./lib/shell-gateway-history.ts";
 import {
   normalizeChatSendResult,
@@ -148,6 +167,7 @@ const STORAGE_KEYS = {
   agentSessionShortcutSchemes: "clawui.agent.session.shortcuts",
   appActionShortcuts: "clawui.app.action.shortcuts",
   lastSession: "clawui.session.last",
+  sessionLabelOverrides: "clawui.session.labelOverrides",
   newSessionPreferredModel: "clawui.newSession.preferredModel",
 };
 
@@ -535,8 +555,14 @@ function parseUiSettings(value: unknown): UiSettings {
     sidebarWidth: parseNumberSetting(
       parsed.sidebarWidth,
       DEFAULT_UI_SETTINGS.sidebarWidth,
-      220,
-      420,
+      SESSION_PANEL_WIDTH_MIN,
+      SESSION_PANEL_WIDTH_MAX,
+    ),
+    memoryPanelWidth: parseNumberSetting(
+      parsed.memoryPanelWidth,
+      DEFAULT_UI_SETTINGS.memoryPanelWidth,
+      MEMORY_PANEL_WIDTH_MIN,
+      MEMORY_PANEL_WIDTH_MAX,
     ),
     modelBadgeScale: parseNumberSetting(
       parsed.modelBadgeScale,
@@ -664,6 +690,26 @@ function loadUiSettings(): UiSettings {
 function saveUiSettings(settings: UiSettings) {
   try {
     localStorage.setItem(STORAGE_KEYS.uiSettings, JSON.stringify(settings));
+  } catch {
+    // ignore
+  }
+}
+
+function loadSessionLabelOverrides(): SessionLabelOverrides {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.sessionLabelOverrides);
+    if (!raw) {
+      return {};
+    }
+    return normalizeSessionLabelOverrides(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
+
+function saveSessionLabelOverrides(overrides: SessionLabelOverrides) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.sessionLabelOverrides, JSON.stringify(overrides));
   } catch {
     // ignore
   }
@@ -2208,7 +2254,12 @@ export default function App() {
   activeViewRef.current = activeView;
   const [showSettings, setShowSettings] = useState(false);
   const [showNewSession, setShowNewSession] = useState(false);
+  const [renamingSession, setRenamingSession] = useState<{ key: string; initialLabel: string } | null>(null);
   const [uiSettings, setUiSettings] = useState<UiSettings>(() => loadUiSettings());
+  const [sessionLabelOverrides, setSessionLabelOverrides] = useState<SessionLabelOverrides>(
+    () => loadSessionLabelOverrides(),
+  );
+  const [resizingPanel, setResizingPanel] = useState<"session" | "memory" | null>(null);
   const [pathPrefixMappingsText, setPathPrefixMappingsText] = useState<string>(
     () => loadPathPrefixMappingsText(),
   );
@@ -2271,6 +2322,7 @@ export default function App() {
   const lastFinalizedAssistantRef = useRef<{ text: string; at: number } | null>(null);
   const gatewayMethodsRef = useRef<Set<string>>(new Set());
   const sessionsRef = useRef<GatewaySessionRow[]>(sessions);
+  const sessionLabelOverridesRef = useRef<SessionLabelOverrides>(sessionLabelOverrides);
   const assistantReplyByRunRef = useRef<Record<string, Record<string, unknown>>>({});
   const committedAssistantAttachmentByRunRef = useRef<Record<string, string>>({});
   const scheduledHistoryHydrationByRunRef = useRef<Record<string, true>>({});
@@ -2325,6 +2377,13 @@ export default function App() {
   useEffect(() => {
     sessionsRef.current = sessions;
   }, [sessions]);
+
+  useEffect(() => {
+    sessionLabelOverridesRef.current = sessionLabelOverrides;
+    saveSessionLabelOverrides(sessionLabelOverrides);
+    setSessions((prev) => applySessionLabelOverridesToRows(prev, sessionLabelOverrides));
+    setAllSessionRows((prev) => applySessionLabelOverridesToRowRecord(prev, sessionLabelOverrides));
+  }, [sessionLabelOverrides, setSessions]);
 
   useEffect(() => {
     sessionPreviewsRef.current = sessionPreviews;
@@ -3639,6 +3698,7 @@ export default function App() {
       `${uiSettings.sidebarFontSize}px`,
     );
     document.documentElement.style.setProperty("--claw-sidebar-width", `${uiSettings.sidebarWidth}px`);
+    document.documentElement.style.setProperty("--claw-memory-panel-width", `${uiSettings.memoryPanelWidth}px`);
     document.documentElement.style.setProperty(
       "--claw-chat-bubble-radius",
       `${uiSettings.chatBubbleRadius}px`,
@@ -4264,7 +4324,10 @@ export default function App() {
         includeDerivedTitles: true,
         includeLastMessage: true,
       }));
-      return mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
+      return applySessionLabelOverridesToRows(
+        mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions),
+        sessionLabelOverridesRef.current,
+      );
     } catch {
       return [];
     }
@@ -4279,7 +4342,10 @@ export default function App() {
         includeDerivedTitles: true,
         includeLastMessage: true,
       }));
-      allSessions = mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
+      allSessions = applySessionLabelOverridesToRows(
+        mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions),
+        sessionLabelOverridesRef.current,
+      );
     } catch {
       return;
     }
@@ -4356,7 +4422,10 @@ export default function App() {
       }));
       setSessionDefaults(res.defaults);
       const primarySessionKey = resolvePrimarySessionKey(agents, lastConfigStateRef.current);
-      const mergedSessions = mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions);
+      const mergedSessions = applySessionLabelOverridesToRows(
+        mergeSessionRowsWithLocalState(sessionsRef.current, res.sessions),
+        sessionLabelOverridesRef.current,
+      );
       const ordered = [...mergedSessions].sort((a, b) => {
         const aIsPrimary = a.key.toLowerCase() === primarySessionKey;
         const bIsPrimary = b.key.toLowerCase() === primarySessionKey;
@@ -4752,6 +4821,9 @@ export default function App() {
     if (previousSelectedKey && previousSelectedKey !== key) {
       saveCurrentToCache(previousSelectedKey);
     }
+    if (label) {
+      setSessionLabelOverrides((prev) => upsertSessionLabelOverride(prev, key, label));
+    }
     pendingSessionCreatesRef.current.add(key);
     setSessions((prev) => {
       const nextSession: GatewaySessionRow = {
@@ -4824,6 +4896,7 @@ export default function App() {
       return key;
     } catch (err) {
       pendingSessionCreatesRef.current.delete(key);
+      setSessionLabelOverrides((prev) => removeSessionLabelOverride(prev, key));
       setSessions((prev) => prev.filter((session) => session.key !== key));
       selectedSessionRef.current = previousSelectedKey;
       setSelectedSessionKey((prev) => (prev === key ? previousSelectedKey : prev));
@@ -5395,6 +5468,7 @@ export default function App() {
           }));
           const resolvedKey = resetRes.key ?? selectedSessionKey;
           if (resolvedKey !== selectedSessionKey) {
+            setSessionLabelOverrides((prev) => moveSessionLabelOverride(prev, selectedSessionKey, resolvedKey));
             setSelectedSessionKey(resolvedKey);
           }
           setSessionModelOverrides((prev) =>
@@ -5421,6 +5495,36 @@ export default function App() {
 
   async function handleCreateSession(label: string, agentId?: string | null, modelId?: string | null) {
     await createSession(label, true, agentId, modelId);
+  }
+
+  function handleRequestRenameSession(key: string, currentLabel: string) {
+    if (!key) {
+      return;
+    }
+    setRenamingSession({
+      key,
+      initialLabel: normalizeSessionLabel(currentLabel) || key,
+    });
+  }
+
+  function handleRenameSession(nextLabelInput: string) {
+    const target = renamingSession;
+    if (!target) {
+      return;
+    }
+    const label = normalizeSessionLabel(nextLabelInput);
+    if (!label) {
+      return;
+    }
+    setSessionLabelOverrides((prev) => upsertSessionLabelOverride(prev, target.key, label));
+    setRenamingSession(null);
+
+    const client = clientRef.current;
+    if (client) {
+      void client.request("sessions.patch", { key: target.key, label }).catch(() => {
+        // ClawFace keeps local names as the source of truth even when gateway sync fails.
+      });
+    }
   }
 
   async function handleLoadMoreSessions() {
@@ -5546,6 +5650,7 @@ export default function App() {
     }
     try {
       await client.request("sessions.delete", { key });
+      setSessionLabelOverrides((prev) => removeSessionLabelOverride(prev, key));
       sessionCacheRef.current.delete(key);
       setSessionActivity((prev) => {
         if (!(key in prev)) {
@@ -5684,6 +5789,28 @@ export default function App() {
     () => getAvatarProfile(uiSettings.avatarProfileId),
     [uiSettings.avatarProfileId],
   );
+  const gatewayStatusIndicator = useMemo(
+    () => deriveGatewayStatusIndicator(connectionState.status),
+    [connectionState.status],
+  );
+  const handleSessionPanelWidthChange = useCallback((nextWidth: number) => {
+    setUiSettings((prev) => {
+      const sidebarWidth = clampPanelWidth(nextWidth, SESSION_PANEL_WIDTH_MIN, SESSION_PANEL_WIDTH_MAX);
+      return sidebarWidth === prev.sidebarWidth ? prev : { ...prev, sidebarWidth };
+    });
+  }, []);
+  const handleMemoryPanelWidthChange = useCallback((nextWidth: number) => {
+    setUiSettings((prev) => {
+      const memoryPanelWidth = clampPanelWidth(nextWidth, MEMORY_PANEL_WIDTH_MIN, MEMORY_PANEL_WIDTH_MAX);
+      return memoryPanelWidth === prev.memoryPanelWidth ? prev : { ...prev, memoryPanelWidth };
+    });
+  }, []);
+  const handleSessionResizeActiveChange = useCallback((active: boolean) => {
+    setResizingPanel((current) => (active ? "session" : current === "session" ? null : current));
+  }, []);
+  const handleMemoryResizeActiveChange = useCallback((active: boolean) => {
+    setResizingPanel((current) => (active ? "memory" : current === "memory" ? null : current));
+  }, []);
 
   const pendingApprovalCountsBySession = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
@@ -5752,10 +5879,14 @@ export default function App() {
 
   return (
     <FileManagerProvider>
-    <div className="app-shell">
+    <div className={`app-shell${resizingPanel ? " is-panel-resizing" : ""}`}>
       {/* Sidebar with unified 3D flip */}
       <div className={`sidebar-flip-container${activeView === "files" ? " is-flipped" : ""}`}
-        style={{ width: sidebarCollapsed ? "84px" : `${uiSettings.sidebarWidth}px`, height: "100%", transition: "width 0.34s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+        style={{
+          width: sidebarCollapsed ? "84px" : `${uiSettings.sidebarWidth}px`,
+          height: "100%",
+          transition: resizingPanel === "session" ? "none" : "width 0.34s cubic-bezier(0.16, 1, 0.3, 1)",
+        }}>
         <div className="sidebar-flip-card" style={{ height: "100%" }}>
           <div className="sidebar-face face-front" style={{ height: "100%" }}>
             <div className={`sidebar-stack${sidebarCollapsed ? " is-collapsed" : ""}`}>
@@ -5773,6 +5904,7 @@ export default function App() {
                 onSetCollapsed={(v) => setSidebarCollapsed(v)}
                 onSelect={handleSelectSession}
                 onCreate={() => setShowNewSession(true)}
+                onRename={handleRequestRenameSession}
                 onDelete={(key, opts) => void handleDeleteSession(key, opts)}
                 hasMore={canLoadMoreSessions}
                 onReachEnd={() => void handleLoadMoreSessions()}
@@ -5787,6 +5919,11 @@ export default function App() {
                 animationsEnabled={uiSettings.enableAnimations}
                 collapsed={sidebarCollapsed}
                 profile={selectedAvatarProfile}
+              />
+              <GatewayStatusIndicator
+                statusLabel={gatewayStatusIndicator.statusLabel}
+                statusDotClass={gatewayStatusIndicator.statusDotClass}
+                collapsed={sidebarCollapsed}
               />
             </div>
           </div>
@@ -5808,6 +5945,20 @@ export default function App() {
           </div>
         </div>
       </div>
+      {sidebarCollapsed ? (
+        <div className="panel-resize-spacer" aria-hidden="true" />
+      ) : (
+        <PanelResizeHandle
+          label="Resize sessions panel"
+          value={uiSettings.sidebarWidth}
+          min={SESSION_PANEL_WIDTH_MIN}
+          max={SESSION_PANEL_WIDTH_MAX}
+          direction="increase-right"
+          onChange={handleSessionPanelWidthChange}
+          onResizeActiveChange={handleSessionResizeActiveChange}
+          className="is-session"
+        />
+      )}
 
       {/* Main content area */}
       <div className="main-shell">
@@ -5866,10 +6017,22 @@ export default function App() {
               onCompact={() => void handleSlashCommand("/compact")}
             />
             {dreamsVisible ? (
-              <DreamDiaryTimelinePane
-                controller={dreamDiaryTimelineController}
-                onClose={() => setShowDreams(false)}
-              />
+              <>
+                <PanelResizeHandle
+                  label="Resize Dreams memory panel"
+                  value={uiSettings.memoryPanelWidth}
+                  min={MEMORY_PANEL_WIDTH_MIN}
+                  max={MEMORY_PANEL_WIDTH_MAX}
+                  direction="increase-left"
+                  onChange={handleMemoryPanelWidthChange}
+                  onResizeActiveChange={handleMemoryResizeActiveChange}
+                  className="is-memory"
+                />
+                <DreamDiaryTimelinePane
+                  controller={dreamDiaryTimelineController}
+                  onClose={() => setShowDreams(false)}
+                />
+              </>
             ) : null}
           </div>
         ) : activeView === "files" ? (
@@ -5963,6 +6126,12 @@ export default function App() {
         models={models}
         preferredModel={newSessionPreferredModel || null}
         onPreferredModelChange={(model) => setNewSessionPreferredModel(model ?? "")}
+      />
+      <RenameSessionModal
+        open={Boolean(renamingSession)}
+        initialLabel={renamingSession?.initialLabel ?? ""}
+        onClose={() => setRenamingSession(null)}
+        onRename={handleRenameSession}
       />
     </div>
     </FileManagerProvider>

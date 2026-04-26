@@ -11,6 +11,31 @@ function loadConnectionFeedbackModule() {
   return loader.loadModule(path.join(repoRoot, "src/lib/connection-feedback.ts"));
 }
 
+test("deriveGatewayStatusIndicator returns compact presentation state for every gateway status", () => {
+  const { deriveGatewayStatusIndicator } = loadConnectionFeedbackModule();
+
+  assert.deepEqual(deriveGatewayStatusIndicator("connected"), {
+    statusLabel: "Gateway connected",
+    statusDotClass: "connected",
+  });
+  assert.deepEqual(deriveGatewayStatusIndicator("connecting"), {
+    statusLabel: "Connecting to gateway…",
+    statusDotClass: "connecting",
+  });
+  assert.deepEqual(deriveGatewayStatusIndicator("pairing-required"), {
+    statusLabel: "Gateway pairing required",
+    statusDotClass: "warning",
+  });
+  assert.deepEqual(deriveGatewayStatusIndicator("error"), {
+    statusLabel: "Gateway connection error",
+    statusDotClass: "warning",
+  });
+  assert.deepEqual(deriveGatewayStatusIndicator("disconnected"), {
+    statusLabel: "Gateway disconnected",
+    statusDotClass: "disconnected",
+  });
+});
+
 test("deriveConnectionFeedback keeps connected status quiet and busy status informative", () => {
   const { deriveConnectionFeedback } = loadConnectionFeedbackModule();
 

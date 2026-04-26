@@ -34,6 +34,7 @@ export default function MediaBrowser(props: MediaBrowserProps) {
     openImageLightbox,
     closeImageLightbox,
     onLightboxImageError,
+    onLightboxImageContextMenu,
     lightboxBlockedByWebLocalFile,
   } = useImageLightboxController();
 
@@ -153,6 +154,7 @@ export default function MediaBrowser(props: MediaBrowserProps) {
                   alt={imageLightbox.name}
                   className="image-lightbox-image"
                   onError={onLightboxImageError}
+                  onContextMenu={onLightboxImageContextMenu}
                 />
               )}
             </div>

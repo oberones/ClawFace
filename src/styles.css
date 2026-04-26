@@ -9,6 +9,7 @@
   --claw-content-width: 860px;
   --claw-sidebar-font-size: 13px;
   --claw-sidebar-width: 308px;
+  --claw-memory-panel-width: 520px;
   --claw-chat-bubble-radius: 18px;
   --claw-message-gap: 16px;
   --claw-panel-opacity: 0.94;
@@ -145,6 +146,16 @@ body::before {
 .status-dot.connected {
   background: #4f9a7e;
   box-shadow: 0 0 0 3px rgba(79, 154, 126, 0.15);
+}
+
+.status-dot.connecting {
+  background: #d6a141;
+  box-shadow: 0 0 0 3px rgba(214, 161, 65, 0.16);
+}
+
+.status-dot.warning {
+  background: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.16);
 }
 
 .status-dot.disconnected {
@@ -466,7 +477,15 @@ body::before {
   letter-spacing: 0.01em;
 }
 
-.session-delete {
+.session-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  margin-bottom: 2px;
+}
+
+.session-card-action {
   appearance: none;
   border: 1px solid color-mix(in srgb, var(--claw-border) 70%, white);
   border-radius: 999px;
@@ -481,7 +500,6 @@ body::before {
   font-size: 15px;
   line-height: 1;
   flex: 0 0 20px;
-  margin-bottom: 2px;
   cursor: pointer;
   opacity: 0;
   transform: scale(0.92);
@@ -493,15 +511,21 @@ body::before {
     background-color calc(180ms * var(--claw-animation-duration-scale)) ease;
 }
 
-.session-card:hover .session-delete,
-.session-card.is-active .session-delete {
+.session-card:hover .session-card-action,
+.session-card.is-active .session-card-action {
   opacity: 1;
   transform: scale(1);
 }
 
-.session-delete:focus-visible {
+.session-card-action:focus-visible {
   opacity: 1;
   transform: scale(1);
+}
+
+.session-card-action:hover {
+  color: color-mix(in srgb, var(--claw-accent) 84%, var(--claw-text));
+  border-color: color-mix(in srgb, var(--claw-accent) 32%, var(--claw-border));
+  background: color-mix(in srgb, var(--claw-accent-soft) 70%, white);
 }
 
 .session-delete:hover {
@@ -698,8 +722,40 @@ body::before {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px 10px;
   position: relative;
+}
+
+.chat-header-action-group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.chat-header-action-group + .chat-header-action-group {
+  margin-left: 2px;
+  padding-left: 12px;
+  border-left: 1px solid color-mix(in srgb, var(--claw-border) 82%, transparent);
+}
+
+.chat-header-action-group.is-runtime {
+  flex: 1 1 auto;
+}
+
+.chat-header-action-group.is-surfaces,
+.chat-header-action-group.is-shell {
+  flex: 0 1 auto;
+}
+
+.chat-header-surface-action {
+  border-color: color-mix(in srgb, var(--claw-accent) 20%, var(--claw-border));
+  background: color-mix(in srgb, var(--claw-accent-soft) 42%, var(--claw-surface));
+}
+
+.chat-header-stop-action {
+  color: #b45309;
 }
 
 .animated-avatar {
@@ -908,6 +964,40 @@ body::before {
   --avatar-row-7: -322px;
   --avatar-row-8: -368px;
   --avatar-row-9: -414px;
+}
+
+.gateway-status-indicator {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  overflow: visible;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--claw-border) 78%, var(--claw-surface));
+  background: color-mix(in srgb, var(--claw-surface) 84%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--claw-surface) 62%, transparent);
+  color: var(--claw-text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.gateway-status-indicator-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.gateway-status-indicator.is-collapsed {
+  width: 40px;
+  min-height: 36px;
+  align-self: center;
+  padding: 0;
 }
 
 .session-runtime-controls {
@@ -3350,7 +3440,7 @@ body::before {
 }
 
 .sidebar-list {
-  padding: 0 8px 10px;
+  padding: 6px 8px 10px;
 }
 
 .sidebar-title {
@@ -3419,7 +3509,7 @@ body::before {
   color: var(--claw-neutral-400);
 }
 
-.session-delete {
+.session-card-action {
   border: 1px solid var(--claw-neutral-200);
   border-radius: 999px;
   width: 22px;
@@ -3433,11 +3523,17 @@ body::before {
   transform: none;
 }
 
-.session-card:hover .session-delete,
-.session-card.is-active .session-delete,
-.session-delete:focus-visible {
+.session-card:hover .session-card-action,
+.session-card.is-active .session-card-action,
+.session-card-action:focus-visible {
   opacity: 1;
   transform: none;
+}
+
+.session-rename:hover {
+  color: var(--claw-neutral-900);
+  border-color: var(--claw-neutral-300);
+  background: var(--claw-neutral-100);
 }
 
 .session-delete:hover {
@@ -4218,6 +4314,16 @@ body::before {
     justify-content: flex-start;
   }
 
+  .chat-header-action-group {
+    flex: 1 1 100%;
+  }
+
+  .chat-header-action-group + .chat-header-action-group {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
+
   .chat-header-actions .ui-btn {
     min-height: 30px;
     padding: 6px 10px;
@@ -4477,6 +4583,9 @@ body::before {
   --frost-warm-active:   #fef3c7;
   --frost-warm-border:   #fde68a;
   --frost-warm-glow:     rgba(253, 230, 138, 0.45);
+  --frost-session-card-bg: color-mix(in srgb, var(--frost-surface) 76%, var(--claw-neutral-50));
+  --frost-session-card-border: color-mix(in srgb, var(--frost-border-strong) 68%, transparent);
+  --frost-session-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 
   /* Glassmorphism — used on sidebar/header/composer (large panels) */
   --frost-glass-bg:      rgba(255, 255, 255, 0.62);
@@ -4497,6 +4606,12 @@ body::before {
   --t-normal: calc(240ms * var(--claw-animation-duration-scale));
   --t-slow:   calc(340ms * var(--claw-animation-duration-scale));
   --t-spring: calc(380ms * var(--claw-animation-duration-scale));
+}
+
+:root[data-appearance-mode="dark"] {
+  --frost-session-card-bg: transparent;
+  --frost-session-card-border: transparent;
+  --frost-session-card-shadow: none;
 }
 
 /* ---------- GPU compositing ------------------------------------------- */
@@ -4630,11 +4745,11 @@ body::before {
   --glow-y: 50%;
   --lift: 0px;
 
-  border: 1px solid transparent;
-  background: transparent;
+  border: 1px solid var(--frost-session-card-border);
+  background: var(--frost-session-card-bg);
   border-radius: var(--claw-radius-sm);
   overflow: hidden;
-  box-shadow: none;
+  box-shadow: var(--frost-session-card-shadow);
   position: relative;
   transform-style: preserve-3d;
   /* The card itself transforms — border, bg, everything moves together */
@@ -5075,7 +5190,7 @@ body::before {
   transition-duration: var(--t-press);
 }
 
-.session-delete {
+.session-card-action {
   transition:
     color            var(--t-fast) var(--ease-out-quart),
     border-color     var(--t-fast) var(--ease-out-quart),
@@ -5084,7 +5199,7 @@ body::before {
     opacity          var(--t-fast) var(--ease-out-quart);
 }
 
-.session-delete:active:not(:disabled) {
+.session-card-action:active:not(:disabled) {
   transform: scale(0.9);
   transition-duration: var(--t-press);
 }
@@ -5584,14 +5699,14 @@ body::before {
   transition: background-color 80ms ease;
 }
 
-:root[data-animations-off] .session-delete {
+:root[data-animations-off] .session-card-action {
   transition:
     color            80ms ease,
     border-color     80ms ease,
     background-color 80ms ease;
 }
 
-:root[data-animations-off] .session-delete:active:not(:disabled) {
+:root[data-animations-off] .session-card-action:active:not(:disabled) {
   transform: none;
 }
 
@@ -5745,6 +5860,80 @@ body::before {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Sidebar flip container ─────────────────────────────────────── */
+
+.app-shell {
+  gap: 0;
+}
+
+.app-shell.is-panel-resizing,
+.app-shell.is-panel-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.panel-resize-handle,
+.panel-resize-spacer {
+  flex: 0 0 12px;
+  align-self: stretch;
+}
+
+.panel-resize-handle {
+  appearance: none;
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 12px;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--claw-accent) 62%, var(--claw-text-muted));
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.panel-resize-handle::before {
+  content: "";
+  width: 2px;
+  height: min(86px, calc(100% - 32px));
+  min-height: 38px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--claw-border-strong) 72%, transparent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--claw-accent) 0%, transparent);
+  transition:
+    width 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.panel-resize-handle:hover::before,
+.panel-resize-handle:focus-visible::before,
+.app-shell.is-panel-resizing .panel-resize-handle::before {
+  width: 3px;
+  background: color-mix(in srgb, var(--claw-accent) 72%, var(--claw-border-strong));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--claw-accent-soft) 76%, transparent);
+}
+
+.panel-resize-handle.is-memory {
+  flex-basis: 10px;
+  min-width: 10px;
+}
+
+.panel-resize-spacer {
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    gap: 8px;
+  }
+
+  .panel-resize-handle.is-session,
+  .panel-resize-spacer {
+    display: none;
+  }
+}
 
 .sidebar-flip-container {
   perspective: 2000px;
@@ -6430,13 +6619,19 @@ body::before {
 }
 
 .chat-workstation-shell .chat-shell {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
+.chat-workstation-shell:not(.is-dreams-open) .chat-shell {
+  min-width: 480px;
+}
+
 .dream-diary-shell {
-  width: min(520px, 42vw);
+  width: var(--claw-memory-panel-width);
+  flex: 0 1 var(--claw-memory-panel-width);
   min-width: 360px;
-  max-width: 580px;
+  max-width: 680px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -6686,7 +6881,8 @@ body::before {
 
 @media (max-width: 1120px) {
   .dream-diary-shell {
-    width: min(460px, 45vw);
+    width: min(var(--claw-memory-panel-width), 45vw);
+    flex-basis: min(var(--claw-memory-panel-width), 45vw);
   }
 }
 
@@ -6697,6 +6893,7 @@ body::before {
 
   .dream-diary-shell {
     width: 100%;
+    flex-basis: auto;
     min-width: 0;
     max-width: none;
     max-height: 52%;
@@ -6707,6 +6904,14 @@ body::before {
   .dream-diary-reader-layout {
     grid-template-columns: 1fr;
     overflow-y: auto;
+  }
+
+  .chat-workstation-shell .chat-shell {
+    min-width: 0;
+  }
+
+  .panel-resize-handle.is-memory {
+    display: none;
   }
 
   .dream-diary-timeline-list,
