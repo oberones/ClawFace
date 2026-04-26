@@ -33,7 +33,6 @@ export type SessionSidebarProps = {
   onDelete: (key: string, opts?: { skipConfirm?: boolean }) => void;
   onReachEnd?: () => void;
   onSearchGateway: (query: string) => Promise<GatewaySessionRow[]>;
-  onOpenDreams: () => void;
   onOpenFiles: () => void;
   onOpenMedia: () => void;
 };
@@ -399,14 +398,6 @@ export default function SessionSidebar(props: SessionSidebarProps) {
               >
                 🖼️ Media
               </button>
-              <button
-                type="button"
-                onClick={props.onOpenDreams}
-                className="ui-btn ui-btn-light"
-                title="Dream Diary"
-              >
-                Dreams
-              </button>
             </div>
           </>
         ) : (
@@ -434,14 +425,6 @@ export default function SessionSidebar(props: SessionSidebarProps) {
               title="Media browser"
             >
               🖼️
-            </button>
-            <button
-              type="button"
-              onClick={props.onOpenDreams}
-              className="ui-btn ui-btn-light"
-              title="Dream Diary"
-            >
-              DR
             </button>
             {!props.autoHover && (
               <button
