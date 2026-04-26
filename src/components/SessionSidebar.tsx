@@ -30,6 +30,7 @@ export type SessionSidebarProps = {
   onSetCollapsed: (collapsed: boolean) => void;
   onSelect: (key: string) => void;
   onCreate: () => void;
+  onRename: (key: string, currentTitle: string) => void;
   onDelete: (key: string, opts?: { skipConfirm?: boolean }) => void;
   onReachEnd?: () => void;
   onSearchGateway: (query: string) => Promise<GatewaySessionRow[]>;
@@ -502,8 +503,8 @@ export default function SessionSidebar(props: SessionSidebarProps) {
               onMouseMove={props.enableAnimations ? (e) => tiltMove(session.key, e) : undefined}
               onMouseLeave={props.enableAnimations ? (e) => tiltLeave(session.key, e) : undefined}
               onClick={(e) => {
-                // Don't trigger if clicking the delete button
-                if ((e.target as HTMLElement).closest(".session-delete")) return;
+                // Don't trigger if clicking an inline session action.
+                if ((e.target as HTMLElement).closest(".session-card-action")) return;
                 const cardEl = e.currentTarget;
                 const clickX = e.clientX;
                 props.onSelect(session.key);
@@ -554,16 +555,27 @@ export default function SessionSidebar(props: SessionSidebarProps) {
                 </div>
 
                 {!props.collapsed && (
-                  <button
-                    type="button"
-                    onClick={(event) => props.onDelete(session.key, { skipConfirm: event.metaKey })}
-                    className={`session-delete${isDeleting ? " is-deleting-spin" : ""}`}
-                    disabled={isDeleting}
-                    title={isDeleting ? "Deleting session..." : "Delete session"}
-                    aria-label={`Delete session ${title}`}
-                  >
-                    {isDeleting ? "" : "\u00D7"}
-                  </button>
+                  <div className="session-card-actions">
+                    <button
+                      type="button"
+                      onClick={() => props.onRename(session.key, title)}
+                      className="session-card-action session-rename"
+                      title="Rename session"
+                      aria-label={`Rename session ${title}`}
+                    >
+                      &#9998;
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => props.onDelete(session.key, { skipConfirm: event.metaKey })}
+                      className={`session-card-action session-delete${isDeleting ? " is-deleting-spin" : ""}`}
+                      disabled={isDeleting}
+                      title={isDeleting ? "Deleting session..." : "Delete session"}
+                      aria-label={`Delete session ${title}`}
+                    >
+                      {isDeleting ? "" : "\u00D7"}
+                    </button>
+                  </div>
                 )}
               </div>
             </article>
