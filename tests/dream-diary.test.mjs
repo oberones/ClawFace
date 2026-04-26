@@ -137,6 +137,36 @@ test("parseDreamDiarySnapshot ignores internal dream artifacts in managed diary 
   ]);
 });
 
+test("parseDreamDiarySnapshot preserves legacy diary entries that begin with role labels", () => {
+  const { parseDreamDiarySnapshot } = loadModule();
+
+  const document = parseDreamDiarySnapshot({
+    found: true,
+    path: "DREAMS.md",
+    content: [
+      "## April 26, 2026 at 3:00 AM UTC",
+      "",
+      "User: The dream kept the transcript framing because this old diary was hand-authored.",
+      "",
+      "## April 26, 2026 at 4:00 AM UTC",
+      "",
+      "Assistant: A second legacy entry still belongs in the diary reader.",
+    ].join("\n"),
+    updatedAtMs: 1234,
+    error: null,
+  });
+
+  assert.equal(document.entries.length, 2);
+  assert.equal(document.entries[0]?.dateLabel, "April 26, 2026 at 3:00 AM UTC");
+  assert.deepEqual(document.entries[0]?.paragraphs, [
+    "User: The dream kept the transcript framing because this old diary was hand-authored.",
+  ]);
+  assert.equal(document.entries[1]?.dateLabel, "April 26, 2026 at 4:00 AM UTC");
+  assert.deepEqual(document.entries[1]?.paragraphs, [
+    "Assistant: A second legacy entry still belongs in the diary reader.",
+  ]);
+});
+
 test("parseDreamDiarySnapshot returns no fallback entry when managed diary contains only artifacts", () => {
   const { parseDreamDiarySnapshot } = loadModule();
 
