@@ -170,6 +170,48 @@ test("normalizeSessionsListResult hides OpenClaw dream narrative sessions from t
   assert.equal(normalized.count, 2);
 });
 
+test("normalizeSessionsListResult hides OpenClaw memory dreaming cron sessions from the workstation session list", () => {
+  const { normalizeSessionsListResult } = loadShellGatewayResponsesModule();
+
+  const normalized = normalizeSessionsListResult({
+    sessions: [
+      {
+        key: "agent:main:main",
+        kind: "direct",
+        updated_at: 1800,
+        label: "Main",
+      },
+      {
+        key: "agent:main:cron-memory-dreaming-promotion-1777334198000",
+        kind: "direct",
+        updated_at: 1900,
+        label: "Cron: Memory Dreaming Promotion",
+      },
+      {
+        key: "agent:main:road-trip",
+        kind: "direct",
+        updated_at: 1700,
+        label: "Road Trip",
+        derived_title: "Dreaming up a northern route",
+        last_message_preview: "Keep the cron notes separate from memory dreaming experiments.",
+      },
+      {
+        key: "agent:main:ui:cron-memory-dreaming-notes-1234abcd",
+        kind: "direct",
+        updated_at: 1600,
+        label: "Cron: Memory Dreaming Notes",
+      },
+    ],
+  });
+
+  assert.deepEqual(normalized.sessions.map((session) => session.key), [
+    "agent:main:main",
+    "agent:main:road-trip",
+    "agent:main:ui:cron-memory-dreaming-notes-1234abcd",
+  ]);
+  assert.equal(normalized.count, 3);
+});
+
 test("mergeSessionRowsWithLocalState preserves an existing explicit label when a refreshed row omits it", () => {
   const { mergeSessionRowsWithLocalState } = loadShellGatewayResponsesModule();
 
