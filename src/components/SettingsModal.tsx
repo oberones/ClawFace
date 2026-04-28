@@ -38,6 +38,7 @@ import {
   validateReplyDoneAudioFile,
 } from "./settings-sections/reply-done-audio-utils.ts";
 import type { DevicePairingSettingsModel } from "../hooks/useDevicePairingController.ts";
+import type { GatewayConnectionTestState } from "../lib/gateway-connection-test.ts";
 
 type SettingsModalProps = {
   open: boolean;
@@ -48,6 +49,8 @@ type SettingsModalProps = {
   onGatewayUrlChange: (value: string) => void;
   onTokenChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
+  gatewayConnectionTest: GatewayConnectionTestState;
+  onTestGatewayConnection: () => void;
   fsServerUrl: string;
   onFsServerUrlChange: (value: string) => void;
   pathPrefixMappingsText: string;
@@ -304,10 +307,12 @@ export default function SettingsModal(props: SettingsModalProps) {
               gatewayUrl={props.gatewayUrl}
               token={props.token}
               password={props.password}
+              connectionTest={props.gatewayConnectionTest}
               fsServerUrl={props.fsServerUrl}
               onGatewayUrlChange={props.onGatewayUrlChange}
               onTokenChange={props.onTokenChange}
               onPasswordChange={props.onPasswordChange}
+              onTestConnection={props.onTestGatewayConnection}
               onFsServerUrlChange={props.onFsServerUrlChange}
             />
 
