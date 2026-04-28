@@ -8,6 +8,12 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.18.0 (2026-04-27)
+
+### Feat
+
+- add gateway connection test
+
 ## v0.17.0 (2026-04-26)
 
 ### Feat
