@@ -29,8 +29,9 @@ ws://127.0.0.1:18789
 4. Open **Settings -> Gateway**.
 5. Set **WebSocket URL** to the local gateway URL if it is not already selected.
 6. Enter any required gateway token or password.
-7. Leave **File Server URL** empty unless your OpenClaw setup specifically exposes files through a separate server.
-8. Leave **Path Prefix Mappings** empty unless your OpenClaw process reports paths that differ from your host filesystem.
+7. Click **Test** next to the WebSocket URL to confirm ClawFace can reach the gateway.
+8. Leave **File Server URL** empty unless your OpenClaw setup specifically exposes files through a separate server.
+9. Leave **Path Prefix Mappings** empty unless your OpenClaw process reports paths that differ from your host filesystem.
 
 ## Media and workspace access
 
@@ -70,8 +71,9 @@ ws://127.0.0.1:18789
 5. Open **Settings -> Gateway**.
 6. Set **WebSocket URL** to the exposed gateway URL.
 7. Enter any required gateway token or password.
-8. Open **Settings -> Path Prefix Mappings**.
-9. Add the Docker path mappings below, or click **Use Docker Example** if the default paths match your container.
+8. Click **Test** next to the WebSocket URL to confirm ClawFace can reach the gateway.
+9. Open **Settings -> Path Prefix Mappings**.
+10. Add the Docker path mappings below, or click **Use Docker Example** if the default paths match your container.
 
 ## Required path mappings
 
@@ -135,7 +137,8 @@ ws://192.168.1.100:18789
 ```
 
 6. Enter any required gateway token or password.
-7. Set **File Server URL** only if your remote setup exposes workspace/media files through a separate HTTP file server.
+7. Click **Test** next to the WebSocket URL to confirm ClawFace can reach the gateway.
+8. Set **File Server URL** only if your remote setup exposes workspace/media files through a separate HTTP file server.
 
 ## Media and workspace access
 
