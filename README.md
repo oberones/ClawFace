@@ -71,6 +71,9 @@ For setup by deployment type, see [ClawFace Quick Start](./docs/QUICK-START.md):
 - OpenClaw running in Docker on your host system
 - OpenClaw running remotely on another machine or server
 
+For the longer user manual, see the [wiki source](./docs/wiki/Home.md), which is
+maintained in this repo before being published to the GitHub Wiki.
+
 ## Install
 
 ### Download a Release
