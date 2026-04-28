@@ -1,0 +1,16 @@
+# ClawFace Wiki
+
+- [Home](Home)
+- [Getting Started](Getting-Started)
+- [OpenClaw Setup Modes](OpenClaw-Setup-Modes)
+- [Gateway Settings](Gateway-Settings)
+- [File Server URL](File-Server-URL)
+- [Media and Path Mapping](Media-and-Path-Mapping)
+- [Sessions and Chat](Sessions-and-Chat)
+- [Files View](Files-View)
+- [Media View](Media-View)
+- [Dreams](Dreams)
+- [Interface Customization](Interface-Customization)
+- [Troubleshooting](Troubleshooting)
+- [FAQ](FAQ)
+- [Contributing](Contributing)
