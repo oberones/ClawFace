@@ -75,6 +75,28 @@ function isDreamNarrativeSessionKey(key: string): boolean {
   return /(?:^|:)dreaming-narrative-(?:light|rem|deep)-/i.test(key);
 }
 
+function isUserCreatedSessionKey(key: string): boolean {
+  return /(?:^|:)ui:/i.test(key);
+}
+
+function isMemoryDreamingCronSession(row: GatewaySessionRow): boolean {
+  if (isUserCreatedSessionKey(row.key)) {
+    return false;
+  }
+  if (/(?:^|[:/_-])cron[-_\s:]+memory[-_\s]+dreaming(?:[-_\s:]|$)/i.test(row.key)) {
+    return true;
+  }
+  const titles = [row.label, row.displayName, row.derivedTitle].filter(
+    (value): value is string => typeof value === "string" && value.trim().length > 0,
+  );
+
+  return titles.some((value) => /^\s*cron\s*:\s*memory\s+dreaming\b/i.test(value));
+}
+
+function isHiddenOpenClawMemorySession(row: GatewaySessionRow): boolean {
+  return isDreamNarrativeSessionKey(row.key) || isMemoryDreamingCronSession(row);
+}
+
 function normalizeGatewaySessionRow(raw: unknown): GatewaySessionRow | null {
   if (!isRecord(raw)) {
     return null;
@@ -232,7 +254,7 @@ export function normalizeSessionsListResult(payload: unknown): SessionsListResul
     ? root.sessions
       .map(normalizeGatewaySessionRow)
       .filter((row): row is GatewaySessionRow => row !== null)
-      .filter((row) => !isDreamNarrativeSessionKey(row.key))
+      .filter((row) => !isHiddenOpenClawMemorySession(row))
     : [];
   return {
     ts: pickNumberLike(root, ["ts"]) ?? 0,
