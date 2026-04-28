@@ -8,6 +8,12 @@ The format is loosely based on Keep a Changelog.
 
 ---
 
+## v0.18.1 (2026-04-28)
+
+### Fix
+
+- hide memory dreaming cron sessions
+
 ## v0.18.0 (2026-04-27)
 
 ### Feat
