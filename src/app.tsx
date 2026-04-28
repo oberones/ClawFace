@@ -11,6 +11,10 @@ import RenameSessionModal from "./components/RenameSessionModal.tsx";
 import DreamDiaryTimelinePane from "./components/dreams/DreamDiaryTimelinePane.tsx";
 import { GatewayClient } from "./lib/gateway.ts";
 import {
+  runGatewayConnectionTest,
+  type GatewayConnectionTestState,
+} from "./lib/gateway-connection-test.ts";
+import {
   type AgentsListResult,
   type ApprovalDecision,
   type Attachment,
@@ -2172,6 +2176,9 @@ export default function App() {
     reason: null,
     note: null,
   });
+  const [gatewayConnectionTest, setGatewayConnectionTest] = useState<GatewayConnectionTestState>({
+    status: "idle",
+  });
   const [sessionState, setSessionState] = useState<SessionState>({
     selectedSessionKey: loadStored(STORAGE_KEYS.lastSession, ""),
     sessions: [],
@@ -2305,6 +2312,7 @@ export default function App() {
 
   const clientRef = useRef<GatewayClient | null>(null);
   const connectionStatusRef = useRef(connectionState.status);
+  const gatewayConnectionTestSeqRef = useRef(0);
   const hasConnectedOnceRef = useRef(false);
   const connectionRecoveryNoticeTimerRef = useRef<number | null>(null);
   const connectionRecoveryNoticeSeqRef = useRef(0);
@@ -2355,6 +2363,22 @@ export default function App() {
   useEffect(() => {
     connectionStatusRef.current = connectionState.status;
   }, [connectionState.status]);
+
+  useEffect(() => {
+    gatewayConnectionTestSeqRef.current += 1;
+    setGatewayConnectionTest({ status: "idle" });
+  }, [gatewayUrl, password, token]);
+
+  const handleTestGatewayConnection = useCallback(() => {
+    const testSeq = ++gatewayConnectionTestSeqRef.current;
+    setGatewayConnectionTest({ status: "testing" });
+    void runGatewayConnectionTest({ gatewayUrl, token, password })
+      .then((result) => {
+        if (gatewayConnectionTestSeqRef.current === testSeq) {
+          setGatewayConnectionTest(result);
+        }
+      });
+  }, [gatewayUrl, password, token]);
 
   useEffect(() => {
     interruptedRunsBySessionRef.current = interruptedRunsBySession;
@@ -6075,6 +6099,8 @@ export default function App() {
         onGatewayUrlChange={setGatewayUrl}
         onTokenChange={setToken}
         onPasswordChange={setPassword}
+        gatewayConnectionTest={gatewayConnectionTest}
+        onTestGatewayConnection={handleTestGatewayConnection}
         fsServerUrl={fsServerUrl}
         onFsServerUrlChange={setFsServerUrl}
         pathPrefixMappingsText={pathPrefixMappingsText}

@@ -121,6 +121,7 @@ export type GatewayClientOptions = {
   platform?: string;
   mode?: string;
   instanceId?: string;
+  persistDeviceAuth?: boolean;
   onHello?: (hello: GatewayHelloOk) => void;
   onEvent?: (evt: GatewayEventFrame) => void;
   onClose?: (info: GatewayCloseInfo) => void;
@@ -392,7 +393,7 @@ export class GatewayClient {
   }
 
   private handleConnectHello(hello: GatewayHelloOk, plan: ConnectPlan) {
-    if (hello?.auth?.deviceToken && plan.deviceIdentity) {
+    if (this.opts.persistDeviceAuth !== false && hello?.auth?.deviceToken && plan.deviceIdentity) {
       storeDeviceAuthToken({
         deviceId: plan.deviceIdentity.deviceId,
         role: hello.auth.role ?? plan.role,
@@ -414,7 +415,11 @@ export class GatewayClient {
     } else {
       this.pendingConnectError = undefined;
     }
-    if (plan.selectedAuth.canFallbackToShared && plan.deviceIdentity) {
+    if (
+      this.opts.persistDeviceAuth !== false &&
+      plan.selectedAuth.canFallbackToShared &&
+      plan.deviceIdentity
+    ) {
       clearDeviceAuthToken({ deviceId: plan.deviceIdentity.deviceId, role: plan.role });
     }
     this.ws?.close(CONNECT_FAILED_CLOSE_CODE, "connect failed");
